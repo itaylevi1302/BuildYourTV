@@ -37,6 +37,12 @@ public class ConfigProvider extends ContentProvider {
 
     @Override public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
         checkCaller();
+        // Read-only: the settings as changed on the TV, so the computer can keep its config.json in step
+        // (`content read --uri content://io.cleanyourtv.ui.config/settings.xml`).
+        if ("settings.xml".equals(uri.getLastPathSegment()) && !mode.contains("w")) {
+            File prefs = new File(getContext().getApplicationInfo().dataDir, "shared_prefs/settings.xml");
+            return ParcelFileDescriptor.open(prefs, ParcelFileDescriptor.MODE_READ_ONLY);
+        }
         File f = file(uri);
         int flags = mode.contains("w")
                 ? ParcelFileDescriptor.MODE_WRITE_ONLY | ParcelFileDescriptor.MODE_CREATE | ParcelFileDescriptor.MODE_TRUNCATE
