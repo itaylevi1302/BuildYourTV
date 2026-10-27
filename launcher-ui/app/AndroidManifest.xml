@@ -6,6 +6,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Continue watching: the Watch Next rows other apps publish to the TV provider (WatchNext). -->
+    <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
     <!-- Granted from ADB (pm grant): lets the screensaver picker switch between this screensaver and Google's. -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
 
@@ -48,6 +50,7 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <application
+        android:supportsRtl="true"
         android:name=".App"
         android:label="CleanYourTV UI"
         android:icon="@drawable/icon"

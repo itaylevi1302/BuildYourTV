@@ -46,6 +46,8 @@ final class Recs {
         String title, backdrop, meta = "", app, pkg;
         boolean detailed;
         boolean localized;      // the title reads in the TV's language (not saved: it only orders a fresh list)
+        String intentUri;       // Continue watching: opens the episode in its app instead of the title page
+        float progress = -1;    // Continue watching: how far along (0 to 1); -1 for a recommendation
     }
 
     interface Listener { void onRecs(); }
@@ -192,12 +194,22 @@ final class Recs {
     List<Pick> all(String kind) {
         List<Pick> list = new ArrayList<>();
         if (!hasKey(context)) return list;    // no TMDB key: no recommendations
+        // Continue watching comes first, then the recommendations without the titles already there.
+        List<Pick> first = new ArrayList<>();
+        java.util.Set<Integer> started = new java.util.HashSet<>();
+        for (Pick p : watching) {
+            if (kind == null || kind.equals(p.kind)) {
+                first.add(p);
+                if (p.id != 0) started.add(p.id);
+            }
+        }
         Map<String, Boolean> have = new HashMap<>();   // one look per app, not per title (this runs every 15 s)
         for (Pick p : picks) {
             if ((kind == null || kind.equals(p.kind))
                     && (!p.detailed || (p.pkg != null && have.computeIfAbsent(p.pkg, this::installed)))) list.add(p);   // app missing: skip
         }
-        if (list.isEmpty()) return list;
+        list.removeIf(p -> started.contains(p.id));
+        if (list.isEmpty()) return first;
         long hour = System.currentTimeMillis() / 3600_000L;
         // Three new ones per hour first, never two from the same franchise ("Law & Order" and "Law & Order: Special…").
         List<Pick> out = new ArrayList<>();
@@ -206,7 +218,72 @@ final class Recs {
             Pick p = list.get((int) ((hour * 3 + i) % list.size()));
             if (seen.add(franchise(p.title))) out.add(p);
         }
+        out.addAll(0, first);
         return out;
+    }
+
+    private volatile List<Pick> watching = new ArrayList<>();
+    private long watchingAt;
+
+    /**
+     * Continue watching: the TV provider's Watch Next rows (WatchNext), each matched to TMDB for its photo, at most every
+     * 5 minutes. A title TMDB doesn't find keeps its card, without a photo.
+     */
+    private void refreshWatching() {
+        long now = System.currentTimeMillis();
+        if (now >= watchingAt && now - watchingAt < 5 * 60_000L) return;
+        watchingAt = now;
+        io.execute(() -> {
+            List<Pick> out = new ArrayList<>();
+            for (WatchNext.Item it : WatchNext.items(context)) {
+                if (out.size() >= 6) break;
+                if (!installed(it.pkg)) continue;
+                Pick p = new Pick();
+                p.title = it.title;
+                p.pkg = it.pkg;
+                p.intentUri = it.intent;
+                p.progress = it.progress;
+                p.kind = it.season > 0 || it.episode > 0 ? "tv" : "movie";
+                p.detailed = true;
+                p.localized = true;
+                try {
+                    JSONArray found = get("/search/multi?language=" + lang() + "&query=" + URLEncoder.encode(it.title, "UTF-8"))
+                            .optJSONArray("results");
+                    for (int i = 0; found != null && i < found.length(); i++) {
+                        JSONObject o = found.getJSONObject(i);
+                        String type = o.optString("media_type"), bd = o.optString("backdrop_path", "");
+                        if ((type.equals("tv") || type.equals("movie")) && !bd.isEmpty() && !"null".equals(bd)) {
+                            p.id = o.optInt("id");
+                            p.kind = type;
+                            p.backdrop = bd;
+                            break;
+                        }
+                    }
+                    if (p.backdrop != null) download(p);
+                } catch (Exception e) {
+                    AppLog.w("continue watching, " + it.title + ": " + e.getMessage());
+                }
+                List<String> parts = new ArrayList<>();
+                parts.add(Ui.tr("Continuar assistindo", "Continue watching"));
+                if (it.season > 0 && it.episode > 0) {
+                    parts.add(Ui.tr("Temporada ", "Season ") + it.season + " · " + Ui.tr("Episódio ", "Episode ") + it.episode);
+                }
+                String label = appLabel(it.pkg);
+                if (!label.isEmpty()) parts.add(label);
+                p.meta = String.join(" · ", parts);
+                out.add(p);
+            }
+            watching = out;
+            notifyListeners();
+        });
+    }
+
+    private String appLabel(String pkg) {
+        try {
+            return context.getPackageManager().getApplicationLabel(context.getPackageManager().getApplicationInfo(pkg, 0)).toString();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     /** "Law & Order: Special Victims Unit" → "law & order" (what comes before ":" or " - "). */
@@ -251,7 +328,9 @@ final class Recs {
 
     /** With a key: fetches the list if stale or the time of day (morning/afternoon/night) changed; then the details. */
     void refreshIfStale() {
-        if (!hasKey(context) || fetching) return;
+        if (!hasKey(context)) return;
+        refreshWatching();
+        if (fetching) return;
         long now = System.currentTimeMillis();
         long stamp = sourceStamp();   // a new key, country or installed streaming-app set refetches
         boolean newKey = stamp != keyStamp;
