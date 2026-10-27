@@ -1539,12 +1539,34 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         if (Prefs.quotes() && HomeData.active().length > 0) drawQuotesCard(c, quotesCard);
     }
 
-    /** Opens a Watch Next row's intent_uri (an intent: URI, or a plain deep link) in its app. */
-    private void openIntentUri(String uri) {
+    /**
+     * Opens a Watch Next row's intent_uri (an intent: URI, or a plain deep link) in the app that published the row.
+     * Any app can publish rows, so the intent is pinned to that app: no other target, no selector, no clip data, no
+     * URI-permission grants, and never this launcher's own components or provider.
+     */
+    private void openIntentUri(String uri, String pkg) {
         try {
             android.content.Intent i = uri.startsWith("intent:")
                     ? android.content.Intent.parseUri(uri, android.content.Intent.URI_INTENT_SCHEME)
                     : new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(uri));
+            String own = getContext().getPackageName();
+            android.content.ComponentName target = i.getComponent();
+            if (pkg == null || pkg.isEmpty() || pkg.equals(own) || (target != null && !pkg.equals(target.getPackageName()))) {
+                AppLog.w("continue watching: refused an intent outside " + pkg);
+                return;
+            }
+            android.net.Uri data = i.getData();
+            if (data != null && data.getAuthority() != null && data.getAuthority().startsWith(own)) {
+                AppLog.w("continue watching: refused a link into this app");
+                return;
+            }
+            i.setPackage(pkg);
+            i.setSelector(null);
+            i.setClipData(null);
+            i.setFlags(i.getFlags() & ~(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    | android.content.Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                    | android.content.Intent.FLAG_GRANT_PREFIX_URI_PERMISSION));
             getContext().startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
         } catch (Exception e) {
             AppLog.w("continue watching: " + e.getMessage());
@@ -2221,7 +2243,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             if (p == null) return;
             click.open();
             if (p.intentUri != null) {
-                openIntentUri(p.intentUri);     // Continue watching: straight back to the episode
+                openIntentUri(p.intentUri, p.pkg);     // Continue watching: straight back to the episode
             } else {
                 DetailActivity.open(getContext(), p.kind, p.id);
             }
@@ -2246,7 +2268,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             if (p == null) return;
             click.open();
             if (p.intentUri != null) {
-                openIntentUri(p.intentUri);     // Continue watching: straight back to the episode
+                openIntentUri(p.intentUri, p.pkg);     // Continue watching: straight back to the episode
             } else {
                 DetailActivity.open(getContext(), p.kind, p.id);
             }
