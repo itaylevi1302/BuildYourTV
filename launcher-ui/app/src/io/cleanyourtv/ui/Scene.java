@@ -5,7 +5,9 @@ import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
+import android.graphics.Matrix;
 import android.graphics.Paint;
+import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.RuntimeShader;
 import android.graphics.Shader;
@@ -37,6 +39,12 @@ final class Scene {
     private Bitmap frostImage, glassA, glassB;
     private BitmapShader glassShaderA;
     private final boolean withGlass;
+    // Without AGSL (Android 12 and older) the screensaver draws a simpler aurora: soft light bands, each a radial
+    // gradient stretched flat, drifting slowly over the sky gradient. Drawn into the same quarter-size layer.
+    private final Paint[] bands = {new Paint(Paint.FILTER_BITMAP_FLAG), new Paint(Paint.FILTER_BITMAP_FLAG), new Paint(Paint.FILTER_BITMAP_FLAG)};
+    private final Matrix bandMatrix = new Matrix();
+    private final Paint dimPaint = new Paint();
+    private static final int AURORA_GREEN = 0x2FD3A0;
 
     Scene() {
         this(true);
@@ -89,6 +97,16 @@ final class Scene {
     void applyPalette() {
         push();
         fallback.setShader(new LinearGradient(0, 0, 0, h, palette.color(1), palette.color(0), Shader.TileMode.CLAMP));
+        if (aurora == null && !withGlass) {
+            int[] tones = {palette.color(2), AURORA_GREEN, palette.color(1)};
+            float[] strength = {0.9f, 0.75f, 0.8f};
+            for (int i = 0; i < bands.length; i++) {
+                int c = tones[i] & 0xFFFFFF;
+                bands[i].setShader(new RadialGradient(0, 0, 1, new int[] {Ui.alpha(0xFF000000 | c, strength[i]),
+                        Ui.alpha(0xFF000000 | c, strength[i] * 0.4f), c}, new float[] {0, 0.5f, 1}, Shader.TileMode.CLAMP));
+            }
+            auroraDirty = true;
+        }
     }
 
     private void push() {
@@ -103,7 +121,10 @@ final class Scene {
     /** Moves the aurora to `seconds`: redraws the layer on the next draw, recomputes the glass's frosted aurora now. */
     void advance(float seconds) {
         time = seconds;
-        if (aurora == null) return;
+        if (aurora == null) {
+            auroraDirty = true;   // the screensaver's simpler aurora moves too
+            return;
+        }
         aurora.setFloatUniform("t", seconds);
         if (withGlass && (!imageFrost || !imageGlass)) {
             BitmapShader s = frost.render(seconds, speed, dim, palette.c, (float) w / h);
@@ -223,13 +244,55 @@ final class Scene {
     void drawBackground(Canvas c) {
         if (aurora == null) {
             if (fallback.getShader() == null) applyPalette();
-            c.drawRect(0, 0, w, h, fallback);
+            if (withGlass) {
+                c.drawRect(0, 0, w, h, fallback);
+                return;
+            }
+            drawBands(c);
             return;
         }
         if (auroraDirty) {
             Canvas rc = auroraNode.beginRecording(lw, lh);
             try {
                 rc.drawPaint(auroraPaint);
+            } finally {
+                auroraNode.endRecording();
+            }
+            auroraDirty = false;
+        }
+        c.save();
+        c.scale((float) w / lw, (float) h / lh);
+        auroraNode.draw(c);
+        c.restore();
+    }
+
+    /** The screensaver's aurora without AGSL: the sky gradient, three drifting light bands, then the dim. */
+    private void drawBands(Canvas c) {
+        if (auroraDirty) {
+            Canvas rc = auroraNode.beginRecording(lw, lh);
+            try {
+                rc.save();
+                rc.scale((float) lw / w, (float) lh / h);
+                rc.drawRect(0, 0, w, h, fallback);
+                rc.restore();
+                float t = time * speed;
+                for (int i = 0; i < bands.length; i++) {
+                    if (bands[i].getShader() == null) continue;
+                    double a = t * (0.035 + 0.012 * i) + i * 2.1;
+                    float cx = lw * (0.5f + 0.32f * (float) Math.sin(a));
+                    float cy = lh * (0.3f + 0.1f * (float) Math.sin(a * 1.7 + i));
+                    float rx = lw * (0.5f + 0.14f * (float) Math.sin(a * 0.8 + 1.3 * i));
+                    float ry = lh * (0.15f + 0.05f * (float) Math.cos(a * 1.3 + i));
+                    bandMatrix.setScale(rx, ry);
+                    bandMatrix.postRotate(-12 + 10 * (float) Math.sin(a * 0.6 + i));
+                    bandMatrix.postTranslate(cx, cy);
+                    bands[i].getShader().setLocalMatrix(bandMatrix);
+                    rc.drawRect(0, 0, lw, lh, bands[i]);
+                }
+                if (dim > 0) {
+                    dimPaint.setColor(Ui.alpha(0xFF000000, dim));
+                    rc.drawRect(0, 0, lw, lh, dimPaint);
+                }
             } finally {
                 auroraNode.endRecording();
             }
