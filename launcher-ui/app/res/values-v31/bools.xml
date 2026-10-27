@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 12 and newer: the screensaver in :home, as on Android 9 and 10. -->
+<!-- Android 12: like Android 11, a TCL Google TV 12 set finishes DreamActivity at once when the DreamService runs in
+     :home, so the screensaver runs in the main process here too (ScreensaverAlone). -->
 <resources>
-    <bool name="dream_in_home">true</bool>
-    <bool name="dream_alone">false</bool>
+    <bool name="dream_in_home">false</bool>
+    <bool name="dream_alone">true</bool>
 </resources>
