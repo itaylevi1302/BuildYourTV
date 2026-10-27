@@ -63,6 +63,7 @@ final class Recs {
     static final String[] PERIOD_LABEL_DE = {"HEUTE MORGEN", "HEUTE NACHMITTAG", "HEUTE ABEND"};
     static final String[] PERIOD_LABEL_FR = {"CE MATIN", "CET APRÈS-MIDI", "CE SOIR"};
     static final String[] PERIOD_LABEL_TR = {"BU SABAH", "BU ÖĞLEDEN SONRA", "BU AKŞAM"};
+    static final String[] PERIOD_LABEL_HE = {"הבוקר", "אחר הצהריים", "הערב"};
     /** Service name on TMDB (part of the name, lowercase) → TV app (HomeApps key, package). */
     private static final String[][] SERVICES = {
         {"netflix", "netflix", "com.netflix.ninja"},
@@ -162,7 +163,7 @@ final class Recs {
     String error() { return error; }
 
     static String periodLabel() {
-        return (Ui.ru ? PERIOD_LABEL_RU : Ui.es ? PERIOD_LABEL_ES : Ui.de ? PERIOD_LABEL_DE : Ui.fr ? PERIOD_LABEL_FR : Ui.tur ? PERIOD_LABEL_TR : Ui.en ? PERIOD_LABEL_EN : PERIOD_LABEL)
+        return (Ui.he ? PERIOD_LABEL_HE : Ui.ru ? PERIOD_LABEL_RU : Ui.es ? PERIOD_LABEL_ES : Ui.de ? PERIOD_LABEL_DE : Ui.fr ? PERIOD_LABEL_FR : Ui.tur ? PERIOD_LABEL_TR : Ui.en ? PERIOD_LABEL_EN : PERIOD_LABEL)
                 [period(System.currentTimeMillis())];
     }
 
@@ -483,6 +484,7 @@ final class Recs {
         if (Ui.de) return "de-DE";   // TMDB's de-AT and de-CH have few translations of their own
         if (Ui.fr) return "fr-FR";
         if (Ui.tur) return "tr-TR";
+        if (Ui.he) return "he-IL";
         return Ui.en ? "en-US" : "pt-BR";
     }
 
@@ -529,13 +531,15 @@ final class Recs {
         }
         if (p.kind.equals("movie")) {
             int minutes = o.optInt("runtime");
-            if (minutes > 0 && Ui.ru) parts.add(minutes >= 60 ? (minutes / 60) + " ч " + (minutes % 60) + " мин" : minutes + " мин");
+            if (minutes > 0 && Ui.he) parts.add(minutes >= 60 ? (minutes / 60) + " שע' " + (minutes % 60) + " דק'" : minutes + " דק'");
+            else if (minutes > 0 && Ui.ru) parts.add(minutes >= 60 ? (minutes / 60) + " ч " + (minutes % 60) + " мин" : minutes + " мин");
             else if (minutes > 0 && Ui.tur) parts.add(minutes >= 60 ? (minutes / 60) + " sa " + (minutes % 60) + " dk" : minutes + " dk");
             else if (minutes > 0 && Ui.en) parts.add(minutes >= 60 ? (minutes / 60) + "h " + (minutes % 60) + "m" : minutes + "m");
             else if (minutes > 0) parts.add(minutes >= 60 ? (minutes / 60) + " h " + (minutes % 60) + " min" : minutes + " min");
         } else {
             int seasons = o.optInt("number_of_seasons");
-            if (seasons > 0 && Ui.ru) parts.add(Russian.count(seasons, "сезон", "сезона", "сезонов"));
+            if (seasons > 0 && Ui.he) parts.add(seasons == 1 ? "עונה אחת" : seasons + " עונות");
+            else if (seasons > 0 && Ui.ru) parts.add(Russian.count(seasons, "сезон", "сезона", "сезонов"));
             else if (seasons > 0 && Ui.en) parts.add(seasons == 1 ? "1 season" : seasons + " seasons");
             else if (seasons > 0 && Ui.de) parts.add(seasons == 1 ? "1 Staffel" : seasons + " Staffeln");
             else if (seasons > 0 && Ui.fr) parts.add(seasons == 1 ? "1 saison" : seasons + " saisons");
@@ -620,6 +624,7 @@ final class Recs {
         if (Ui.ru) return Russian.text(name);
         if (Ui.fr) return French.text(name);
         if (Ui.tur) return Turkish.text(name);
+        if (Ui.he) return Hebrew.text(name);
         for (String[] g : Ui.es ? GENRES_ES : Ui.de ? GENRES_DE : GENRES_PT) if (g[0].equalsIgnoreCase(name)) return g[1];
         return name;
     }

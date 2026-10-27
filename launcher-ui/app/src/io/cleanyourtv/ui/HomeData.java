@@ -348,6 +348,18 @@ final class HomeData {
             if (code >= 95) return "Thunderstorms";
             return "Rain";
         }
+        if (Ui.he) {
+            if (code == 0) return day ? "שמשי" : "בהיר";
+            if (code == 1) return day ? "שמשי ברובו" : "בהיר ברובו";
+            if (code == 2) return "מעונן חלקית";
+            if (code == 3) return "מעונן";
+            if (code == 45 || code == 48) return "ערפל";
+            if (code >= 51 && code <= 57) return "טפטוף";
+            if (code == 65 || code == 67 || code == 82) return "גשם כבד";
+            if (code >= 71 && code <= 77 || code == 85 || code == 86) return "שלג";
+            if (code >= 95) return "סופות רעמים";
+            return "גשם";
+        }
         if (Ui.ru) {
             if (code == 0) return "Ясно";
             if (code == 1) return "Малооблачно";
@@ -453,7 +465,7 @@ final class HomeData {
 
     static String hour(long at) {
         return Ui.once("hour", at, () -> Ui.en ? new SimpleDateFormat("h a", Locale.US).format(new java.util.Date(at))
-                : new SimpleDateFormat(Ui.es || Ui.ru || Ui.tur ? "HH:mm" : Ui.de ? "HH 'Uhr'" : "HH'h'", Ui.locale()).format(new java.util.Date(at)));
+                : new SimpleDateFormat(Ui.es || Ui.ru || Ui.tur || Ui.he ? "HH:mm" : Ui.de ? "HH 'Uhr'" : "HH'h'", Ui.locale()).format(new java.util.Date(at)));
     }
 
     /** How long ago the data was fetched, if it's stale (no internet): "12 min ago". */
@@ -463,6 +475,7 @@ final class HomeData {
         if (age < every * 2) return "";
         long minutes = age / 60_000;
         if (Ui.en) return minutes < 60 ? minutes + " min ago" : (minutes / 60) + " h ago";
+        if (Ui.he) return minutes < 60 ? "לפני " + minutes + " דק'" : "לפני " + (minutes / 60) + " שע'";
         if (Ui.ru) return minutes < 60 ? minutes + " мин назад" : (minutes / 60) + " ч назад";
         if (Ui.es) return minutes < 60 ? "hace " + minutes + " min" : "hace " + (minutes / 60) + " h";
         if (Ui.de) return minutes < 60 ? "vor " + minutes + " Min." : "vor " + (minutes / 60) + " Std.";

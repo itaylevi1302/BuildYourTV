@@ -102,6 +102,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private static final String[] TABS_DE = {"Entdecken", "Filme", "Serien"};
     private static final String[] TABS_FR = {"Explorer", "Films", "Séries"};
     private static final String[] TABS_TR = {"Keşfet", "Filmler", "Diziler"};
+    private static final String[] TABS_HE = {"גילוי", "סרטים", "סדרות"};
     private static final String[] TAB_KIND = {null, "movie", "tv"};
     private static final int Z_TOP = 4, Z_CARDS = 5;
 
@@ -485,7 +486,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     }
 
     private static String[] tabs() {
-        return Ui.ru ? TABS_RU : Ui.es ? TABS_ES : Ui.de ? TABS_DE : Ui.fr ? TABS_FR : Ui.tur ? TABS_TR : Ui.en ? TABS_EN : TABS;
+        return Ui.he ? TABS_HE : Ui.ru ? TABS_RU : Ui.es ? TABS_ES : Ui.de ? TABS_DE : Ui.fr ? TABS_FR : Ui.tur ? TABS_TR : Ui.en ? TABS_EN : TABS;
     }
 
     @Override public void onData() {
@@ -533,7 +534,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         float kk = width / 1920f;
         sky.layout(0, 0, width, height);
         place(heroLayer, 0, 0);
-        place(status, width - status.getMeasuredWidth(), 0);
+        place(status, Ui.he ? 0 : width - status.getMeasuredWidth(), 0);   // Hebrew: the buttons sit on the left (layoutLight)
         place(platter, 0, Math.round(750 * kk));
         place(tiles, 0, Math.round(790 * kk));
         place(drawerLayer, 0, Math.round(470 * kk));
@@ -1154,6 +1155,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             tileRects[i].set(x, y, x + tw, y + th);
             x += tw + gap;
         }
+        // Hebrew: the first app on the right, the rest following leftward (the shelf is centred, so mirror on w).
+        if (Ui.he) for (int i = 0; i < n; i++) tileRects[i].set(w - tileRects[i].right, tileRects[i].top, w - tileRects[i].left, tileRects[i].bottom);
         crispLogos.clear();
     }
 
@@ -1465,6 +1468,12 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         // A card that is off gives its room to the other one.
         weatherCard.set(left, cardsTop, qt ? split - 16 * k : right, cardsTop + CARDS_H * k);
         quotesCard.set(wx ? split + 16 * k : left, cardsTop, right, cardsTop + CARDS_H * k);
+        // Hebrew: inputs on the right and shortcuts to their left; the weather card moves to the right too.
+        if (Ui.he) {
+            float axis = (MARGIN + CONTENT_R) * k;
+            for (int i = 0; i < n; i++) drawerRects[i].set(axis - drawerRects[i].right, drawerRects[i].top, axis - drawerRects[i].left, drawerRects[i].bottom);
+            for (RectF r : new RectF[] {weatherCard, quotesCard}) r.set(axis - r.right, r.top, axis - r.left, r.bottom);
+        }
         drawerDirty = true;
     }
 
@@ -1520,14 +1529,20 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         hourTemp.setColor(drawerInk(0.95f));
         pricePaint.setColor(drawerInk(0.95f));
         float titleBase = ROW_TITLE * k;
-        if (drawerInputs > 0) c.drawText(Ui.tr("Entradas", "Inputs"), drawerRects[0].left + 4 * k, titleBase, rowTitle);
-        if (drawerInputs < drawerItems.size()) c.drawText(Ui.tr("Atalhos", "Shortcuts"), drawerRects[drawerInputs].left + 4 * k, titleBase, rowTitle);
+        if (drawerInputs > 0) drawRowTitle(c, Ui.tr("Entradas", "Inputs"), drawerRects[0], titleBase);
+        if (drawerInputs < drawerItems.size()) drawRowTitle(c, Ui.tr("Atalhos", "Shortcuts"), drawerRects[drawerInputs], titleBase);
         int top = -1;
         for (int i = 0; i < drawerItems.size(); i++) if (drawerFocus[i].value > 0.02f && (top < 0 || drawerFocus[i].value > drawerFocus[top].value)) top = i;
         for (int i = 0; i < drawerItems.size(); i++) if (i != top) drawDrawerTile(c, i);
         if (top >= 0) drawDrawerTile(c, top);
         if (Prefs.weather()) drawWeatherCard(c, weatherCard);
         if (Prefs.quotes() && HomeData.active().length > 0) drawQuotesCard(c, quotesCard);
+    }
+
+    /** A drawer row's title over its first button: at the button's left edge, or its right edge in Hebrew. */
+    private void drawRowTitle(Canvas c, String title, RectF first, float base) {
+        float x = Ui.he ? first.right - 4 * k - rowTitle.measureText(title) : first.left + 4 * k;
+        c.drawText(title, x, base, rowTitle);
     }
 
     /** Square drawer button: symbol and name; an input with no device is dimmed. Focused: white, with dark text. */
@@ -1611,7 +1626,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             textWeather = wx;
             weatherTitle = Prefs.city().isEmpty() ? Ui.tr("Clima", "Weather") : Prefs.city();
             nowTemp = HomeData.degrees(wx.temp);
-            highLow = Ui.ru ? "Макс. " + HomeData.degrees(wx.max) + "   Мин. " + HomeData.degrees(wx.min)
+            highLow = Ui.he ? "מקס' " + HomeData.degrees(wx.max) + "   מינ' " + HomeData.degrees(wx.min)
+                    : Ui.ru ? "Макс. " + HomeData.degrees(wx.max) + "   Мин. " + HomeData.degrees(wx.min)
                     : Ui.en ? "H:" + HomeData.degrees(wx.max) + "   L:" + HomeData.degrees(wx.min)
                     : Ui.de ? "H:" + HomeData.degrees(wx.max) + "   T:" + HomeData.degrees(wx.min)
                     : Ui.fr ? "Max. " + HomeData.degrees(wx.max) + "   Min. " + HomeData.degrees(wx.min)
@@ -2022,7 +2038,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         switch (zone) {
             case Z_SHELF:
                 if (dx != 0) {
-                    int next = Math.max(0, Math.min(shelf.size() - 1, shelfIndex + dx));
+                    int next = Math.max(0, Math.min(shelf.size() - 1, shelfIndex + (Ui.he ? -dx : dx)));   // mirrored in Hebrew
                     if (next == shelfIndex) return;
                     shelfIndex = next;
                 } else if (dy < 0) {
@@ -2071,8 +2087,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 int at = on.indexOf(widgetIndex);
                 if (dy < 0 || at < 0) {
                     zone = Z_DRAWER;
-                } else if (dx != 0 && at + dx >= 0 && at + dx < on.size()) {
-                    widgetIndex = on.get(at + dx);
+                } else if (dx != 0 && at + (Ui.he ? -dx : dx) >= 0 && at + (Ui.he ? -dx : dx) < on.size()) {
+                    widgetIndex = on.get(at + (Ui.he ? -dx : dx));
                 } else {
                     return;
                 }
@@ -2080,7 +2096,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             }
             default:
                 if (dx != 0) {
-                    int next = Math.max(0, Math.min(drawerItems.size() - 1, drawerIndex + dx));
+                    int next = Math.max(0, Math.min(drawerItems.size() - 1, drawerIndex + (Ui.he ? -dx : dx)));   // mirrored in Hebrew
                     if (next == drawerIndex) return;
                     drawerIndex = next;
                 } else if (dy < 0) {
@@ -2280,7 +2296,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         switch (e.getKeyCode()) {
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-                if (down) shiftReorder(e.getKeyCode() == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1);
+                if (down) shiftReorder((e.getKeyCode() == KeyEvent.KEYCODE_DPAD_LEFT) != Ui.he ? -1 : 1);   // mirrored in Hebrew
                 return true;
             case KeyEvent.KEYCODE_DPAD_UP:
             case KeyEvent.KEYCODE_DPAD_DOWN:
@@ -2661,11 +2677,22 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             topRects[3 + i].set(right - b, cy - b / 2, right, cy + b / 2);
             right -= b + L_BUTTON_GAP * k;
         }
+        // Hebrew reads right to left: the title and tabs go to the right, the round buttons to the left. The row is
+        // mirrored around the content's centre, so the tabs still come first and the buttons follow them, leftward.
+        if (Ui.he) {
+            float axis = (MARGIN + CONTENT_R) * k;
+            for (int i = 0; i < 6; i++) topRects[i].set(axis - topRects[i].right, topRects[i].top, axis - topRects[i].left, topRects[i].bottom);
+        }
         float top = L_CARDS_TOP * k, ch = L_CARD_H * k, g = L_CARD_GAP * k, left = MARGIN * k, tall = L_TALL_W * k;
         float wide = (CONTENT_R - MARGIN) * k - 2 * tall - 2 * g;
         cardRects[0].set(left, top, left + wide, top + ch);
         cardRects[1].set(cardRects[0].right + g, top, cardRects[0].right + g + tall, top + ch);
         cardRects[2].set(cardRects[1].right + g, top, cardRects[1].right + g + tall, top + ch);
+        // Hebrew: the large card on the right, the two tall ones following it leftward (same mirror as the top row).
+        if (Ui.he) {
+            float axis = (MARGIN + CONTENT_R) * k;
+            for (RectF r : cardRects) r.set(axis - r.right, r.top, axis - r.left, r.bottom);
+        }
         heroDirty = statusDirty = true;
     }
 
@@ -2785,7 +2812,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             return;
         }
         String hello = Ui.tr("Para você", "For You");
-        c.drawText(hello, MARGIN * k - Ui.leftBearing(lTitle, hello), L_TITLE_BASE * k, lTitle);
+        float helloX = Ui.he ? CONTENT_R * k - lTitle.measureText(hello) : MARGIN * k - Ui.leftBearing(lTitle, hello);
+        c.drawText(hello, helloX, L_TITLE_BASE * k, lTitle);
         // Text tabs (the selected one in bold, in the main text color); with focus on the tabs, the selected one gets
         // the white pill with a shadow and grows a little (the tvOS focus).
         float focus = Ui.clamp(topFocus[tab].value);
@@ -2832,7 +2860,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             weatherLinePrefs = Prefs.version;
             weatherLineLanguage = Ui.language;
             weatherLine = HomeData.degrees(wx.temp) + "  " + HomeData.condition(wx.code, wx.isDay) + "   "
-                    + (Ui.ru ? "Макс. " + HomeData.degrees(wx.max) + "  Мин. " + HomeData.degrees(wx.min)
+                    + (Ui.he ? "מקס' " + HomeData.degrees(wx.max) + "  מינ' " + HomeData.degrees(wx.min)
+                    : Ui.ru ? "Макс. " + HomeData.degrees(wx.max) + "  Мин. " + HomeData.degrees(wx.min)
                     : Ui.en ? "H:" + HomeData.degrees(wx.max) + "  L:" + HomeData.degrees(wx.min)
                     : Ui.de ? "H:" + HomeData.degrees(wx.max) + "  T:" + HomeData.degrees(wx.min)
                     : Ui.fr ? "Max. " + HomeData.degrees(wx.max) + "  Min. " + HomeData.degrees(wx.min)
@@ -2906,10 +2935,12 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
         if (p == null) return;
         fitPaint.set(lCardTitle);
-        c.drawText(TextUtils.ellipsize(p.title, fitPaint, bw, TextUtils.TruncateAt.END).toString(), base.left, base.bottom + 46 * k, lCardTitle);
+        String title = TextUtils.ellipsize(p.title, fitPaint, bw, TextUtils.TruncateAt.END).toString();
+        c.drawText(title, Ui.he ? base.right - lCardTitle.measureText(title) : base.left, base.bottom + 46 * k, lCardTitle);
         if (i == 0 && p.meta != null && !p.meta.isEmpty()) {
             fitPaint.set(lCardMeta);
-            c.drawText(TextUtils.ellipsize(p.meta, fitPaint, bw, TextUtils.TruncateAt.END).toString(), base.left, base.bottom + 80 * k, lCardMeta);
+            String meta = TextUtils.ellipsize(p.meta, fitPaint, bw, TextUtils.TruncateAt.END).toString();
+            c.drawText(meta, Ui.he ? base.right - lCardMeta.measureText(meta) : base.left, base.bottom + 80 * k, lCardMeta);
         }
     }
 
@@ -2939,7 +2970,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             if (f > 0.01f) {
                 String label = lightButtons.get(i).label;
                 float half = lTip.measureText(label) / 2;
-                float x = Math.min(r.centerX(), CONTENT_R * k - half);
+                float x = Ui.he ? Math.max(r.centerX(), MARGIN * k + half) : Math.min(r.centerX(), CONTENT_R * k - half);
                 lTip.setAlpha(Math.round(255 * f));
                 c.drawText(label, x, r.bottom + (40 + 4 * f) * k, lTip);
             }
@@ -2959,6 +2990,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 }
                 break;
             case Z_CARDS:
+                if (Ui.he) dx = -dx;   // mirrored cards (layoutLight): ← goes on to the next card, further left
                 if (dx > 0 && cardIndex == cards.size() - 1 && tabFirst[3] > 1) {
                     turnPage(1);
                     cardIndex = 0;
@@ -2980,7 +3012,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 break;
             case Z_TOP:
                 if (dx != 0) {
-                    int next = Math.max(picksOn() ? 0 : 3, Math.min(5, topIndex + dx));
+                    // Mirrored for Hebrew (layoutLight): ← moves on to the next item, which sits further left.
+                    int next = Math.max(picksOn() ? 0 : 3, Math.min(5, topIndex + (Ui.he ? -dx : dx)));
                     if (next == topIndex) return true;
                     topIndex = next;
                     if (topIndex < 3) selectTab(topIndex);   // like Apple TV tabs: focusing a tab selects it

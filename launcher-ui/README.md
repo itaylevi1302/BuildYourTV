@@ -87,7 +87,7 @@ logged, never guessed. [`config.example.json`](config.example.json) has them all
 |---|---|---|
 | `tmdb_key` | TMDB API key or read access token | Free at themoviedb.org → Settings → API. The picks, Explore and the TMDB sign-in need it. Can also be typed on the TV under TMDB account. |
 | `tmdb_region` | `"auto"` or two letters (`"BR"`, `"US"`) | Which titles are on which streaming app. `auto` is the TV's country. |
-| `language` | `auto`, `pt`, `en`, `es`, `de`, `ru`, `fr`, `tr` | `auto` follows the TV. |
+| `language` | `auto`, `pt`, `en`, `es`, `de`, `ru`, `fr`, `tr`, `he` | `auto` follows the TV. Hebrew (`he`) also mirrors the home screen right to left. |
 | `shelf` | list of packages | The apps on the home screen, in order. |
 | `dock_apps` | list of packages | CleanYourTV's name for `shelf`, read when `shelf` is absent, so a theme's `config.json` works. |
 | `hidden_apps` | list of packages | Apps never shown. |
