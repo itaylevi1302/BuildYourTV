@@ -494,12 +494,13 @@ public class SettingsActivity extends Activity {
         // MARK: - Home Settings and Remote Buttons
 
         private static final String[] LANGUAGES = {"auto", "pt", "en", "es", "de", "ru", "fr", "tr", "he"}, UNITS = {"auto", "C", "F"}, THEMES = {"auto", "light", "dark"};
-        private static final String[] CLOCKS = {"auto", "24h", "12h"}, STYLES = {"photos", "aurora"};
+        private static final String[] CLOCKS = {"auto", "24h", "12h"}, STYLES = {"photos", "aurora", "google"};
         /** Home Settings: language, temperature, theme, clock, weather, city, quotes, then one row per coin. */
         private static final int CLOCK_ROW = 3, WEATHER_ROW = 4, CITY_ROW = 5, QUOTES_ROW = 6, COIN_ROWS = 7;
 
         private static String styleName(String style) {
-            return style.equals("aurora") ? Ui.tr("Relógio e aurora", "Clock and aurora") : Ui.tr("Destaques", "Picks");
+            return style.equals("aurora") ? Ui.tr("Relógio e aurora", "Clock and aurora")
+                    : style.equals("google") ? Ui.tr("Fotos do Google", "Google Photos") : Ui.tr("Destaques", "Picks");
         }
 
         private boolean dollar() {
@@ -927,6 +928,15 @@ public class SettingsActivity extends Activity {
             } else if (screen == HOME_SETTINGS) {
                 adjust(1);
                 invalidate();
+                return;
+            } else if (focus == 0 && Prefs.screensaverStyle().equals("google")) {
+                // Google's screensaver: OK opens its own settings, where the Google Photos album is picked.
+                try {
+                    getContext().startActivity(new android.content.Intent("dreamx.two.panel.SETTINGS")
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+                } catch (RuntimeException ex) {
+                    AppLog.w("Google screensaver settings: " + ex.getMessage());
+                }
                 return;
             } else if (focus == 0) {
                 pause();

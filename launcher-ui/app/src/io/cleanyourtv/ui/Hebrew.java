@@ -355,6 +355,7 @@ final class Hebrew {
             // Screensaver style and clock format
             case "Picks": return "המלצות";
             case "Clock and aurora": return "שעון וזוהר צפוני";
+            case "Google Photos": return "תמונות Google";
             case "Clock format": return "תצוגת שעון";
             case "24-hour": return "24 שעות";
             case "12-hour": return "12 שעות";

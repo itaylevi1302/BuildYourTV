@@ -72,12 +72,28 @@ final class Prefs {
 
     static void setTheme(String v) { put("theme", v); }
 
-    /** The screensaver: "photos" (the picks, as before) or "aurora" (the clock over the sky, without photos). */
+    /**
+     * The screensaver: "photos" (the picks, as before), "aurora" (the clock over the sky, without photos) or "google"
+     * (Google TV's own screensaver, which can show a Google Photos album).
+     */
     static String screensaverStyle() {
-        return "aurora".equals(sp().getString("screensaver", "photos")) ? "aurora" : "photos";
+        String v = sp().getString("screensaver", "photos");
+        return "aurora".equals(v) || "google".equals(v) ? v : "photos";
     }
 
-    static void setScreensaverStyle(String v) { put("screensaver", v); }
+    static final String GOOGLE_SCREENSAVER = "com.google.android.apps.tv.dreamx/.service.Backdrop";
+
+    /** Also points the system's screensaver at Google's or at ours; that needs WRITE_SECURE_SETTINGS (pm grant). */
+    static void setScreensaverStyle(String v) {
+        put("screensaver", v);
+        if (app == null) return;
+        String own = app.getPackageName() + "/." + (app.getResources().getBoolean(R.bool.dream_alone) ? "ScreensaverAlone" : "Screensaver");
+        try {
+            android.provider.Settings.Secure.putString(app.getContentResolver(), "screensaver_components",
+                    "google".equals(v) ? GOOGLE_SCREENSAVER : own);
+        } catch (SecurityException e) {
+            AppLog.w("screensaver not switched, no WRITE_SECURE_SETTINGS: " + e.getMessage());
+        }
     }
 
     /** "auto" (12-hour in English, 24-hour otherwise, as before), "24h" or "12h". */
