@@ -233,7 +233,7 @@ public class ExploreActivity extends Activity {
         page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setClipChildren(false);
-        page.setPadding(0, 0, 0, Math.round(80 * k));
+        page.setPaddingRelative(0, 0, 0, Math.round(80 * k));
         scroll.addView(page);
         root.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.addView(burger(), burgerParams());
@@ -375,7 +375,7 @@ public class ExploreActivity extends Activity {
 
     private FrameLayout.LayoutParams burgerParams() {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.leftMargin = Math.round(52 * k);
+        lp.setMarginStart(Math.round(52 * k));
         lp.topMargin = Math.round(66 * k);
         return lp;
     }
@@ -386,19 +386,19 @@ public class ExploreActivity extends Activity {
         box.setElevation(24 * k);
         menu = new LinearLayout(this);
         menu.setOrientation(LinearLayout.VERTICAL);
-        menu.setPadding(Math.round(40 * k), Math.round(48 * k), Math.round(40 * k), Math.round(60 * k));
+        menu.setPaddingRelative(Math.round(40 * k), Math.round(48 * k), Math.round(40 * k), Math.round(60 * k));
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
         TextView title = TvUi.text(this, k, 40, Ui.displaySemibold, TvUi.INK);
         title.setText(Ui.tr("Explorar", "Explore"));
-        title.setPadding(Math.round(26 * k), 0, 0, 0);
+        title.setPaddingRelative(Math.round(26 * k), 0, 0, 0);
         top.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         top.addView(TvUi.iconButton(this, k, "settings", null, v -> {
             closeMenu(false);
             showPage(SETTINGS);
         }));
-        top.setPadding(0, 0, 0, Math.round(26 * k));
+        top.setPaddingRelative(0, 0, 0, Math.round(26 * k));
         menu.addView(top);
         menuItem(menu, SEARCH, Ui.tr("Buscar", "Search"), null);
         menuItem(menu, HOME, Ui.tr("Início", "Home"), null);
@@ -434,14 +434,14 @@ public class ExploreActivity extends Activity {
         LinearLayout item = new LinearLayout(this);
         item.setOrientation(LinearLayout.HORIZONTAL);
         item.setGravity(Gravity.CENTER_VERTICAL);
-        item.setPadding(Math.round(26 * k), Math.round(16 * k), Math.round(26 * k), Math.round(16 * k));
+        item.setPaddingRelative(Math.round(26 * k), Math.round(16 * k), Math.round(26 * k), Math.round(16 * k));
         if (logo != null) {
             ImageView img = new ImageView(this);
             img.setClipToOutline(true);
             img.setBackground(TvUi.round(TvUi.CARD, 10 * k));
             Images.load(img, logo.isEmpty() ? null : Tmdb.LOGO + logo);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Math.round(46 * k), Math.round(46 * k));
-            lp.rightMargin = Math.round(20 * k);
+            lp.setMarginEnd(Math.round(20 * k));
             item.addView(img, lp);
         }
         TextView t = TvUi.text(this, k, 30, Ui.medium, TvUi.DIM);
@@ -497,7 +497,7 @@ public class ExploreActivity extends Activity {
         ViewGroup box = (ViewGroup) menu.getParent();
         box.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
         box.setVisibility(View.VISIBLE);
-        box.setTranslationX(-560 * k);
+        box.setTranslationX((Ui.he ? 560 : -560) * k);   // Hebrew: the menu slides in from the right
         box.animate().translationX(0).setDuration(220).start();
         shade.setVisibility(View.VISIBLE);
         shade.animate().alpha(1).setDuration(220).start();
@@ -514,7 +514,7 @@ public class ExploreActivity extends Activity {
         menuOpen = false;
         ViewGroup box = (ViewGroup) menu.getParent();
         box.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
-        box.animate().translationX(-560 * k).setDuration(200)
+        box.animate().translationX((Ui.he ? 560 : -560) * k).setDuration(200)
                 .withEndAction(() -> { if (!menuOpen) box.setVisibility(View.GONE); }).start();
         shade.animate().alpha(0).setDuration(200).withEndAction(() -> { if (!menuOpen) shade.setVisibility(View.GONE); }).start();
         scroll.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
@@ -537,11 +537,14 @@ public class ExploreActivity extends Activity {
             return super.dispatchKeyEvent(e);
         }
         if (menuOpen) {
-            if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_DPAD_RIGHT) {
+            // Away from the menu closes it; toward the edge does nothing (mirrored in Hebrew, where the menu is on the right).
+            int away = Ui.he ? KeyEvent.KEYCODE_DPAD_LEFT : KeyEvent.KEYCODE_DPAD_RIGHT;
+            int edge = Ui.he ? KeyEvent.KEYCODE_DPAD_RIGHT : KeyEvent.KEYCODE_DPAD_LEFT;
+            if (code == KeyEvent.KEYCODE_BACK || code == away) {
                 if (!down) closeMenu(true);
                 return true;
             }
-            if (code == KeyEvent.KEYCODE_DPAD_LEFT) return true;
+            if (code == edge) return true;
             if (code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN) {
                 View f = getCurrentFocus();
                 View next = f == null ? null : f.focusSearch(code == KeyEvent.KEYCODE_DPAD_UP ? View.FOCUS_UP : View.FOCUS_DOWN);
@@ -549,10 +552,10 @@ public class ExploreActivity extends Activity {
             }
             return super.dispatchKeyEvent(e);
         }
-        if (code == KeyEvent.KEYCODE_DPAD_LEFT && down && Tmdb.hasKey()) {
+        if (code == (Ui.he ? KeyEvent.KEYCODE_DPAD_RIGHT : KeyEvent.KEYCODE_DPAD_LEFT) && down && Tmdb.hasKey()) {
             View f = getCurrentFocus();
             boolean heroBack = f != null && f == hero && heroAt > 0;   // the banner goes back first, then the menu
-            if (!heroBack && (f == null || f.focusSearch(View.FOCUS_LEFT) == null)) {
+            if (!heroBack && (f == null || f.focusSearch(Ui.he ? View.FOCUS_RIGHT : View.FOCUS_LEFT) == null)) {
                 openMenu();
                 return true;
             }
@@ -701,12 +704,12 @@ public class ExploreActivity extends Activity {
         rows.setOrientation(LinearLayout.VERTICAL);
         rows.setClipChildren(false);
         rows.setClipToPadding(false);
-        rows.setPadding(Math.round(INSET * k), 0, 0, 0);
+        rows.setPaddingRelative(Math.round(INSET * k), 0, 0, 0);
         LinearLayout.LayoutParams rowsLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         if (withHero) rowsLp.topMargin = -Math.round(HERO_BLEED * k);   // the first row sits over the banner's picture
         page.addView(rows, rowsLp);
         status = TvUi.text(this, k, 26, Ui.regular, TvUi.DIM);
-        status.setPadding(0, Math.round(30 * k), 0, 0);
+        status.setPaddingRelative(0, Math.round(30 * k), 0, 0);
         status.setText(Ui.tr("Carregando…", "Loading…"));
         rows.addView(status);
         switch (id) {
@@ -753,13 +756,13 @@ public class ExploreActivity extends Activity {
     private void header(String title, String sub) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(Math.round(INSET * k), Math.round(56 * k), 0, Math.round(10 * k));
+        box.setPaddingRelative(Math.round(INSET * k), Math.round(56 * k), 0, Math.round(10 * k));
         TextView h = TvUi.text(this, k, 60, Ui.displaySemibold, TvUi.INK);
         h.setText(title);
         box.addView(h);
         TextView s = TvUi.text(this, k, 26, Ui.regular, TvUi.DIM);
         s.setText(sub);
-        s.setPadding(0, Math.round(12 * k), 0, 0);
+        s.setPaddingRelative(0, Math.round(12 * k), 0, 0);
         box.addView(s);
         page.addView(box, 0);
     }
@@ -842,7 +845,7 @@ public class ExploreActivity extends Activity {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setClipChildren(false);
-        box.setPadding(0, Math.round(26 * k), 0, Math.round(10 * k));
+        box.setPaddingRelative(0, Math.round(26 * k), 0, Math.round(10 * k));
         TextView h = TvUi.text(this, k, 32, Ui.semibold, TvUi.INK);
         h.setText(s.title);
         box.addView(h);
@@ -853,7 +856,7 @@ public class ExploreActivity extends Activity {
             TextView num = TvUi.text(this, k, 120, Ui.displaySemibold, TvUi.INK);
             num.setText(String.valueOf(i + 1));
             num.setShadowLayer(18 * k, 0, 4 * k, 0xE6000000);
-            num.setPadding(Math.round(12 * k), 0, 0, Math.round(4 * k));
+            num.setPaddingRelative(Math.round(12 * k), 0, 0, Math.round(4 * k));
             card.addView(num, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                     Gravity.BOTTOM | Gravity.START));
             grid.add(cell);
@@ -888,12 +891,12 @@ public class ExploreActivity extends Activity {
         tabBar = new LinearLayout(this);
         tabBar.setOrientation(LinearLayout.HORIZONTAL);
         tabBar.setClipChildren(false);
-        tabBar.setPadding(Math.round(INSET * k), Math.round(20 * k), Math.round(96 * k), Math.round(10 * k));
+        tabBar.setPaddingRelative(Math.round(INSET * k), Math.round(20 * k), Math.round(96 * k), Math.round(10 * k));
         for (int i = 0; i < labels.length; i++) {
             final int which = i;
             TextView t = TvUi.text(this, k, 28, Ui.medium, TvUi.DIM);
             t.setText(labels[i]);
-            t.setPadding(Math.round(32 * k), Math.round(16 * k), Math.round(32 * k), Math.round(16 * k));
+            t.setPaddingRelative(Math.round(32 * k), Math.round(16 * k), Math.round(32 * k), Math.round(16 * k));
             t.setFocusable(true);
             t.setOnFocusChangeListener((v, has) -> {
                 styleTabs();
@@ -905,13 +908,13 @@ public class ExploreActivity extends Activity {
                 }
             });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.rightMargin = Math.round(14 * k);
+            lp.setMarginEnd(Math.round(14 * k));
             tabBar.addView(t, lp);
         }
         TvUi.HScroll bar = new TvUi.HScroll(this, Math.round(260 * k));
         bar.addView(tabBar);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.leftMargin = -Math.round(INSET * k);
+        lp.setMarginStart(-Math.round(INSET * k));
         rows.addView(bar, lp);
         tabBody = new LinearLayout(this);
         tabBody.setOrientation(LinearLayout.VERTICAL);
@@ -994,7 +997,7 @@ public class ExploreActivity extends Activity {
     private TextView note(String text) {
         TextView t = TvUi.text(this, k, 26, Ui.regular, TvUi.DIM);
         t.setText(text);
-        t.setPadding(0, Math.round(24 * k), 0, 0);
+        t.setPaddingRelative(0, Math.round(24 * k), 0, 0);
         return t;
     }
 
@@ -1157,7 +1160,7 @@ public class ExploreActivity extends Activity {
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setClipChildren(false);
-        bar.setPadding(0, Math.round(16 * k), 0, 0);
+        bar.setPaddingRelative(0, Math.round(16 * k), 0, 0);
         View first;
         if (search) {
             EditText field = new EditText(this);
@@ -1168,7 +1171,7 @@ public class ExploreActivity extends Activity {
             field.setTypeface(Ui.medium);
             field.setHint(Ui.tr("Filme, série ou pessoa", "Movie, show or person"));
             field.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
-            field.setPadding(Math.round(36 * k), Math.round(22 * k), Math.round(36 * k), Math.round(22 * k));
+            field.setPaddingRelative(Math.round(36 * k), Math.round(22 * k), Math.round(36 * k), Math.round(22 * k));
             field.setBackground(TvUi.round(0x1FFFFFFF, 40 * k));
             field.setOnFocusChangeListener((v, has) -> v.setBackground(TvUi.round(has ? 0x47FFFFFF : 0x1FFFFFFF, 40 * k)));
             field.addTextChangedListener(new TextWatcher() {
@@ -1194,13 +1197,13 @@ public class ExploreActivity extends Activity {
         }
         LinearLayout filterButton = TvUi.iconButton(this, k, "tune", Ui.tr("Filtros", "Filters"), v -> openFilter());
         LinearLayout.LayoutParams fl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        fl.leftMargin = search ? Math.round(20 * k) : 0;
+        fl.setMarginStart(search ? Math.round(20 * k) : 0);
         bar.addView(filterButton, fl);
         if (!search) {
             TextView save = TvUi.button(this, k, saved != null ? Ui.tr("Salvar alterações", "Save changes") : Ui.tr("Salvar no menu", "Save to menu"),
                     v -> askSave());
             LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            sl.leftMargin = Math.round(20 * k);
+            sl.setMarginStart(Math.round(20 * k));
             bar.addView(save, sl);
         }
         rows.addView(bar);
@@ -1210,10 +1213,10 @@ public class ExploreActivity extends Activity {
         rows.addView(chips);
         if (search && !recent().isEmpty()) {
             TvUi.Flow recent = new TvUi.Flow(this, Math.round(14 * k), Math.round(14 * k));
-            recent.setPadding(Math.round(6 * k), Math.round(22 * k), Math.round(INSET * k), 0);
+            recent.setPaddingRelative(Math.round(6 * k), Math.round(22 * k), Math.round(INSET * k), 0);
             TextView label = TvUi.text(this, k, 24, Ui.medium, TvUi.FAINT);
             label.setText(Ui.tr("Recentes", "Recent"));
-            label.setPadding(0, Math.round(14 * k), Math.round(6 * k), 0);
+            label.setPaddingRelative(0, Math.round(14 * k), Math.round(6 * k), 0);
             recent.addView(label);
             EditText field = (EditText) first;
             for (String q : recent()) {
@@ -1236,7 +1239,7 @@ public class ExploreActivity extends Activity {
         chips.removeAllViews();
         if (filter.empty()) return;
         TvUi.Flow flow = new TvUi.Flow(this, Math.round(14 * k), Math.round(14 * k));
-        flow.setPadding(Math.round(6 * k), Math.round(22 * k), Math.round(INSET * k), 0);
+        flow.setPaddingRelative(Math.round(6 * k), Math.round(22 * k), Math.round(INSET * k), 0);
         if (!filter.kind.equals("all")) {
             flow.addView(TvUi.toggle(this, k, filter.kind.equals("movie") ? Ui.tr("Filmes", "Movies") : Ui.tr("Séries", "Shows"), true, v -> {
                 filter.kind = "all";
@@ -1409,7 +1412,7 @@ public class ExploreActivity extends Activity {
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setClipChildren(false);
-        panel.setPadding(Math.round(56 * k), Math.round(56 * k), Math.round(56 * k), Math.round(56 * k));
+        panel.setPaddingRelative(Math.round(56 * k), Math.round(56 * k), Math.round(56 * k), Math.round(56 * k));
         TextView h = TvUi.text(this, k, 48, Ui.displaySemibold, TvUi.INK);
         h.setText(Ui.tr("Filtros", "Filters"));
         panel.addView(h);
@@ -1452,7 +1455,7 @@ public class ExploreActivity extends Activity {
         }
         panel.addView(yrs);
         TvUi.Flow buttons = panelFlow();
-        buttons.setPadding(0, Math.round(40 * k), 0, 0);
+        buttons.setPaddingRelative(0, Math.round(40 * k), 0, 0);
         TextView apply = TvUi.button(this, k, Ui.tr("Aplicar", "Apply"), v -> {
             String query = filter.query;
             filter = draft;
@@ -1484,13 +1487,13 @@ public class ExploreActivity extends Activity {
         TextView t = TvUi.text(this, k, 24, Ui.semibold, TvUi.FAINT);
         t.setText(text.toUpperCase(Locale.ROOT));
         t.setLetterSpacing(0.1f);
-        t.setPadding(0, Math.round(34 * k), 0, Math.round(16 * k));
+        t.setPaddingRelative(0, Math.round(34 * k), 0, Math.round(16 * k));
         return t;
     }
 
     private TvUi.Flow panelFlow() {
         TvUi.Flow f = new TvUi.Flow(this, Math.round(14 * k), Math.round(14 * k));
-        f.setPadding(Math.round(4 * k), 0, 0, 0);
+        f.setPaddingRelative(Math.round(4 * k), 0, 0, 0);
         f.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return f;
     }
@@ -1532,20 +1535,20 @@ public class ExploreActivity extends Activity {
     private void buildSettings() {
         status.setVisibility(View.GONE);
         TvUi.Flow buttons = new TvUi.Flow(this, Math.round(18 * k), Math.round(18 * k));
-        buttons.setPadding(Math.round(6 * k), Math.round(30 * k), Math.round(INSET * k), 0);
+        buttons.setPaddingRelative(Math.round(6 * k), Math.round(30 * k), Math.round(INSET * k), 0);
         String account = Tmdb.signedIn(this) ? Ui.tr("Conta TMDB: ", "TMDB account: ") + Tmdb.accountName(this) : Ui.tr("Conectar conta TMDB", "Connect TMDB account");
         buttons.addView(TvUi.button(this, k, account, v -> startActivity(new Intent(this, TmdbLoginActivity.class))));
         buttons.addView(TvUi.button(this, k, Ui.tr("Serviços e apps", "Services and apps"), v -> startActivity(new Intent(this, ServicesActivity.class))));
         rows.addView(buttons, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         TextView h = TvUi.text(this, k, 32, Ui.semibold, TvUi.INK);
         h.setText(Ui.tr("Menu lateral", "Side menu"));
-        h.setPadding(0, Math.round(50 * k), 0, Math.round(8 * k));
+        h.setPaddingRelative(0, Math.round(50 * k), 0, Math.round(8 * k));
         rows.addView(h);
         rows.addView(note(Ui.tr("Buscar, Início e Minha lista ficam sempre no topo. OK num item: mover, ocultar ou remover.",
                 "Search, Home and My list always stay on top. OK on an item: move, hide or remove.")));
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
-        list.setPadding(0, Math.round(20 * k), 0, 0);
+        list.setPaddingRelative(0, Math.round(20 * k), 0, 0);
         rows.addView(list);
         fillOrganizer(list, null);
         buttons.getChildAt(0).requestFocus();
@@ -1561,7 +1564,7 @@ public class ExploreActivity extends Activity {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(Math.round(28 * k), Math.round(18 * k), Math.round(28 * k), Math.round(18 * k));
+            row.setPaddingRelative(Math.round(28 * k), Math.round(18 * k), Math.round(28 * k), Math.round(18 * k));
             TextView num = TvUi.text(this, k, 24, Ui.medium, TvUi.FAINT);
             num.setText(String.valueOf(i + 1));
             num.setMinWidth(Math.round(54 * k));
@@ -1665,34 +1668,34 @@ public class ExploreActivity extends Activity {
         heroTitle = TvUi.text(this, k, 76, Ui.displaySemibold, TvUi.INK);
         heroTitle.setMaxLines(2);
         heroTitle.setEllipsize(TextUtils.TruncateAt.END);
-        heroTitle.setPadding(0, Math.round(14 * k), 0, 0);
+        heroTitle.setPaddingRelative(0, Math.round(14 * k), 0, 0);
         text.addView(heroTitle);
         heroMeta = TvUi.text(this, k, 26, Ui.medium, TvUi.DIM);
-        heroMeta.setPadding(0, Math.round(18 * k), 0, 0);
+        heroMeta.setPaddingRelative(0, Math.round(18 * k), 0, 0);
         text.addView(heroMeta);
         heroOverview = TvUi.text(this, k, 26, Ui.regular, TvUi.DIM);
         heroOverview.setMaxLines(3);
         heroOverview.setEllipsize(TextUtils.TruncateAt.END);
         heroOverview.setLineSpacing(6 * k, 1);
-        heroOverview.setPadding(0, Math.round(14 * k), 0, 0);
+        heroOverview.setPaddingRelative(0, Math.round(14 * k), 0, 0);
         text.addView(heroOverview);
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(0, Math.round(28 * k), 0, 0);
+        bar.setPaddingRelative(0, Math.round(28 * k), 0, 0);
         heroButton = TvUi.text(this, k, 27, Ui.medium, TvUi.INK);
         heroButton.setText(Ui.tr("Ver detalhes", "Details"));
-        heroButton.setPadding(Math.round(34 * k), Math.round(16 * k), Math.round(34 * k), Math.round(16 * k));
+        heroButton.setPaddingRelative(Math.round(34 * k), Math.round(16 * k), Math.round(34 * k), Math.round(16 * k));
         heroButton.setBackground(TvUi.round(0x33FFFFFF, 40 * k));
         bar.addView(heroButton);
         heroDots = new LinearLayout(this);
         heroDots.setOrientation(LinearLayout.HORIZONTAL);
-        heroDots.setPadding(Math.round(30 * k), 0, 0, 0);
+        heroDots.setPaddingRelative(Math.round(30 * k), 0, 0, 0);
         bar.addView(heroDots);
         text.addView(bar);
         FrameLayout.LayoutParams tl = new FrameLayout.LayoutParams(Math.round(900 * k), ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM | Gravity.START);
-        tl.leftMargin = Math.round(INSET * k);
+        tl.setMarginStart(Math.round(INSET * k));
         tl.bottomMargin = Math.round((40 + HERO_BLEED) * k);
         hero.addView(text, tl);
         hero.setFocusable(true);
@@ -1705,7 +1708,10 @@ public class ExploreActivity extends Activity {
             if (!heroList.isEmpty()) open((Tmdb.Title) heroList.get(heroAt)[0]);
         });
         hero.setOnKeyListener((v, code, e) -> {
-            boolean right = code == KeyEvent.KEYCODE_DPAD_RIGHT, back = code == KeyEvent.KEYCODE_DPAD_LEFT && heroAt > 0;
+            // Next banner: → (← in Hebrew, which reads the other way); back one: the opposite key.
+            int nextKey = Ui.he ? KeyEvent.KEYCODE_DPAD_LEFT : KeyEvent.KEYCODE_DPAD_RIGHT;
+            int backKey = Ui.he ? KeyEvent.KEYCODE_DPAD_RIGHT : KeyEvent.KEYCODE_DPAD_LEFT;
+            boolean right = code == nextKey, back = code == backKey && heroAt > 0;
             if ((!right && !back) || heroList.size() < 2) return false;
             if (e.getAction() == KeyEvent.ACTION_DOWN) stepHero(right ? 1 : -1);
             return true;
@@ -1756,7 +1762,7 @@ public class ExploreActivity extends Activity {
         for (int i = 0; i < list.size(); i++) {
             View dot = new View(this);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Math.round(12 * k), Math.round(12 * k));
-            lp.rightMargin = Math.round(10 * k);
+            lp.setMarginEnd(Math.round(10 * k));
             heroDots.addView(dot, lp);
         }
         showHero();

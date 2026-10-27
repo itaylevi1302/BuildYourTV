@@ -47,7 +47,7 @@ public class PersonActivity extends Activity {
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setClipChildren(false);
-        content.setPadding(Math.round(96 * k), Math.round(80 * k), 0, Math.round(80 * k));
+        content.setPaddingRelative(Math.round(96 * k), Math.round(80 * k), 0, Math.round(80 * k));
         content.setClipToPadding(false);
         TextView loading = TvUi.text(this, k, 30, Ui.regular, TvUi.DIM);
         loading.setText(Ui.tr("Carregando…", "Loading…"));
@@ -81,7 +81,7 @@ public class PersonActivity extends Activity {
         top.addView(photo, new LinearLayout.LayoutParams(Math.round(300 * k), Math.round(450 * k)));
         LinearLayout text = new LinearLayout(this);
         text.setOrientation(LinearLayout.VERTICAL);
-        text.setPadding(Math.round(56 * k), 0, Math.round(96 * k), 0);
+        text.setPaddingRelative(Math.round(56 * k), 0, Math.round(96 * k), 0);
         TextView name = TvUi.text(this, k, 68, Ui.displaySemibold, TvUi.INK);
         name.setText(o.optString("name"));
         text.addView(name);
@@ -96,7 +96,7 @@ public class PersonActivity extends Activity {
         if (death.length() >= 4 && !"null".equals(death)) meta.add(Ui.tr("Morte: ", "Died: ") + date(death));
         TextView m = TvUi.text(this, k, 27, Ui.medium, TvUi.DIM);
         m.setText(TextUtils.join("  ·  ", meta));
-        m.setPadding(0, Math.round(16 * k), 0, Math.round(20 * k));
+        m.setPaddingRelative(0, Math.round(16 * k), 0, Math.round(20 * k));
         text.addView(m);
         TextView bio = TvUi.text(this, k, 26, Ui.regular, TvUi.DIM);
         bio.setText(biography.isEmpty() ? Ui.tr("Sem biografia no TMDB.", "No biography on TMDB.") : biography);

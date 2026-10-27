@@ -52,6 +52,8 @@ final class TvUi {
         t.setTypeface(face);
         t.setTextColor(color);
         t.setIncludeFontPadding(false);
+        // Hebrew: a line that starts with a Latin word ("All+ · Movie…") still reads right to left, like the screen.
+        if (Ui.he) t.setTextDirection(View.TEXT_DIRECTION_LOCALE);
         return t;
     }
 
@@ -160,7 +162,7 @@ final class TvUi {
         TextView b = text(c, k, 28, Ui.medium, INK);
         b.setText(label);
         b.setGravity(Gravity.CENTER);
-        b.setPadding(Math.round(34 * k), Math.round(18 * k), Math.round(34 * k), Math.round(18 * k));
+        b.setPaddingRelative(Math.round(34 * k), Math.round(18 * k), Math.round(34 * k), Math.round(18 * k));
         b.setBackground(round(0x33FFFFFF, 40 * k));
         b.setFocusable(true);
         b.setFocusableInTouchMode(true);
@@ -194,12 +196,12 @@ final class TvUi {
         box.setOrientation(LinearLayout.VERTICAL);
         TextView h = text(a, k, 32, Ui.semibold, INK);
         h.setText(title);
-        h.setPadding(0, 0, 0, Math.round(18 * k));
+        h.setPaddingRelative(0, 0, 0, Math.round(18 * k));
         box.addView(h);
         Row line = new Row(a);
         line.setClipChildren(false);
         line.setClipToPadding(false);
-        line.setPadding(inset + Math.round(24 * k), Math.round(30 * k), Math.round(96 * k), Math.round(20 * k));
+        line.setPaddingRelative(inset + Math.round(24 * k), Math.round(30 * k), Math.round(96 * k), Math.round(20 * k));
         for (int i = 0; i < titles.size() && i < ROW_MAX; i++) line.addView(poster(a, k, titles.get(i), open));
         if (titles.size() > ROW_MAX || (more != null && titles.size() >= ROW_MAX)) {
             Runnable all = more != null ? more : () -> GridActivity.show(a, title, titles, open);
@@ -208,10 +210,10 @@ final class TvUi {
         HScroll scroll = new HScroll(a, Math.round(300 * k));
         scroll.addView(line);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.leftMargin = -inset;
+        lp.setMarginStart(-inset);
         box.addView(scroll, lp);
         box.setClipChildren(false);
-        box.setPadding(0, Math.round(26 * k), 0, Math.round(10 * k));
+        box.setPaddingRelative(0, Math.round(26 * k), 0, Math.round(10 * k));
         return box;
     }
 
@@ -230,7 +232,7 @@ final class TvUi {
         TextView fallback = text(a, k, 24, Ui.medium, DIM);
         fallback.setText(t.name);
         fallback.setGravity(Gravity.CENTER);
-        fallback.setPadding(Math.round(14 * k), 0, Math.round(14 * k), 0);
+        fallback.setPaddingRelative(Math.round(14 * k), 0, Math.round(14 * k), 0);
         card.addView(fallback, 0, new FrameLayout.LayoutParams(w, h));
         if (t.kind.equals("movie") || t.kind.equals("tv")) card.addView(seenBadge(a, k), badgeParams(k));
         Images.load(img, t.poster.isEmpty() ? null : (t.kind.equals("person") ? Tmdb.PROFILE : Tmdb.POSTER) + t.poster);
@@ -245,10 +247,10 @@ final class TvUi {
         name.setMarqueeRepeatLimit(-1);
         name.setHorizontalFadingEdgeEnabled(true);
         name.setFadingEdgeLength(Math.round(18 * k));
-        name.setPadding(0, Math.round(26 * k), 0, 0);
+        name.setPaddingRelative(0, Math.round(26 * k), 0, 0);
         cell.addView(name, new LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.rightMargin = Math.round(POSTER_GAP * k);
+        lp.setMarginEnd(Math.round(POSTER_GAP * k));
         cell.setLayoutParams(lp);
         refreshSeen(card);
         return cell;
@@ -267,7 +269,8 @@ final class TvUi {
 
     private static FrameLayout.LayoutParams badgeParams(float k) {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(Math.round(44 * k), Math.round(44 * k), Gravity.TOP | Gravity.END);
-        lp.topMargin = lp.rightMargin = Math.round(10 * k);
+        lp.topMargin = Math.round(10 * k);
+        lp.setMarginEnd(lp.topMargin);
         return lp;
     }
 
@@ -324,7 +327,7 @@ final class TvUi {
         TextView label = text(a, k, 26, Ui.medium, INK);
         label.setText(Ui.tr("Ver mais", "See more"));
         label.setGravity(Gravity.CENTER);
-        label.setPadding(0, Math.round(12 * k), 0, 0);
+        label.setPaddingRelative(0, Math.round(12 * k), 0, 0);
         card.addView(arrow);
         card.addView(label);
         card.setContentDescription(Ui.tr("Ver mais", "See more"));
@@ -419,7 +422,7 @@ final class TvUi {
         b.setOrientation(LinearLayout.HORIZONTAL);
         b.setGravity(Gravity.CENTER);
         boolean round = label == null || label.isEmpty();
-        b.setPadding(Math.round((round ? 18 : 30) * k), Math.round(16 * k), Math.round((round ? 18 : 34) * k), Math.round(16 * k));
+        b.setPaddingRelative(Math.round((round ? 18 : 30) * k), Math.round(16 * k), Math.round((round ? 18 : 34) * k), Math.round(16 * k));
         Icon icon = new Icon(c, symbol, 22 * k);
         int side = Math.round(36 * k);
         b.addView(icon, new LinearLayout.LayoutParams(side, side));
@@ -427,7 +430,7 @@ final class TvUi {
         if (!round) {
             t = text(c, k, 28, Ui.medium, INK);
             t.setText(label);
-            t.setPadding(Math.round(14 * k), 0, 0, 0);
+            t.setPaddingRelative(Math.round(14 * k), 0, 0, 0);
             b.addView(t);
         }
         b.setBackground(round(0x33FFFFFF, 40 * k));
@@ -449,7 +452,7 @@ final class TvUi {
     static TextView toggle(Context c, float k, String label, boolean on, View.OnClickListener click) {
         TextView b = text(c, k, 26, Ui.medium, INK);
         b.setGravity(Gravity.CENTER);
-        b.setPadding(Math.round(28 * k), Math.round(14 * k), Math.round(28 * k), Math.round(14 * k));
+        b.setPaddingRelative(Math.round(28 * k), Math.round(14 * k), Math.round(28 * k), Math.round(14 * k));
         b.setFocusable(true);
         b.setFocusableInTouchMode(true);
         b.setTag(on);
@@ -519,7 +522,7 @@ final class TvUi {
                 line.setOrientation(HORIZONTAL);
                 line.setClipChildren(false);
                 line.setClipToPadding(false);
-                line.setPadding(Math.round(24 * k), Math.round(30 * k), 0, Math.round(16 * k));
+                line.setPaddingRelative(Math.round(24 * k), Math.round(30 * k), 0, Math.round(16 * k));
                 addView(line);
             }
             line.addView(cell);
@@ -640,8 +643,10 @@ final class TvUi {
                     y += lineH + gapY;
                     lineH = 0;
                 }
-                c.layout(getPaddingLeft() + x, getPaddingTop() + y, getPaddingLeft() + x + c.getMeasuredWidth(),
-                        getPaddingTop() + y + c.getMeasuredHeight());
+                // Right to left (Hebrew): the same lines, filled from the right edge.
+                int cl = getLayoutDirection() == LAYOUT_DIRECTION_RTL ? r - l - getPaddingRight() - x - c.getMeasuredWidth()
+                        : getPaddingLeft() + x;
+                c.layout(cl, getPaddingTop() + y, cl + c.getMeasuredWidth(), getPaddingTop() + y + c.getMeasuredHeight());
                 x += c.getMeasuredWidth() + gapX;
                 lineH = Math.max(lineH, c.getMeasuredHeight());
             }
@@ -664,13 +669,13 @@ final class TvUi {
         int ink = light ? 0xFF1C1C1E : INK, pill = light ? 0xFF1C1C1E : INK, onPill = light ? 0xFFFFFFFF : 0xFF14161A;
         LinearLayout box = new LinearLayout(a);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(Math.round(14 * k), Math.round(18 * k), Math.round(14 * k), Math.round(14 * k));
+        box.setPaddingRelative(Math.round(14 * k), Math.round(18 * k), Math.round(14 * k), Math.round(14 * k));
         box.setBackground(round(light ? 0xF7F4F4F6 : 0xF2202329, 26 * k));
         box.setElevation(30 * k);
         TextView h = text(a, k, 22, Ui.semibold, light ? 0x8C1C1C1E : FAINT);
         h.setText(title.toUpperCase(java.util.Locale.ROOT));
         h.setLetterSpacing(0.1f);
-        h.setPadding(Math.round(22 * k), 0, Math.round(22 * k), Math.round(12 * k));
+        h.setPaddingRelative(Math.round(22 * k), 0, Math.round(22 * k), Math.round(12 * k));
         box.addView(h);
         PopupWindow pop = new PopupWindow(box, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true);
         pop.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
@@ -681,7 +686,7 @@ final class TvUi {
             TextView row = text(a, k, 28, Ui.medium, ink);
             row.setText(items[i]);
             row.setMinWidth(Math.round(340 * k));
-            row.setPadding(Math.round(22 * k), Math.round(16 * k), Math.round(22 * k), Math.round(16 * k));
+            row.setPaddingRelative(Math.round(22 * k), Math.round(16 * k), Math.round(22 * k), Math.round(16 * k));
             row.setFocusable(true);
             row.setOnFocusChangeListener((v, has) -> {
                 v.setBackground(has ? round(pill, 16 * k) : null);

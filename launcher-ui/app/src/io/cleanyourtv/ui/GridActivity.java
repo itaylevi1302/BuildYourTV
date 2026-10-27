@@ -65,12 +65,12 @@ public class GridActivity extends Activity {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setClipChildren(false);
-        content.setPadding(Math.round(96 * k), Math.round(64 * k), 0, Math.round(80 * k));
+        content.setPaddingRelative(Math.round(96 * k), Math.round(64 * k), 0, Math.round(80 * k));
         TextView h = TvUi.text(this, k, 56, Ui.displaySemibold, TvUi.INK);
         h.setText(getIntent().getStringExtra(TITLE));
         content.addView(h);
         status = TvUi.text(this, k, 26, Ui.regular, TvUi.DIM);
-        status.setPadding(0, Math.round(12 * k), 0, Math.round(6 * k));
+        status.setPaddingRelative(0, Math.round(12 * k), 0, Math.round(6 * k));
         content.addView(status);
         TvUi.OnTitle open = t -> DetailActivity.open(this, t.kind, t.id);
         if (path == null) {

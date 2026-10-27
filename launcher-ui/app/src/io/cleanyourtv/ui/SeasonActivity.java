@@ -48,13 +48,13 @@ public class SeasonActivity extends Activity {
         TvUi.Scroll scroll = new TvUi.Scroll(this);
         list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
-        list.setPadding(Math.round(140 * k), Math.round(70 * k), Math.round(140 * k), Math.round(80 * k));
+        list.setPaddingRelative(Math.round(140 * k), Math.round(70 * k), Math.round(140 * k), Math.round(80 * k));
         TextView h = TvUi.text(this, k, 56, Ui.displaySemibold, TvUi.INK);
         h.setText(getIntent().getStringExtra(NAME));
         list.addView(h);
         TextView sub = TvUi.text(this, k, 28, Ui.medium, TvUi.DIM);
         sub.setText(season == 0 ? Ui.tr("Especiais", "Specials") : Ui.tr("Temporada ", "Season ") + season);
-        sub.setPadding(0, Math.round(10 * k), 0, Math.round(26 * k));
+        sub.setPaddingRelative(0, Math.round(10 * k), 0, Math.round(26 * k));
         list.addView(sub);
         scroll.addView(list);
         root.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -76,7 +76,7 @@ public class SeasonActivity extends Activity {
             ov.setText(overview);
             ov.setMaxLines(3);
             ov.setEllipsize(TextUtils.TruncateAt.END);
-            ov.setPadding(0, 0, 0, Math.round(26 * k));
+            ov.setPaddingRelative(0, 0, 0, Math.round(26 * k));
             list.addView(ov);
         }
         JSONArray episodes = o.optJSONArray("episodes");
@@ -94,7 +94,7 @@ public class SeasonActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(Math.round(18 * k), Math.round(18 * k), Math.round(28 * k), Math.round(18 * k));
+        row.setPaddingRelative(Math.round(18 * k), Math.round(18 * k), Math.round(28 * k), Math.round(18 * k));
         ImageView still = new ImageView(this);
         still.setScaleType(ImageView.ScaleType.CENTER_CROP);
         still.setBackground(TvUi.round(TvUi.CARD, 12 * k));
@@ -104,13 +104,13 @@ public class SeasonActivity extends Activity {
         row.addView(still, new LinearLayout.LayoutParams(Math.round(280 * k), Math.round(158 * k)));
         LinearLayout texts = new LinearLayout(this);
         texts.setOrientation(LinearLayout.VERTICAL);
-        texts.setPadding(Math.round(30 * k), 0, 0, 0);
+        texts.setPaddingRelative(Math.round(30 * k), 0, 0, 0);
         TextView title = TvUi.text(this, k, 29, Ui.medium, TvUi.INK);
         TextView meta = TvUi.text(this, k, 23, Ui.regular, TvUi.DIM);
         TextView over = TvUi.text(this, k, 23, Ui.regular, TvUi.DIM);
         over.setMaxLines(2);
         over.setEllipsize(TextUtils.TruncateAt.END);
-        meta.setPadding(0, Math.round(8 * k), 0, Math.round(8 * k));
+        meta.setPaddingRelative(0, Math.round(8 * k), 0, Math.round(8 * k));
         List<String> parts = new ArrayList<>();
         String air = e.optString("air_date");
         if (air.length() == 10) parts.add(air.substring(8) + "/" + air.substring(5, 7) + "/" + air.substring(0, 4));

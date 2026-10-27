@@ -75,7 +75,7 @@ public class DetailActivity extends Activity {
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setClipChildren(false);
-        content.setPadding(Math.round(96 * k), Math.round(90 * k), 0, Math.round(80 * k));
+        content.setPaddingRelative(Math.round(96 * k), Math.round(90 * k), 0, Math.round(80 * k));
         content.setClipToPadding(false);
         TextView loading = TvUi.text(this, k, 30, Ui.regular, TvUi.DIM);
         loading.setText(Ui.tr("Carregando…", "Loading…"));
@@ -137,35 +137,36 @@ public class DetailActivity extends Activity {
         JSONArray genres = o.optJSONArray("genres");
         for (int i = 0; genres != null && i < genres.length() && i < 3; i++) meta.add(genres.optJSONObject(i).optString("name"));
         int runtime = o.optInt("runtime");
-        if (movie && runtime > 0) meta.add(runtime >= 60 ? (runtime / 60) + " h " + (runtime % 60) + " min" : runtime + " min");
+        if (movie && runtime > 0 && Ui.he) meta.add(runtime >= 60 ? (runtime / 60) + " שע' " + (runtime % 60) + " דק'" : runtime + " דק'");
+        else if (movie && runtime > 0) meta.add(runtime >= 60 ? (runtime / 60) + " h " + (runtime % 60) + " min" : runtime + " min");
         int seasons = o.optInt("number_of_seasons");
         if (!movie && seasons > 0) meta.add(seasons == 1 ? Ui.tr("1 temporada", "1 season") : seasons + Ui.tr(" temporadas", " seasons"));
         double vote = o.optDouble("vote_average");
         if (vote > 0) meta.add(String.format(Ui.PT, "★ %.1f (%d)", vote, o.optInt("vote_count")));
         TextView m = TvUi.text(this, k, 28, Ui.medium, TvUi.DIM);
         m.setText(TextUtils.join("  ·  ", meta));
-        m.setPadding(0, Math.round(18 * k), 0, 0);
+        m.setPaddingRelative(0, Math.round(18 * k), 0, 0);
         content.addView(m);
 
         String people = people(o, movie);
         if (!people.isEmpty()) {
             TextView p = TvUi.text(this, k, 25, Ui.regular, TvUi.DIM);
             p.setText(people);
-            p.setPadding(0, Math.round(10 * k), 0, 0);
+            p.setPaddingRelative(0, Math.round(10 * k), 0, 0);
             content.addView(p);
         }
         String status = status(o, movie);
         if (!status.isEmpty()) {
             TextView st = TvUi.text(this, k, 25, Ui.medium, TvUi.ACCENT);
             st.setText(status);
-            st.setPadding(0, Math.round(10 * k), 0, 0);
+            st.setPaddingRelative(0, Math.round(10 * k), 0, 0);
             content.addView(st);
         }
         String tagline = o.optString("tagline");
         if (!tagline.isEmpty()) {
             TextView t = TvUi.text(this, k, 28, Ui.medium, TvUi.INK);
             t.setText(tagline);
-            t.setPadding(0, Math.round(22 * k), 0, 0);
+            t.setPaddingRelative(0, Math.round(22 * k), 0, 0);
             content.addView(t);
         }
         String overview = o.optString("overview");
@@ -176,7 +177,7 @@ public class DetailActivity extends Activity {
             ov.setMaxLines(5);
             ov.setEllipsize(TextUtils.TruncateAt.END);
             ov.setLineSpacing(8 * k, 1);
-            ov.setPadding(0, Math.round(16 * k), 0, 0);
+            ov.setPaddingRelative(0, Math.round(16 * k), 0, 0);
             content.addView(ov);
         }
 
@@ -185,7 +186,7 @@ public class DetailActivity extends Activity {
                 : o.optJSONObject("watch/providers").optJSONObject("results").optJSONObject(Tmdb.region());
         String[] watchApp = firstApp(region);
         TvUi.Flow actions = new TvUi.Flow(this, Math.round(20 * k), Math.round(20 * k));
-        actions.setPadding(Math.round(14 * k), Math.round(36 * k), Math.round(96 * k), Math.round(16 * k));
+        actions.setPaddingRelative(Math.round(14 * k), Math.round(36 * k), Math.round(96 * k), Math.round(16 * k));
         if (watchApp != null) {
             actions.addView((TvUi.button(this, k, "▶  " + Ui.tr("Assistir em ", "Watch on ") + watchApp[1], v -> watch(watchApp[0]))));
         }
@@ -347,7 +348,7 @@ public class DetailActivity extends Activity {
         JSONArray list = kw == null ? null : kw.optJSONArray(movie ? "keywords" : "results");
         if (list == null || list.length() == 0) return null;
         TvUi.Flow line = new TvUi.Flow(this, Math.round(16 * k), Math.round(16 * k));
-        line.setPadding(Math.round(14 * k), Math.round(14 * k), Math.round(96 * k), Math.round(14 * k));
+        line.setPaddingRelative(Math.round(14 * k), Math.round(14 * k), Math.round(96 * k), Math.round(14 * k));
         for (int i = 0; i < list.length() && i < 12; i++) {
             JSONObject w = list.optJSONObject(i);
             String word = w.optString("name");
@@ -361,7 +362,7 @@ public class DetailActivity extends Activity {
     private View review(JSONObject r) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(Math.round(28 * k), Math.round(22 * k), Math.round(28 * k), Math.round(22 * k));
+        box.setPaddingRelative(Math.round(28 * k), Math.round(22 * k), Math.round(28 * k), Math.round(22 * k));
         JSONObject details = r.optJSONObject("author_details");
         double rating = details == null ? 0 : details.optDouble("rating", 0);
         TextView who = TvUi.text(this, k, 25, Ui.medium, TvUi.INK);
@@ -370,7 +371,7 @@ public class DetailActivity extends Activity {
         body.setText(r.optString("content").replaceAll("\\s+", " "));
         body.setMaxLines(4);
         body.setEllipsize(TextUtils.TruncateAt.END);
-        body.setPadding(0, Math.round(10 * k), 0, 0);
+        body.setPaddingRelative(0, Math.round(10 * k), 0, 0);
         box.addView(who);
         box.addView(body);
         TvUi.softFocus(box, k, 18 * k);
@@ -385,7 +386,7 @@ public class DetailActivity extends Activity {
     private TextView header(String text) {
         TextView t = TvUi.text(this, k, 32, Ui.semibold, TvUi.INK);
         t.setText(text);
-        t.setPadding(0, Math.round(40 * k), 0, Math.round(12 * k));
+        t.setPaddingRelative(0, Math.round(40 * k), 0, Math.round(12 * k));
         return t;
     }
 
@@ -413,7 +414,7 @@ public class DetailActivity extends Activity {
 
     private View whereToWatch(JSONObject region) {
         TvUi.Flow line = new TvUi.Flow(this, Math.round(18 * k), Math.round(18 * k));
-        line.setPadding(0, Math.round(14 * k), Math.round(96 * k), Math.round(14 * k));
+        line.setPaddingRelative(0, Math.round(14 * k), Math.round(96 * k), Math.round(14 * k));
         String[][] types = {{"flatrate", Ui.tr("Assinatura", "Subscription")}, {"free", Ui.tr("Grátis", "Free")},
                 {"ads", Ui.tr("Grátis com anúncios", "Free with ads")}, {"rent", Ui.tr("Aluguel", "Rent")}, {"buy", Ui.tr("Compra", "Buy")}};
         Set<String> added = new HashSet<>();
@@ -439,7 +440,7 @@ public class DetailActivity extends Activity {
         LinearLayout chip = new LinearLayout(this);
         chip.setOrientation(LinearLayout.HORIZONTAL);
         chip.setGravity(Gravity.CENTER_VERTICAL);
-        chip.setPadding(Math.round(16 * k), Math.round(16 * k), Math.round(30 * k), Math.round(16 * k));
+        chip.setPaddingRelative(Math.round(16 * k), Math.round(16 * k), Math.round(30 * k), Math.round(16 * k));
         ImageView img = new ImageView(this);
         img.setClipToOutline(true);
         img.setBackground(TvUi.round(0x00000000, 12 * k));
@@ -448,13 +449,13 @@ public class DetailActivity extends Activity {
         chip.addView(img, new LinearLayout.LayoutParams(size, size));
         LinearLayout texts = new LinearLayout(this);
         texts.setOrientation(LinearLayout.VERTICAL);
-        texts.setPadding(Math.round(18 * k), 0, 0, 0);
+        texts.setPaddingRelative(Math.round(18 * k), 0, 0, 0);
         TextView n = TvUi.text(this, k, 25, Ui.medium, TvUi.INK);
         n.setText(name);
         TextView s = TvUi.text(this, k, 21, Ui.regular, TvUi.DIM);
         s.setText(type + "  ·  " + (app != null ? Ui.tr("abre ", "opens ") + Providers.label(this, app) : Ui.tr("sem app na TV", "no app on the TV")));
         if (app != null) chipNotes.add(new Object[] {app, s, type});
-        s.setPadding(0, Math.round(6 * k), 0, 0);
+        s.setPaddingRelative(0, Math.round(6 * k), 0, 0);
         texts.addView(n);
         texts.addView(s);
         chip.addView(texts);

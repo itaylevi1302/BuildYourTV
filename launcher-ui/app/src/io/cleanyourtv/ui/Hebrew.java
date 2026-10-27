@@ -41,6 +41,8 @@ final class Hebrew {
             case "Canceled": return "בוטלה";
             case "Specials": return "פרקים מיוחדים";
             case "Season ": return "עונה ";
+            case "Episode ": return "פרק ";
+            case "Continue watching": return "המשך צפייה";
             case " ep.": return " פרקים";
             case "Tagged “": return "בנושא „";
             case "In my list": return "ברשימה שלי";

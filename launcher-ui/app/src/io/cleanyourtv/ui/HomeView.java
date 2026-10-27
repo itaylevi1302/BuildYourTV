@@ -1539,6 +1539,18 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         if (Prefs.quotes() && HomeData.active().length > 0) drawQuotesCard(c, quotesCard);
     }
 
+    /** Opens a Watch Next row's intent_uri (an intent: URI, or a plain deep link) in its app. */
+    private void openIntentUri(String uri) {
+        try {
+            android.content.Intent i = uri.startsWith("intent:")
+                    ? android.content.Intent.parseUri(uri, android.content.Intent.URI_INTENT_SCHEME)
+                    : new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(uri));
+            getContext().startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (Exception e) {
+            AppLog.w("continue watching: " + e.getMessage());
+        }
+    }
+
     /** A drawer row's title over its first button: at the button's left edge, or its right edge in Hebrew. */
     private void drawRowTitle(Canvas c, String title, RectF first, float base) {
         float x = Ui.he ? first.right - 4 * k - rowTitle.measureText(title) : first.left + 4 * k;
@@ -1588,6 +1600,10 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
 
     private void drawWeather(Canvas c, RectF r) {
         refreshDrawerText();
+        if (Ui.he) {
+            drawWeatherRtl(c, r);
+            return;
+        }
         float x = r.left + 34 * k;
         c.drawText(weatherTitle, x, r.top + 54 * k, cardTitle);
         HomeData.Weather wx = textWeather;
@@ -1651,6 +1667,46 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 changeText[i] = HomeData.change(data.changes[i]);
             }
         }
+    }
+
+    /**
+     * The weather card mirrored for Hebrew: now (city, symbol and temperature, condition, high and low) on the right,
+     * the next hours from right to left, sunrise and sunset under them starting from the right.
+     */
+    private void drawWeatherRtl(Canvas c, RectF r) {
+        float x = r.right - 34 * k;
+        c.drawText(weatherTitle, x - cardTitle.measureText(weatherTitle), r.top + 54 * k, cardTitle);
+        HomeData.Weather wx = textWeather;
+        if (Double.isNaN(wx.temp)) {
+            String none = Ui.tr("Sem dados do clima agora.", "No weather data right now.");
+            c.drawText(none, x - cardDim.measureText(none), r.top + 120 * k, cardDim);
+            return;
+        }
+        String symbol = Symbols.weather(wx.code, wx.isDay);
+        float sw = Symbols.width(getContext(), symbol, 52 * k);
+        Symbols.draw(getContext(), c, symbol, x - sw / 2, r.top + 132 * k, 52 * k, drawerInk(0.95f));
+        c.drawText(nowTemp, x - sw - 18 * k - bigTemp.measureText(nowTemp), r.top + 170 * k, bigTemp);
+        String cond = HomeData.condition(wx.code, wx.isDay);
+        c.drawText(cond, x - cardText.measureText(cond), r.top + 220 * k, cardText);
+        c.drawText(highLow, x - cardDim.measureText(highLow), r.top + 258 * k, cardDim);
+        float split = r.right - 392 * k;
+        fill.setShader(null);
+        fill.setColor(tone(0x1A000000, 0x24FFFFFF));
+        c.drawRoundRect(split - k, r.top + 34 * k, split + k, r.bottom - 34 * k, k, k, fill);
+        float hr = split - 30 * k, hw = (hr - (r.left + 30 * k)) / 6;
+        for (int i = 0; i < wx.hours.size() && i < 6; i++) {
+            float hc = hr - hw * (i + 0.5f);
+            c.drawText(hourText[i], hc, r.top + 96 * k, hourPaint);
+            Symbols.draw(getContext(), c, Symbols.weather(wx.hourCode.get(i), wx.hourDay.get(i)), hc, r.top + 142 * k, 30 * k, drawerInk(0.9f));
+            c.drawText(hourTempText[i], hc, r.top + 196 * k, hourTemp);
+        }
+        float sx = hr, base = r.top + 258 * k;
+        if (wx.sunrise != 0) sx = sunItem(c, "sunrise", sunriseText, sx - sunWidth("sunrise", sunriseText), base) - sunWidth("sunrise", sunriseText) - 36 * k;
+        if (wx.sunset != 0) sunItem(c, "sunset", sunsetText, sx - sunWidth("sunset", sunsetText), base);
+    }
+
+    private float sunWidth(String symbol, String label) {
+        return Symbols.width(getContext(), symbol, 22 * k) + 10 * k + cardDim.measureText(label);
     }
 
     private float sunItem(Canvas c, String symbol, String label, float x, float base) {
@@ -2164,7 +2220,11 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             Recs.Pick p = currentPick();
             if (p == null) return;
             click.open();
-            DetailActivity.open(getContext(), p.kind, p.id);
+            if (p.intentUri != null) {
+                openIntentUri(p.intentUri);     // Continue watching: straight back to the episode
+            } else {
+                DetailActivity.open(getContext(), p.kind, p.id);
+            }
             return;
         } else if (zone == Z_STATUS) {
             if (statusItems.isEmpty()) return;
@@ -2185,7 +2245,11 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             Recs.Pick p = cardIndex < cards.size() ? cards.get(cardIndex) : null;
             if (p == null) return;
             click.open();
-            DetailActivity.open(getContext(), p.kind, p.id);
+            if (p.intentUri != null) {
+                openIntentUri(p.intentUri);     // Continue watching: straight back to the episode
+            } else {
+                DetailActivity.open(getContext(), p.kind, p.id);
+            }
             return;
         } else {
             if (shelf.isEmpty()) return;
@@ -2934,6 +2998,19 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             c.restore();
         }
         if (p == null) return;
+        if (p.progress >= 0) {
+            // Continue watching: how far along, as a thin bar along the bottom of the photo (like Apple TV's Up Next).
+            float barH = 6 * k, inset = 24 * k, by = cell.bottom - inset - barH;
+            tmp.set(cell.left + inset, by, cell.right - inset, by + barH);
+            fill.setShader(null);
+            fill.setColor(0x59FFFFFF);
+            c.drawRoundRect(tmp, barH / 2, barH / 2, fill);
+            float done = tmp.width() * Math.max(0.04f, p.progress);
+            if (Ui.he) tmp.left = tmp.right - done;     // Hebrew fills from the right
+            else tmp.right = tmp.left + done;
+            fill.setColor(0xF2FFFFFF);
+            c.drawRoundRect(tmp, barH / 2, barH / 2, fill);
+        }
         fitPaint.set(lCardTitle);
         String title = TextUtils.ellipsize(p.title, fitPaint, bw, TextUtils.TruncateAt.END).toString();
         c.drawText(title, Ui.he ? base.right - lCardTitle.measureText(title) : base.left, base.bottom + 46 * k, lCardTitle);
