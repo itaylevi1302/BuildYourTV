@@ -192,11 +192,18 @@ public class SettingsActivity extends Activity {
         private String rowText(int row) {
             switch (screen) {
                 case MAIN: {
-                    String[] names = {Ui.tr("Tela de Descanso, ver agora", "Screensaver, preview") + ", " + styleName(Prefs.screensaverStyle()),
-                            Ui.tr("Ajustes do Início", "Home Settings"),
-                            Ui.tr("Prateleira", "Shelf"), Ui.tr("Botões do Controle", "Remote Buttons"), Ui.tr("Serviços", "Services"),
-                            Ui.tr("Conta TMDB, ", "TMDB account, ") + account(), Ui.tr("Ajustes da TV", "TV Settings")};
-                    return row < names.length ? names[row] : "";
+                    if (row >= MAIN_ROWS) return "";
+                    String label = mainLabels()[row];
+                    switch (row) {
+                        case WATCH_ROW: return label + ", " + onOff(Prefs.continueWatching());
+                        case YOUTUBE_ROW_M: return label + ", " + onOff(Prefs.youtubePicks());
+                        case ADS_ROW_M: return label + ", " + onOff(adsOn());
+                        case STYLE_ROW: return label + ", " + styleName(Prefs.screensaverStyle());
+                        case DELAY_ROW: return label + ", " + saverMinutes() + Ui.tr(" min", " min");
+                        case REMOTE_ROW: return label + ", " + onOff(remoteOn());
+                        case TMDB_ROW: return label + ", " + account();
+                        default: return label;
+                    }
                 }
                 case HOME_SETTINGS: {
                     String[] labels = settingLabels(), values = settingValues();
@@ -229,8 +236,8 @@ public class SettingsActivity extends Activity {
         private RectF rowBox(int row) {
             float top, height;
             if (screen == MAIN) {
-                top = LIST_TOP + row * (ROW_H + ROW_GAP);
-                height = ROW_H;
+                top = mainRowTop(row);
+                height = M_ROW;
             } else {
                 top = LIST_TOP + 20 + row * (LIST_ROW_H + LIST_ROW_GAP);
                 height = LIST_ROW_H;
@@ -297,7 +304,7 @@ public class SettingsActivity extends Activity {
 
         private int rowCount() {
             switch (screen) {
-                case MAIN: return 7;
+                case MAIN: return MAIN_ROWS;
                 case HOME_SETTINGS: return settingLabels().length;
                 case PICKER: return Math.min(PICK_VISIBLE, pickLabels.size());
                 case SHELF_EDIT: return Math.min(PICK_VISIBLE, shelfRows.size());
@@ -322,47 +329,223 @@ public class SettingsActivity extends Activity {
             }
             scene.drawBackground(c);
 
-            // On the left (the right in Hebrew): big symbol, title, description.
+            // The side panel (on the left, the right in Hebrew): on the main list it describes the focused row, like the
+            // Apple TV's settings; elsewhere it shows the app. The credits sit at its foot.
             float cx = (Ui.he ? 1420 : 500) * k;
-            Symbols.draw(getContext(), c, "sparkles", cx, 400 * k, 150 * k, 0xEBFFFFFF);
-            c.drawText("BuildYourTV", cx, 612 * k, title);
-            c.drawText(Ui.tr("Início e tela de descanso da TV", "Your TV's home screen and screensaver"), cx, 660 * k, subtitle);
-            c.drawText(versionName(getContext()), cx, 704 * k, version);
-            c.drawText("Itay Levi · github.com/itaylevi1302/BuildYourTV", cx, 742 * k, version);
-            // The project it grew from (MIT): credited here as well as in LICENSE and NOTICE.
-            c.drawText(Ui.tr("Baseado no CleanYourTV UI, de Matheus Caldeira", "Based on CleanYourTV UI by Matheus Caldeira"), cx, 780 * k, version);
+            if (screen == MAIN) drawPanel(c, cx);
+            else {
+                Symbols.draw(getContext(), c, "sparkles", cx, 400 * k, 150 * k, 0xEBFFFFFF);
+                c.drawText("BuildYourTV", cx, 612 * k, title);
+                c.drawText(Ui.tr("Início e tela de descanso da TV", "Your TV's home screen and screensaver"), cx, 660 * k, subtitle);
+            }
+            c.drawText(versionName(getContext()) + "  ·  Itay Levi  ·  github.com/itaylevi1302/BuildYourTV", cx, 988 * k, version);
+            // The project it grew from (MIT): credited here as well as in LICENSE and NOTICE; TMDB asks for its line.
+            c.drawText(Ui.tr("Baseado no CleanYourTV UI, de Matheus Caldeira", "Based on CleanYourTV UI by Matheus Caldeira"), cx, 1022 * k, version);
+            c.drawText(Ui.tr("Usa a API do TMDB, sem endosso ou certificação do TMDB.",
+                    "This product uses the TMDB API but is not endorsed or certified by TMDB."), cx, 1056 * k, version);
 
             if (screen == MAIN) drawMain(c); else if (screen == PICKER) drawPicker(c); else if (screen == SHELF_EDIT) drawShelfEditor(c); else drawList(c);
         }
 
-        private static final String[] MAIN_ICONS = {"bedtime", "home", "apps", "tune", "play", "sync", "tv_settings"};
+        // MARK: - Main list: four sections of rows, as in the Apple TV's settings
+
+        private static final int HOME_ROW = 0, SHELF_ROW = 1, WATCH_ROW = 2, YOUTUBE_ROW_M = 3, STYLE_ROW = 4,
+                DELAY_ROW = 5, ADS_ROW_M = 6, REMOTE_ROW = 7, SERVICES_ROW = 8, TMDB_ROW = 9, TV_ROW = 10, MAIN_ROWS = 11;
+        private static final int[] SECTION_START = {HOME_ROW, STYLE_ROW, ADS_ROW_M, TMDB_ROW, MAIN_ROWS};
+        private static final String[] MAIN_ICONS = {"home", "apps", "play", "tv", "sparkles", "bedtime", "check", "tune",
+                "live_tv", "sync", "tv_settings"};
+        private static final int[] MAIN_COLORS = {0xFF0A84FF, 0xFF5E5CE6, 0xFFFF375F, 0xFFFF3B30, 0xFFBF5AF2, 0xFFFF9F0A,
+                0xFF30D158, 0xFF0FA3C8, 0xFFE0A800, 0xFF8E8E93, 0xFF636366};
+        /** Design units: where the list starts, a row's height and the gaps around a section's card. */
+        private static final float M_TOP = 132, M_HEADER = 38, M_ROW = 54, M_GAP = 2, M_PAD = 6, M_AFTER = 12;
+
+        private String[] sectionNames() {
+            return new String[] {Ui.tr("Tela inicial", "Home screen"), Ui.tr("Tela de descanso", "Screensaver"),
+                    Ui.tr("Rede e controle", "Network and remote"), Ui.tr("Conta e sistema", "Account and system")};
+        }
+
+        private String[] mainLabels() {
+            return new String[] {Ui.tr("Ajustes do Início", "Home Settings"), Ui.tr("Prateleira", "Shelf"),
+                    Ui.tr("Continuar assistindo", "Continue watching"), Ui.tr("Sugestões do YouTube", "YouTube picks"),
+                    Ui.tr("Estilo", "Style"), Ui.tr("Começa após", "Starts after"), Ui.tr("Bloqueio de anúncios", "Ad blocking"),
+                    Ui.tr("Botões do Controle", "Remote Buttons"), Ui.tr("Serviços", "Services"), Ui.tr("Conta TMDB", "TMDB account"),
+                    Ui.tr("Ajustes da TV", "TV Settings")};
+        }
+
+        private String[] mainDescriptions() {
+            return new String[] {
+                Ui.tr("Idioma, relógio, clima, cidade e tema da tela inicial.", "Language, clock, weather, city and theme of the home screen."),
+                Ui.tr("Os apps da prateleira e a ordem deles.", "Which apps sit on the shelf, and in what order."),
+                Ui.tr("Os primeiros cartões: o que você começou na Netflix e no Stremio, com o progresso.",
+                        "The first cards: what you started on Netflix and Stremio, with how far along you are."),
+                Ui.tr("Vídeos que o YouTube recomenda, depois de Continuar assistindo.", "Videos YouTube recommends for you, after Continue watching."),
+                Ui.tr("Destaques, relógio e aurora, ou um álbum do Google Fotos. ← → mudam, OK mostra.",
+                        "Picks, the clock over the aurora, or a Google Photos album. ← → change it, OK shows it."),
+                Ui.tr("Quanto tempo sem tocar no controle até a tela de descanso.", "How long without touching the remote until the screensaver."),
+                Ui.tr("Um DNS que bloqueia anúncios e rastreamento em todos os apps. Não bloqueia os do YouTube.",
+                        "A DNS that blocks ad and tracking servers in every app. It doesn't block YouTube's ads."),
+                Ui.tr("O que fazem os botões Netflix, YouTube e outros do controle.", "What the remote's Netflix, YouTube and other buttons do."),
+                Ui.tr("De quais serviços vêm as sugestões.", "Which streaming services the recommendations come from."),
+                Ui.tr("A conta da sua lista e das suas notas.", "The account behind your list and your ratings."),
+                Ui.tr("Abre os ajustes normais da TV.", "Opens the TV's own settings.")};
+        }
+
+        /** The top of row `i` (design units), and through `headerY` the baseline of each section's name. */
+        private float mainRowTop(int i) {
+            float y = M_TOP;
+            for (int sct = 0; sct < 4; sct++) {
+                y += M_HEADER;
+                for (int r = SECTION_START[sct]; r < SECTION_START[sct + 1]; r++) {
+                    if (r == i) return y + M_PAD + (r - SECTION_START[sct]) * (M_ROW + M_GAP);
+                }
+                y += 2 * M_PAD + (SECTION_START[sct + 1] - SECTION_START[sct]) * (M_ROW + M_GAP) - M_GAP + M_AFTER;
+            }
+            return y;
+        }
 
         private void drawMain(Canvas c) {
-            Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
-            listText(c, Ui.tr("Ajustes", "Settings"), (LIST_TOP - 24) * k, heading);
-            String[] labels = {Ui.tr("Tela de Descanso", "Screensaver"), Ui.tr("Ajustes do Início", "Home Settings"),
-                    Ui.tr("Prateleira", "Shelf"), Ui.tr("Botões do Controle", "Remote Buttons"), Ui.tr("Serviços", "Services"),
-                    Ui.tr("Conta TMDB", "TMDB account"), Ui.tr("Ajustes da TV", "TV Settings")};
-            for (int i = 0; i < labels.length; i++) {
-                float y = (LIST_TOP + i * (ROW_H + ROW_GAP)) * k;
-                listRow(y, ROW_H * k);
-                float f = drawRowBackground(c, i);
-                rowLabel.setColor(blend(0xF2FFFFFF, INK, f));
-                float base = rowRect.centerY() + Ui.halfCap(rowLabel);
-                // An icon at the row's start, the label after it (the Apple TV settings list).
-                float iw = 30 * k, ix = Ui.he ? rowRect.right - 30 * k - iw / 2 : rowRect.left + 30 * k + iw / 2;
-                Symbols.draw(getContext(), c, MAIN_ICONS[i], ix, rowRect.centerY(), iw, blend(0xD9FFFFFF, INK, f));
-                atStart(c, labels[i], base, rowLabel, iw + 22 * k);
-                if (i == 0 || i == 5) {
-                    rowValue.setColor(blend(0x8CFFFFFF, 0x8C1C1C1E, f));
-                    // The screensaver's style: ← → change it (shown while focused), OK shows it.
-                    String style = styleName(Prefs.screensaverStyle());
-                    atEnd(c, i == 5 ? account() : f > 0.5f ? "‹  " + style + "  ›" : style, base, rowValue);
-                } else {
-                    endIcon(c, "chevron_right", 22 * k, blend(0x66FFFFFF, 0x991C1C1E, f));
-                }
+            Paint heading = Ui.text(Ui.displaySemibold, 40 * k, 0xFFFFFFFF);
+            listText(c, Ui.tr("Ajustes", "Settings"), 104 * k, heading);
+            String[] names = sectionNames(), labels = mainLabels();
+            Paint card = new Paint(Paint.ANTI_ALIAS_FLAG);
+            card.setColor(0x14FFFFFF);
+            // The cards behind each section and the section names, then the rows (the focused one last, on top).
+            for (int sct = 0; sct < 4; sct++) {
+                int first = SECTION_START[sct], last = SECTION_START[sct + 1] - 1;
+                float top = (mainRowTop(first) - M_PAD) * k, bottom = (mainRowTop(last) + M_ROW + M_PAD) * k;
+                tmp.set(listLeft(), top, listRight(), bottom);
+                c.drawRoundRect(tmp, 20 * k, 20 * k, card);
+                listText(c, names[sct], top - 12 * k, header);
             }
-            drawRecs(c, (LIST_TOP + labels.length * (ROW_H + ROW_GAP) + 46) * k);
+            for (int i = 0; i < MAIN_ROWS; i++) if (i != focus) drawMainRow(c, i, labels[i]);
+            if (focus < MAIN_ROWS) drawMainRow(c, focus, labels[focus]);
+        }
+
+        private void drawMainRow(Canvas c, int i, String label) {
+            listRow(mainRowTop(i) * k, M_ROW * k);
+            rowRect.inset(6 * k, 0);
+            float f = drawRowBackground(c, i);
+            float base = rowRect.centerY() + Ui.halfCap(rowLabel);
+            // The icon on a coloured tile at the row's start, the label after it.
+            float tile = 38 * k, tx = Ui.he ? rowRect.right - 18 * k - tile : rowRect.left + 18 * k;
+            tmp.set(tx, rowRect.centerY() - tile / 2, tx + tile, rowRect.centerY() + tile / 2);
+            Paint fillTile = new Paint(Paint.ANTI_ALIAS_FLAG);
+            fillTile.setColor(MAIN_COLORS[i]);
+            c.drawRoundRect(tmp, 10 * k, 10 * k, fillTile);
+            Symbols.draw(getContext(), c, MAIN_ICONS[i], tmp.centerX(), tmp.centerY(), 24 * k, 0xFFFFFFFF);
+            rowLabel.setColor(blend(0xF2FFFFFF, INK, f));
+            atStart(c, label, base, rowLabel, tile + 4 * k);
+            // The row's end: a switch, a value in a pill, a status, or a chevron to a page.
+            switch (i) {
+                case WATCH_ROW: drawSwitch(c, Prefs.continueWatching(), f); break;
+                case YOUTUBE_ROW_M: drawSwitch(c, Prefs.youtubePicks(), f); break;
+                case ADS_ROW_M: drawSwitch(c, adsOn(), f); break;
+                case STYLE_ROW: {
+                    String style = styleName(Prefs.screensaverStyle());
+                    drawPill(c, f > 0.5f ? "‹  " + style + "  ›" : style, f, 0);
+                    break;
+                }
+                case DELAY_ROW: drawPill(c, saverMinutes() + Ui.tr(" min", " min"), f, 0); break;
+                case SHELF_ROW:
+                    endIcon(c, "chevron_right", 22 * k, blend(0x66FFFFFF, 0x991C1C1E, f));
+                    drawPill(c, String.valueOf(HomeApps.shelfPackages(getContext()).size()), f, 34 * k);
+                    break;
+                case REMOTE_ROW: {
+                    endIcon(c, "chevron_right", 22 * k, blend(0x66FFFFFF, 0x991C1C1E, f));
+                    boolean on = remoteOn();
+                    drawStatus(c, on, on ? Ui.tr("Ligados", "On ") : Ui.tr("Desligados", "Off "), f, 34 * k);
+                    break;
+                }
+                case TMDB_ROW:
+                    rowValue.setColor(blend(0x8CFFFFFF, 0x8C1C1C1E, f));
+                    atEnd(c, account(), base, rowValue);
+                    break;
+                default:
+                    endIcon(c, "chevron_right", 22 * k, blend(0x66FFFFFF, 0x991C1C1E, f));
+            }
+        }
+
+        /** An on/off switch at the row's end: green when on, its knob at the end side. */
+        private void drawSwitch(Canvas c, boolean on, float f) {
+            float w2 = 58 * k, h2 = 32 * k, x0 = Ui.he ? rowRect.left + 24 * k : rowRect.right - 24 * k - w2;
+            tmp.set(x0, rowRect.centerY() - h2 / 2, x0 + w2, rowRect.centerY() + h2 / 2);
+            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+            p.setColor(on ? 0xFF30D158 : blend(0x40FFFFFF, 0x331C1C1E, f));
+            c.drawRoundRect(tmp, h2 / 2, h2 / 2, p);
+            boolean knobRight = on != Ui.he;     // on: the knob at the end (the right, or the left in Hebrew)
+            float kx = knobRight ? tmp.right - h2 / 2 : tmp.left + h2 / 2;
+            p.setColor(0xFFFFFFFF);
+            p.setShadowLayer(3 * k, 0, k, 0x40000000);
+            c.drawCircle(kx, tmp.centerY(), h2 / 2 - 3 * k, p);
+        }
+
+        /** A value in a pill at the row's end, `offset` further in (when a chevron is there). */
+        private void drawPill(Canvas c, String text, float f, float offset) {
+            float tw = rowValue.measureText(text), pw = tw + 32 * k, ph = 38 * k;
+            float x0 = Ui.he ? rowRect.left + 22 * k + offset : rowRect.right - 22 * k - offset - pw;
+            tmp.set(x0, rowRect.centerY() - ph / 2, x0 + pw, rowRect.centerY() + ph / 2);
+            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+            p.setColor(blend(0x1FFFFFFF, 0x141C1C1E, f));
+            c.drawRoundRect(tmp, ph / 2, ph / 2, p);
+            rowValue.setColor(blend(0xD9FFFFFF, 0xD91C1C1E, f));
+            Paint.Align a = rowValue.getTextAlign();
+            rowValue.setTextAlign(Paint.Align.CENTER);
+            c.drawText(text, tmp.centerX(), rowRect.centerY() + Ui.halfCap(rowValue), rowValue);
+            rowValue.setTextAlign(a);
+        }
+
+        /** A green or amber dot and a word at the row's end. */
+        private void drawStatus(Canvas c, boolean ok, String text, float f, float offset) {
+            rowValue.setColor(blend(0xB3FFFFFF, 0xB31C1C1E, f));
+            float tw = rowValue.measureText(text), dot = 6 * k;
+            float textEnd = Ui.he ? rowRect.left + 22 * k + offset : rowRect.right - 22 * k - offset;
+            Paint.Align a = rowValue.getTextAlign();
+            rowValue.setTextAlign(Ui.he ? Paint.Align.LEFT : Paint.Align.RIGHT);
+            c.drawText(text, textEnd, rowRect.centerY() + Ui.halfCap(rowValue), rowValue);
+            rowValue.setTextAlign(a);
+            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+            p.setColor(ok ? 0xFF30D158 : AMBER);
+            float dx = Ui.he ? textEnd + tw + 12 * k : textEnd - tw - 12 * k;
+            c.drawCircle(dx, rowRect.centerY(), dot, p);
+        }
+
+        /** The side panel on the main list: the focused row's icon, name and what it does. */
+        private void drawPanel(Canvas c, float cx) {
+            int i = Math.min(focus, MAIN_ROWS - 1);
+            float tile = 172 * k;
+            tmp.set(cx - tile / 2, 300 * k, cx + tile / 2, 300 * k + tile);
+            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+            p.setColor(MAIN_COLORS[i]);
+            p.setShadowLayer(30 * k, 0, 12 * k, 0x59000000);
+            c.drawRoundRect(tmp, 40 * k, 40 * k, p);
+            Symbols.draw(getContext(), c, MAIN_ICONS[i], cx, tmp.centerY(), 100 * k, 0xFFFFFFFF);
+            c.drawText(mainLabels()[i], cx, 560 * k, title);
+            String desc = mainDescriptions()[i];
+            if (i == TMDB_ROW) desc += "\n" + recsLine();
+            if (i == WATCH_ROW && !Prefs.continueWatching()) desc += "\n" + Ui.tr("Desligado agora.", "Off right now.");
+            notice.setTextSize(27 * k);
+            notice.setColor(0xB3FFFFFF);
+            android.text.StaticLayout layout = android.text.StaticLayout.Builder
+                    .obtain(desc, 0, desc.length(), notice, Math.round(620 * k))
+                    .setAlignment(android.text.Layout.Alignment.ALIGN_CENTER)
+                    .setLineSpacing(8 * k, 1)
+                    .build();
+            c.save();
+            c.translate(cx - 310 * k, 600 * k);
+            layout.draw(c);
+            c.restore();
+            notice.setTextSize(23 * k);
+        }
+
+        /** The recommendations' state in one sentence (under TMDB account). */
+        private String recsLine() {
+            String error = recs.optString("error");
+            int count = recs.optInt("count");
+            if (!hasKey) return Ui.tr("Sem chave do TMDB: digite a sua em Conta TMDB.", "No TMDB key: type yours under TMDB account.");
+            if (!error.isEmpty()) return Ui.tr("Erro: ", "Error: ") + error + ".";
+            if (count > 0) return Ui.tr("Ligadas · " + count + " títulos nos apps da TV, 3 novos a cada hora.",
+                    "On · " + count + " titles from the TV's apps, 3 new ones every hour.");
+            return Ui.tr("Buscando os títulos…", "Fetching titles…");
         }
 
         /** Whether the remote's app buttons are handled (this app's accessibility service is switched on). */
@@ -482,28 +665,6 @@ public class SettingsActivity extends Activity {
             return Tmdb.signedIn(getContext()) ? Tmdb.accountName(getContext()) : Ui.tr("Não conectada", "Not connected");
         }
 
-        /** Home screen picks: status, and the credit TMDB asks for. */
-        private float drawRecs(Canvas c, float y) {
-            listText(c, Ui.tr("ESTADO", "STATUS"), y, header);
-            statusLine(c, remoteOn(), remoteOn() ? Ui.tr("Botões do controle: ligados", "Remote buttons: on")
-                    : Ui.tr("Botões do controle: desligados", "Remote buttons: off"), y + 42 * k);
-            statusLine(c, adsOn(), adsOn() ? Ui.tr("Bloqueio de anúncios: ligado", "Ad blocking: on")
-                    : Ui.tr("Bloqueio de anúncios: desligado", "Ad blocking: off"), y + 80 * k);
-            y += 76 * k;
-            String line;
-            String error = recs.optString("error");
-            int count = recs.optInt("count");
-            if (!hasKey) line = Ui.tr("Sem chave do TMDB: digite a sua em Conta TMDB.", "No TMDB key: type yours under TMDB account.");
-            else if (!error.isEmpty()) line = Ui.tr("Erro: ", "Error: ") + error + ".";
-            else if (count > 0) line = Ui.tr("Ligadas · " + count + " títulos nos apps da TV, 3 novos a cada hora.",
-                    "On · " + count + " titles from the TV's apps, 3 new ones every hour.");
-            else line = Ui.tr("Buscando os títulos…", "Fetching titles…");
-            statusLine(c, hasKey && error.isEmpty() && count > 0, TextUtils.ellipsize(line, notice, 760 * k, TextUtils.TruncateAt.END).toString(), y + 42 * k);
-            listText(c, Ui.tr("Usa a API do TMDB, sem endosso ou certificação do TMDB.",
-                    "This product uses the TMDB API but is not endorsed or certified by TMDB."), y + 80 * k, version);
-            return y + 78 * k;
-        }
-
         /** List row: no background; focused, white with a shadow (the Apple TV focus). Returns how focused it is. */
         private float drawRowBackground(Canvas c, int i) {
             float f = Ui.clamp(pop[i].value);
@@ -557,10 +718,16 @@ public class SettingsActivity extends Activity {
                     return true;
                 case KeyEvent.KEYCODE_DPAD_LEFT:
                 case KeyEvent.KEYCODE_DPAD_RIGHT:
-                    if (down && screen == MAIN && focus == 0) {
-                        int at = java.util.Arrays.asList(STYLES).indexOf(Prefs.screensaverStyle());
+                    if (down && screen == MAIN) {
                         int dir = (e.getKeyCode() == KeyEvent.KEYCODE_DPAD_RIGHT) != Ui.he ? 1 : -1;   // mirrored in Hebrew
-                        Prefs.setScreensaverStyle(STYLES[(at + dir + STYLES.length) % STYLES.length]);
+                        if (focus == STYLE_ROW) {
+                            int at = java.util.Arrays.asList(STYLES).indexOf(Prefs.screensaverStyle());
+                            Prefs.setScreensaverStyle(STYLES[(at + dir + STYLES.length) % STYLES.length]);
+                        } else if (focus == DELAY_ROW) {
+                            stepSaver(dir);
+                        } else if (focus == WATCH_ROW || focus == YOUTUBE_ROW_M || focus == ADS_ROW_M) {
+                            toggleMain(focus);
+                        }
                         invalidate();
                         spoken.focusMoved();
                     } else if (down && screen == SHELF_EDIT) {
@@ -598,7 +765,7 @@ public class SettingsActivity extends Activity {
                                 focus = pickFor - 1 - keysScroll;
                                 screen = REMOTE_KEYS;
                             } else {
-                                focus = screen == HOME_SETTINGS ? 1 : screen == SHELF_EDIT ? 2 : screen == REMOTE_KEYS ? 3 : 0;
+                                focus = screen == HOME_SETTINGS ? HOME_ROW : screen == SHELF_EDIT ? SHELF_ROW : screen == REMOTE_KEYS ? REMOTE_ROW : 0;
                                 screen = MAIN;
                             }
                         }
@@ -618,7 +785,7 @@ public class SettingsActivity extends Activity {
         private static final String[] CLOCKS = {"auto", "24h", "12h"}, STYLES = {"photos", "aurora", "google"};
         /** Home Settings: language, temperature, theme, clock, weather, city, quotes, then one row per coin. */
         private static final int CLOCK_ROW = 3, WEATHER_ROW = 4, CITY_ROW = 5, QUOTES_ROW = 6;
-        private static final int WATCHING_ROW = 7, YOUTUBE_ROW = 8, ADS_ROW = 9, SAVER_ROW = 10, COIN_ROWS = 11;
+        private static final int COIN_ROWS = 7;
 
         private static String styleName(String style) {
             return style.equals("aurora") ? Ui.tr("Relógio e aurora", "Clock and aurora")
@@ -638,10 +805,6 @@ public class SettingsActivity extends Activity {
             l.add(Ui.tr("Widget do clima", "Weather widget"));
             l.add(Ui.tr("Cidade", "City"));
             l.add(Ui.tr("Widget de cotações", "Quotes widget"));
-            l.add(Ui.tr("Continuar assistindo", "Continue watching"));
-            l.add(Ui.tr("Sugestões do YouTube", "YouTube picks"));
-            l.add(Ui.tr("Bloqueio de anúncios", "Ad blocking"));
-            l.add(Ui.tr("Tela de descanso após", "Screensaver after"));
             if (Prefs.quotes()) {     // the coins only matter with the quotes widget on
                 l.add("Bitcoin");
                 l.add("Ethereum");
@@ -668,10 +831,6 @@ public class SettingsActivity extends Activity {
             v[WEATHER_ROW] = onOff(Prefs.weather());
             v[CITY_ROW] = !cityStatus.isEmpty() ? cityStatus : Prefs.city().isEmpty() ? "—" : Prefs.city();
             v[QUOTES_ROW] = onOff(Prefs.quotes());
-            v[WATCHING_ROW] = onOff(Prefs.continueWatching());
-            v[YOUTUBE_ROW] = onOff(Prefs.youtubePicks());
-            v[ADS_ROW] = onOff(adsOn());
-            v[SAVER_ROW] = saverMinutes() + Ui.tr(" min", " min");
             // No quotes widget, nowhere to show prices: the coins read as off (and stay locked) until it is back on.
             for (int i = COIN_ROWS; i < v.length; i++) v[i] = onOff(Prefs.quotes() && Prefs.coin(i - COIN_ROWS));
             return v;
@@ -755,10 +914,6 @@ public class SettingsActivity extends Activity {
                 case WEATHER_ROW: Prefs.setWeather(!Prefs.weather()); break;
                 case CITY_ROW: return;
                 case QUOTES_ROW: Prefs.setQuotes(!Prefs.quotes()); break;
-                case WATCHING_ROW: Prefs.setContinueWatching(!Prefs.continueWatching()); break;
-                case YOUTUBE_ROW: Prefs.setYoutubePicks(!Prefs.youtubePicks()); break;
-                case ADS_ROW: setAds(!adsOn()); return;
-                case SAVER_ROW: stepSaver(dir); return;
                 default:
                     if (!Prefs.quotes()) return;
                     Prefs.setCoin(focus - COIN_ROWS, !Prefs.coin(focus - COIN_ROWS));
@@ -1036,6 +1191,14 @@ public class SettingsActivity extends Activity {
             listText(c, line, hy, hint);
         }
 
+        /** The three switches on the main list. */
+        private void toggleMain(int row) {
+            if (row == WATCH_ROW) Prefs.setContinueWatching(!Prefs.continueWatching());
+            else if (row == YOUTUBE_ROW_M) Prefs.setYoutubePicks(!Prefs.youtubePicks());
+            else if (row == ADS_ROW_M) setAds(!adsOn());
+            HomeData.get(getContext()).settingsChanged();
+        }
+
         private void activate() {
             Context c = getContext();
             if (screen == PICKER && pickFor == PICK_CITY) {
@@ -1062,7 +1225,17 @@ public class SettingsActivity extends Activity {
                 adjust(1);
                 invalidate();
                 return;
-            } else if (focus == 0 && Prefs.screensaverStyle().equals("google")) {
+            } else if (focus == WATCH_ROW || focus == YOUTUBE_ROW_M || focus == ADS_ROW_M) {
+                toggleMain(focus);
+                invalidate();
+                spoken.focusMoved();
+                return;
+            } else if (focus == DELAY_ROW) {
+                stepSaver(1);
+                invalidate();
+                spoken.focusMoved();
+                return;
+            } else if (focus == STYLE_ROW && Prefs.screensaverStyle().equals("google")) {
                 // Google's screensaver: OK opens its own settings, where the Google Photos album is picked.
                 try {
                     getContext().startActivity(new android.content.Intent("dreamx.two.panel.SETTINGS")
@@ -1071,22 +1244,22 @@ public class SettingsActivity extends Activity {
                     AppLog.w("Google screensaver settings: " + ex.getMessage());
                 }
                 return;
-            } else if (focus == 0) {
+            } else if (focus == STYLE_ROW) {
                 pause();
                 activity.showPreview();
-            } else if (focus == 1) {
+            } else if (focus == HOME_ROW) {
                 screen = HOME_SETTINGS;
                 focus = 0;
-            } else if (focus == 2) {
+            } else if (focus == SHELF_ROW) {
                 openShelfEditor();
-            } else if (focus == 3) {
+            } else if (focus == REMOTE_ROW) {
                 loadApps();
                 screen = REMOTE_KEYS;
                 focus = 0;
                 keysScroll = 0;
-            } else if (focus == 4) {
+            } else if (focus == SERVICES_ROW) {
                 activity.startActivity(new Intent(c, ServicesActivity.class));
-            } else if (focus == 5) {
+            } else if (focus == TMDB_ROW) {
                 // A release APK comes without a key: it is typed here once (or pushed in config.json "tmdb_key").
                 if (Tmdb.hasKey()) activity.startActivity(new Intent(c, TmdbLoginActivity.class)); else askTmdbKey();
             } else {
