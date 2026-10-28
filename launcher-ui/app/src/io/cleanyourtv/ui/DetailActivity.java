@@ -177,7 +177,8 @@ public class DetailActivity extends Activity {
             ov.setMaxLines(5);
             ov.setEllipsize(TextUtils.TruncateAt.END);
             ov.setLineSpacing(8 * k, 1);
-            ov.setPaddingRelative(0, Math.round(16 * k), 0, 0);
+            // Hebrew: the overview fills the width and would run into the left edge; keep the same margin there.
+            ov.setPaddingRelative(0, Math.round(16 * k), Ui.he ? Math.round(96 * k) : 0, 0);
             content.addView(ov);
         }
 
@@ -301,7 +302,9 @@ public class DetailActivity extends Activity {
         if (next != null) {
             String d = next.optString("air_date");
             String when = d.length() == 10 ? d.substring(8) + "/" + d.substring(5, 7) : d;
-            return Ui.tr("Próximo episódio: ", "Next episode: ") + "T" + next.optInt("season_number") + "E" + next.optInt("episode_number") + " · " + when;
+            String ep = Ui.he ? "עונה " + next.optInt("season_number") + ", פרק " + next.optInt("episode_number")
+                    : "T" + next.optInt("season_number") + "E" + next.optInt("episode_number");
+            return Ui.tr("Próximo episódio: ", "Next episode: ") + ep + " · " + when;
         }
         String s = o.optString("status");
         if (s.equals("Ended")) return Ui.tr("Série encerrada", "Ended");
