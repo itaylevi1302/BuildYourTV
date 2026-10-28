@@ -165,7 +165,7 @@ public class SettingsActivity extends Activity {
             scene.setMotion(0.5f, 0.2f);
             scene.applyPalette();
             setFocusable(true);
-            setContentDescription("CleanYourTV UI");
+            setContentDescription("BuildYourTV");
             // TalkBack: one item per row, id = row + 1.
             spoken = new Spoken(this, new Spoken.Source() {
                 @Override public void items(List<Integer> out) { for (int i = 1; i <= rowCount(); i++) out.add(i); }
@@ -325,10 +325,12 @@ public class SettingsActivity extends Activity {
             // On the left (the right in Hebrew): big symbol, title, description.
             float cx = (Ui.he ? 1420 : 500) * k;
             Symbols.draw(getContext(), c, "sparkles", cx, 400 * k, 150 * k, 0xEBFFFFFF);
-            c.drawText("CleanYourTV UI", cx, 612 * k, title);
+            c.drawText("BuildYourTV", cx, 612 * k, title);
             c.drawText(Ui.tr("Início e tela de descanso da TV", "Your TV's home screen and screensaver"), cx, 660 * k, subtitle);
             c.drawText(versionName(getContext()), cx, 704 * k, version);
-            c.drawText("Matheus Caldeira · github.com/matheus-caldeira/cleanyourtv-ui", cx, 742 * k, version);
+            c.drawText("Itay Levi · github.com/itaylevi1302/BuildYourTV", cx, 742 * k, version);
+            // The project it grew from (MIT): credited here as well as in LICENSE and NOTICE.
+            c.drawText(Ui.tr("Baseado no CleanYourTV UI, de Matheus Caldeira", "Based on CleanYourTV UI by Matheus Caldeira"), cx, 780 * k, version);
 
             if (screen == MAIN) drawMain(c); else if (screen == PICKER) drawPicker(c); else if (screen == SHELF_EDIT) drawShelfEditor(c); else drawList(c);
         }
@@ -530,9 +532,9 @@ public class SettingsActivity extends Activity {
 
         private static String versionName(Context c) {
             try {
-                return "CleanYourTV UI " + c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionName;
+                return "BuildYourTV " + c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionName;
             } catch (android.content.pm.PackageManager.NameNotFoundException e) {
-                return "CleanYourTV UI";
+                return "BuildYourTV";
             }
         }
 

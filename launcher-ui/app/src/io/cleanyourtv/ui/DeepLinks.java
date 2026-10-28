@@ -22,7 +22,7 @@ import java.util.Map;
 final class DeepLinks {
     private DeepLinks() {}
 
-    private static final String UA = "CleanYourTV-UI/1.0 (https://github.com/matheus-caldeira/cleanyourtv-ui)";
+    private static final String UA = "BuildYourTV/1.0 (https://github.com/itaylevi1302/BuildYourTV)";
     private static final Map<String, Map<String, String>> CACHE = new HashMap<>();
 
     /** App package → link to the title in it ("tv" or "movie", TMDB id); empty when Wikidata has none. */

@@ -43,6 +43,7 @@ final class Hebrew {
             case "Season ": return "עונה ";
             case "Episode ": return "פרק ";
             case "Continue watching": return "המשך צפייה";
+            case "Based on CleanYourTV UI by Matheus Caldeira": return "מבוסס על CleanYourTV UI של Matheus Caldeira";
             case "YouTube picks": return "המלצות YouTube";
             case "Ad blocking": return "חסימת פרסומות";
             case "Screensaver after": return "שומר מסך אחרי";

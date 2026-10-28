@@ -54,7 +54,7 @@
     <application
         android:supportsRtl="true"
         android:name=".App"
-        android:label="CleanYourTV UI"
+        android:label="BuildYourTV"
         android:icon="@drawable/icon"
         android:banner="@drawable/banner"
         android:allowBackup="false"
@@ -65,7 +65,7 @@
             android:name=".SettingsActivity"
             android:process=":home"
             android:exported="true"
-            android:label="CleanYourTV UI"
+            android:label="BuildYourTV"
             android:launchMode="singleTask"
             android:taskAffinity="io.cleanyourtv.ui.settings"
             android:excludeFromRecents="true"
@@ -84,7 +84,7 @@
             android:name=".HomeActivity"
             android:process=":home"
             android:exported="true"
-            android:label="CleanYourTV UI"
+            android:label="BuildYourTV"
             android:launchMode="singleTask"
             android:taskAffinity=""
             android:stateNotNeeded="true"
@@ -170,7 +170,7 @@
             android:process=":home"
             android:enabled="@bool/dream_in_home"
             android:exported="true"
-            android:label="CleanYourTV UI"
+            android:label="BuildYourTV"
             android:permission="android.permission.BIND_DREAM_SERVICE">
             <intent-filter>
                 <action android:name="android.service.dreams.DreamService" />
@@ -183,7 +183,7 @@
             android:name=".ScreensaverAlone"
             android:enabled="@bool/dream_alone"
             android:exported="true"
-            android:label="CleanYourTV UI"
+            android:label="BuildYourTV"
             android:permission="android.permission.BIND_DREAM_SERVICE">
             <intent-filter>
                 <action android:name="android.service.dreams.DreamService" />
@@ -198,7 +198,7 @@
             android:name=".RemoteKeyService"
             android:process=":keys"
             android:exported="true"
-            android:label="CleanYourTV UI"
+            android:label="BuildYourTV"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
