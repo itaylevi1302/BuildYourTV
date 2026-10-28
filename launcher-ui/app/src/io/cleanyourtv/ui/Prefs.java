@@ -156,6 +156,14 @@ final class Prefs {
     static boolean weather() { return sp().getBoolean("weather", true); }
     static void setWeather(boolean on) { put("weather", on); }
 
+    /** Continue watching on the first tab (the TV's Watch Next rows and Stremio's in-progress titles). */
+    static boolean continueWatching() { return sp().getBoolean("continueWatching", true); }
+    static void setContinueWatching(boolean on) { put("continueWatching", on); }
+
+    /** YouTube's recommended videos on the first tab, after Continue watching. */
+    static boolean youtubePicks() { return sp().getBoolean("youtubePicks", true); }
+    static void setYoutubePicks(boolean on) { put("youtubePicks", on); }
+
     static boolean quotes() { return sp().getBoolean("quotes", Config.SHOW_CRYPTO); }
     static void setQuotes(boolean on) { put("quotes", on); }
 

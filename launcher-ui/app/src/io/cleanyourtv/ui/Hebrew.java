@@ -43,6 +43,17 @@ final class Hebrew {
             case "Season ": return "עונה ";
             case "Episode ": return "פרק ";
             case "Continue watching": return "המשך צפייה";
+            case "YouTube picks": return "המלצות YouTube";
+            case "Ad blocking": return "חסימת פרסומות";
+            case "Screensaver after": return "שומר מסך אחרי";
+            case " min": return " דק'";
+            case "STATUS": return "מצב";
+            case "Remote buttons: on": return "כפתורי השלט: פועלים";
+            case "Remote buttons: off": return "כפתורי השלט: כבויים";
+            case "Ad blocking: on": return "חסימת פרסומות: פועלת";
+            case "Ad blocking: off": return "חסימת פרסומות: כבויה";
+            case "No permission to change the DNS.": return "אין הרשאה לשנות את ה־DNS.";
+            case "No permission to change the time.": return "אין הרשאה לשנות את הזמן.";
             case "Recommended on YouTube": return "מומלץ ב־YouTube";
             case " ep.": return " פרקים";
             case "Tagged “": return "בנושא „";

@@ -197,13 +197,13 @@ final class Recs {
         // Continue watching comes first, then the recommendations without the titles already there.
         List<Pick> first = new ArrayList<>();
         java.util.Set<Integer> started = new java.util.HashSet<>();
-        for (Pick p : watching) {
+        for (Pick p : Prefs.continueWatching() ? watching : new ArrayList<Pick>()) {
             if (kind == null || kind.equals(p.kind)) {
                 first.add(p);
                 if (p.id != 0) started.add(p.id);
             }
         }
-        if (kind == null) first.addAll(youtube);    // YouTube's picks only on the first tab, after Continue watching
+        if (kind == null && Prefs.youtubePicks()) first.addAll(youtube);    // YouTube's picks only on the first tab, after Continue watching
         Map<String, Boolean> have = new HashMap<>();   // one look per app, not per title (this runs every 15 s)
         for (Pick p : picks) {
             if ((kind == null || kind.equals(p.kind))
