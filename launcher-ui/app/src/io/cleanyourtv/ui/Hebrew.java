@@ -43,6 +43,7 @@ final class Hebrew {
             case "Season ": return "עונה ";
             case "Episode ": return "פרק ";
             case "Continue watching": return "המשך צפייה";
+            case "Recommended on YouTube": return "מומלץ ב־YouTube";
             case " ep.": return " פרקים";
             case "Tagged “": return "בנושא „";
             case "In my list": return "ברשימה שלי";

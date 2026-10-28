@@ -203,6 +203,7 @@ final class Recs {
                 if (p.id != 0) started.add(p.id);
             }
         }
+        if (kind == null) first.addAll(youtube);    // YouTube's picks only on the first tab, after Continue watching
         Map<String, Boolean> have = new HashMap<>();   // one look per app, not per title (this runs every 15 s)
         for (Pick p : picks) {
             if ((kind == null || kind.equals(p.kind))
@@ -222,7 +223,7 @@ final class Recs {
         return out;
     }
 
-    private volatile List<Pick> watching = new ArrayList<>();
+    private volatile List<Pick> watching = new ArrayList<>(), youtube = new ArrayList<>();
     private long watchingAt;
 
     /**
@@ -236,7 +237,7 @@ final class Recs {
         io.execute(() -> {
             List<Pick> out = new ArrayList<>();
             for (WatchNext.Item it : WatchNext.items(context)) {
-                if (out.size() >= 6) break;
+                if (out.size() >= 9) break;
                 if (!installed(it.pkg)) continue;
                 Pick p = new Pick();
                 p.title = it.title;
@@ -247,15 +248,22 @@ final class Recs {
                 p.detailed = true;
                 p.localized = true;
                 try {
-                    JSONArray found = get("/search/multi?language=" + lang() + "&query=" + URLEncoder.encode(it.title, "UTF-8"))
+                    // Stremio gives the IMDb id: an exact match, with the title in the TV's language.
+                    JSONObject byId = it.imdb == null ? null
+                            : get("/find/" + it.imdb + "?external_source=imdb_id&language=" + lang());
+                    JSONArray found = byId != null ? concat(byId.optJSONArray("tv_results"), byId.optJSONArray("movie_results"))
+                            : get("/search/multi?language=" + lang() + "&query=" + URLEncoder.encode(it.title, "UTF-8"))
                             .optJSONArray("results");
                     for (int i = 0; found != null && i < found.length(); i++) {
                         JSONObject o = found.getJSONObject(i);
                         String type = o.optString("media_type"), bd = o.optString("backdrop_path", "");
+                        if (type.isEmpty()) type = o.has("first_air_date") ? "tv" : "movie";   // /find leaves it out
                         if ((type.equals("tv") || type.equals("movie")) && !bd.isEmpty() && !"null".equals(bd)) {
                             p.id = o.optInt("id");
                             p.kind = type;
                             p.backdrop = bd;
+                            String local = o.optString(type.equals("tv") ? "name" : "title");
+                            if (it.imdb != null && !local.isEmpty()) p.title = local;
                             break;
                         }
                     }
@@ -274,8 +282,33 @@ final class Recs {
                 out.add(p);
             }
             watching = out;
+            List<Pick> yt = new ArrayList<>();
+            for (WatchNext.Item it : WatchNext.youtube(context, 6)) {
+                Pick p = new Pick();
+                p.title = it.title;
+                p.pkg = it.pkg;
+                p.intentUri = it.intent;
+                p.kind = "video";
+                p.detailed = true;
+                p.localized = true;
+                p.backdrop = it.poster;
+                p.meta = Ui.tr("Recomendado no YouTube", "Recommended on YouTube");
+                try {
+                    download(p);
+                } catch (Exception e) {
+                    AppLog.w("YouTube picks, " + it.title + ": " + e.getMessage());
+                }
+                yt.add(p);
+            }
+            youtube = yt;
             notifyListeners();
         });
+    }
+
+    private static JSONArray concat(JSONArray a, JSONArray b) throws org.json.JSONException {
+        JSONArray out = new JSONArray();
+        for (JSONArray x : new JSONArray[] {a, b}) for (int i = 0; x != null && i < x.length(); i++) out.put(x.get(i));
+        return out;
     }
 
     private String appLabel(String pkg) {
@@ -323,7 +356,10 @@ final class Recs {
     }
 
     private File imageFile(Pick p) {
-        return new File(new File(context.getCacheDir(), "recs"), p.backdrop.replace("/", ""));
+        // A full https URL (YouTube's thumbnails) is named by its hash; a TMDB path by itself.
+        String name = p.backdrop.startsWith("https://") ? "u" + Integer.toHexString(p.backdrop.hashCode()) + ".jpg"
+                : p.backdrop.replace("/", "");
+        return new File(new File(context.getCacheDir(), "recs"), name);
     }
 
     /** With a key: fetches the list if stale or the time of day (morning/afternoon/night) changed; then the details. */
@@ -785,7 +821,13 @@ final class Recs {
         //noinspection ResultOfMethodCallIgnored
         f.getParentFile().mkdirs();
         File part = new File(f.getPath() + ".part");
-        HttpURLConnection c = (HttpURLConnection) new URL(IMAGES + p.backdrop).openConnection();
+        String url = IMAGES + p.backdrop;
+        if (p.backdrop.startsWith("https://")) {
+            // YouTube's thumbnail: the 1280-wide one when the video has it (sddefault is 640 wide and letterboxed).
+            url = p.backdrop.replaceFirst("/(sd|hq|mq)default\\.jpg.*$", "/maxresdefault.jpg");
+            if (!url.equals(p.backdrop) && !exists(url)) url = p.backdrop;
+        }
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(8000);
         c.setReadTimeout(20000);
         try (InputStream in = c.getInputStream(); FileOutputStream out = new FileOutputStream(part)) {
@@ -801,6 +843,22 @@ final class Recs {
         }
         if (!part.renameTo(f)) throw new IOException("couldn't save the image");
         prune(f.getParentFile());
+    }
+
+    private static boolean exists(String url) {
+        try {
+            HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+            c.setRequestMethod("HEAD");
+            c.setConnectTimeout(5000);
+            c.setReadTimeout(5000);
+            try {
+                return c.getResponseCode() == 200;
+            } finally {
+                c.disconnect();
+            }
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     /** Reads the original (≥ 1920 wide) and builds the backdrop (Backdrop: cards plus frosted and glass versions). */

@@ -46,7 +46,7 @@ final class WatchNext {
 
     /** One title to continue: what the app published, with how far along it is (0 to 1). */
     static final class Item {
-        String pkg, title, intent;
+        String pkg, title, intent, imdb, poster;
         int season, episode;
         float progress;
         long engaged;
@@ -58,11 +58,10 @@ final class WatchNext {
      */
     static java.util.List<Item> items(Context c) {
         java.util.List<Item> out = new java.util.ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
         long since = System.currentTimeMillis() - 60L * 24 * 3600_000L;
         try (Cursor cur = c.getContentResolver().query(TvContract.WatchNextPrograms.CONTENT_URI, null, null, null, null)) {
-            if (cur == null) return out;
-            java.util.Set<String> seen = new java.util.HashSet<>();
-            while (cur.moveToNext()) {
+            while (cur != null && cur.moveToNext()) {
                 Item it = new Item();
                 it.pkg = text(cur, "package_name");
                 it.title = text(cur, "title");
@@ -80,7 +79,68 @@ final class WatchNext {
         } catch (RuntimeException e) {
             AppLog.w("continue watching: " + e.getMessage());
         }
+        stremio(c, out, seen);
+        // Most recent first; Stremio's rows have no date, so they keep their own order after the dated ones.
         java.util.Collections.sort(out, (a, b) -> Long.compare(b.engaged, a.engaged));
+        return out;
+    }
+
+    private static final String STREMIO = "com.stremio.one";
+    private static final java.util.regex.Pattern IMDB = java.util.regex.Pattern.compile("/(tt\\d+)");
+    private static final java.util.regex.Pattern EPISODE = java.util.regex.Pattern.compile("%3A(\\d+)%3A(\\d+)");
+
+    /**
+     * Stremio publishes no Watch Next rows, but its preview channel holds what is in progress (a playback position
+     * and a stremio:// link with the IMDb id, and season and episode for a show). Started, unfinished titles only.
+     */
+    private static void stremio(Context c, java.util.List<Item> out, java.util.Set<String> seen) {
+        try (Cursor cur = c.getContentResolver().query(TvContract.PreviewPrograms.CONTENT_URI, null, null, null, null)) {
+            while (cur != null && cur.moveToNext()) {
+                if (!STREMIO.equals(text(cur, "package_name"))) continue;
+                long pos = cur.getLong(Math.max(0, cur.getColumnIndex("last_playback_position_millis")));
+                long dur = cur.getLong(Math.max(0, cur.getColumnIndex("duration_millis")));
+                if (dur <= 0) continue;
+                Item it = new Item();
+                it.pkg = STREMIO;
+                it.title = text(cur, "title");
+                it.intent = text(cur, "intent_uri");
+                it.progress = Math.min(1f, (float) pos / dur);
+                if (it.title.isEmpty() || !it.intent.startsWith("stremio:") || it.progress < 0.02f || it.progress > 0.97f) continue;
+                java.util.regex.Matcher m = IMDB.matcher(it.intent);
+                if (m.find()) it.imdb = m.group(1);
+                m = EPISODE.matcher(it.intent);
+                if (m.find()) {
+                    it.season = Integer.parseInt(m.group(1));
+                    it.episode = Integer.parseInt(m.group(2));
+                }
+                if (seen.add(it.pkg + "\n" + it.title)) out.add(it);
+            }
+        } catch (RuntimeException e) {
+            AppLog.w("continue watching, Stremio: " + e.getMessage());
+        }
+    }
+
+    private static final String YOUTUBE = "com.google.android.youtube.tv";
+
+    /** YouTube's recommended videos from its preview channels (single videos only, no playlists), in its order. */
+    static java.util.List<Item> youtube(Context c, int max) {
+        java.util.List<Item> out = new java.util.ArrayList<>();
+        try (Cursor cur = c.getContentResolver().query(TvContract.PreviewPrograms.CONTENT_URI, null, null, null, null)) {
+            java.util.Set<String> seen = new java.util.HashSet<>();
+            while (cur != null && cur.moveToNext() && out.size() < max) {
+                if (!YOUTUBE.equals(text(cur, "package_name"))) continue;
+                Item it = new Item();
+                it.pkg = YOUTUBE;
+                it.title = text(cur, "title");
+                it.intent = text(cur, "intent_uri");
+                it.poster = text(cur, "poster_art_uri");
+                it.progress = -1;
+                if (it.title.isEmpty() || !it.intent.contains("watch?v=") || !it.poster.startsWith("https://")) continue;
+                if (seen.add(it.intent)) out.add(it);
+            }
+        } catch (RuntimeException e) {
+            AppLog.w("YouTube picks: " + e.getMessage());
+        }
         return out;
     }
 
