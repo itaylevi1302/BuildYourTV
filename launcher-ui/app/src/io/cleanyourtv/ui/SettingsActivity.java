@@ -115,8 +115,8 @@ public class SettingsActivity extends Activity {
 
     static final class SettingsView extends View implements Choreographer.FrameCallback {
         private static final int MAIN = 0, HOME_SETTINGS = 2, REMOTE_KEYS = 3, PICKER = 4, SHELF_EDIT = 5;
-        private static final float LIST_ROW_H = 68, LIST_ROW_GAP = 6;
-        private static final int PICK_VISIBLE = 9;
+        private static final float LIST_ROW_H = 54, LIST_ROW_GAP = 2, SUB_TOP = 156;
+        private static final int PICK_VISIBLE = 12;
         private static final float LIST_X = 1000, LIST_R = 1824, LIST_TOP = 186, ROW_H = 74, ROW_GAP = 8;
         private static final int AMBER = 0xFFFFC266, INK = 0xFF1C1C1E;
 
@@ -239,7 +239,7 @@ public class SettingsActivity extends Activity {
                 top = mainRowTop(row);
                 height = M_ROW;
             } else {
-                top = LIST_TOP + 20 + row * (LIST_ROW_H + LIST_ROW_GAP);
+                top = SUB_TOP + row * (LIST_ROW_H + LIST_ROW_GAP);
                 height = LIST_ROW_H;
             }
             focusBox.set(listLeft(), top * k, listRight(), (top + height) * k);
@@ -332,8 +332,9 @@ public class SettingsActivity extends Activity {
             // The side panel (on the left, the right in Hebrew): on the main list it describes the focused row, like the
             // Apple TV's settings; elsewhere it shows the app. The credits sit at its foot.
             float cx = (Ui.he ? 1420 : 500) * k;
-            if (screen == MAIN) drawPanel(c, cx);
-            else {
+            if (screen == MAIN || screen == HOME_SETTINGS || screen == SHELF_EDIT || screen == REMOTE_KEYS || screen == PICKER) {
+                drawPanel(c, cx, screen == MAIN ? Math.min(focus, MAIN_ROWS - 1) : parentRow());
+            } else {
                 Symbols.draw(getContext(), c, "sparkles", cx, 400 * k, 150 * k, 0xEBFFFFFF);
                 c.drawText("BuildYourTV", cx, 612 * k, title);
                 c.drawText(Ui.tr("Início e tela de descanso da TV", "Your TV's home screen and screensaver"), cx, 660 * k, subtitle);
@@ -510,8 +511,14 @@ public class SettingsActivity extends Activity {
         }
 
         /** The side panel on the main list: the focused row's icon, name and what it does. */
-        private void drawPanel(Canvas c, float cx) {
-            int i = Math.min(focus, MAIN_ROWS - 1);
+        /** The main-list row an inner screen was opened from (its tile and words fill the side panel). */
+        private int parentRow() {
+            if (screen == SHELF_EDIT) return SHELF_ROW;
+            if (screen == REMOTE_KEYS || (screen == PICKER && pickFor != PICK_CITY)) return REMOTE_ROW;
+            return HOME_ROW;
+        }
+
+        private void drawPanel(Canvas c, float cx, int i) {
             float tile = 172 * k;
             tmp.set(cx - tile / 2, 300 * k, cx + tile / 2, 300 * k + tile);
             Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -1073,27 +1080,54 @@ public class SettingsActivity extends Activity {
             CustomTiles.edit(activity, app[0], app[1], null);
         }
 
+        // MARK: - Inner screens, in the main list's style: a heading, the rows on one card, a hint under it
+
+        private void subHeading(Canvas c, String text) {
+            listText(c, text, 104 * k, Ui.text(Ui.displaySemibold, 40 * k, 0xFFFFFFFF));
+        }
+
+        /** The card behind `rows` rows; returns where the hint under it goes. */
+        private float subCard(Canvas c, int rows) {
+            Paint card = new Paint(Paint.ANTI_ALIAS_FLAG);
+            card.setColor(0x14FFFFFF);
+            float bottom = (SUB_TOP + Math.max(1, rows) * (LIST_ROW_H + LIST_ROW_GAP) - LIST_ROW_GAP + 6) * k;
+            tmp.set(listLeft(), (SUB_TOP - 6) * k, listRight(), bottom);
+            c.drawRoundRect(tmp, 20 * k, 20 * k, card);
+            return bottom + 46 * k;
+        }
+
+        /** Row `i` of an inner screen: placed, inset like the main list's, focused; returns how focused it is. */
+        private float subRow(Canvas c, int i) {
+            listRow((SUB_TOP + i * (LIST_ROW_H + LIST_ROW_GAP)) * k, LIST_ROW_H * k);
+            rowRect.inset(6 * k, 0);
+            return drawRowBackground(c, i);
+        }
+
+        private Paint hintPaint() {
+            return Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
+        }
+
         private void drawShelfEditor(Canvas c) {
-            Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
-            listText(c, Ui.tr("Prateleira", "Shelf"), (LIST_TOP - 24) * k, heading);
+            subHeading(c, Ui.tr("Prateleira", "Shelf"));
             int rows = rowCount();
+            float hy = subCard(c, rows);
             for (int i = 0; i < rows; i++) {
                 String[] app = shelfRows.get(pickScroll + i);
                 int place = shelfOrder.indexOf(app[0]);
-                float y = (LIST_TOP + 20 + i * (LIST_ROW_H + LIST_ROW_GAP)) * k;
-                listRow(y, LIST_ROW_H * k);
-                float f = drawRowBackground(c, i);
+                float f = subRow(c, i);
                 rowLabel.setColor(blend(place >= 0 ? 0xF2FFFFFF : 0x80FFFFFF, place >= 0 ? INK : 0x801C1C1E, f));
-                rowValue.setColor(blend(0xB3FFFFFF, 0xB31C1C1E, f));
                 float base = rowRect.centerY() + Ui.halfCap(rowLabel);
                 atStart(c, TextUtils.ellipsize(app[1], new TextPaint(rowLabel), 520 * k, TextUtils.TruncateAt.END).toString(), base, rowLabel);
-                atEnd(c, place >= 0 ? "#" + (place + 1) : Ui.tr("Fora", "Off"), base, rowValue);
+                // On the shelf: its place, in a pill; off it: a dim "Off".
+                if (place >= 0) drawPill(c, String.valueOf(place + 1), f, 0);
+                else {
+                    rowValue.setColor(blend(0x59FFFFFF, 0x591C1C1E, f));
+                    atEnd(c, Ui.tr("Fora", "Off"), base, rowValue);
+                }
             }
-            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
-            float hy = (LIST_TOP + 20 + rows * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
             listText(c, Ui.tr("OK põe ou tira (até " + HomeApps.MAX_SHELF + "). ← → mudam a ordem. Menu (≡) ou segurar OK na Home: logo e cor.",
                     "OK adds or removes (up to " + HomeApps.MAX_SHELF + "). ← → change the order.",
-                    "OK pone o quita del estante (hasta " + HomeApps.MAX_SHELF + "). ← → cambian el orden."), hy, hint);
+                    "OK pone o quita del estante (hasta " + HomeApps.MAX_SHELF + "). ← → cambian el orden."), hy, hintPaint());
         }
 
         private void openPicker(int which) {
@@ -1113,26 +1147,20 @@ public class SettingsActivity extends Activity {
             screen = PICKER;
         }
 
-        /** A long list (the apps): nine rows at a time, the one in use checked. */
+        /** A long list (the apps, the cities): twelve rows at a time, the one in use checked. */
         private void drawPicker(Canvas c) {
-            Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
-            String title = pickFor == PICK_CITY ? Ui.tr("Cidade", "City") : RemoteKeys.buttons(getContext()).get(pickFor - 1).name;
-            listText(c, title, (LIST_TOP - 24) * k, heading);
+            subHeading(c, pickFor == PICK_CITY ? Ui.tr("Cidade", "City") : RemoteKeys.buttons(getContext()).get(pickFor - 1).name);
             int rows = rowCount();
+            float hy = subCard(c, rows);
             for (int i = 0; i < rows; i++) {
                 int at = pickScroll + i;
-                float y = (LIST_TOP + 20 + i * (LIST_ROW_H + LIST_ROW_GAP)) * k;
-                listRow(y, LIST_ROW_H * k);
-                float f = drawRowBackground(c, i);
+                float f = subRow(c, i);
                 rowLabel.setColor(blend(0xF2FFFFFF, INK, f));
                 atStart(c, pickLabels.get(at), rowRect.centerY() + Ui.halfCap(rowLabel), rowLabel);
-                if (at == pickCurrent) {
-                    endIcon(c, "check", 26 * k, blend(0xFFFFFFFF, INK, f));
-                }
+                if (at == pickCurrent) endIcon(c, "check", 26 * k, blend(0xFF30D158, 0xFF1F8F3C, f));
             }
-            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
-            float hy = (LIST_TOP + 20 + rows * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
-            listText(c, (pickScroll + focus + 1) + " / " + pickLabels.size() + "  ·  " + Ui.tr("OK escolhe, Voltar cancela.", "OK picks, Back cancels."), hy, hint);
+            listText(c, (pickScroll + focus + 1) + " / " + pickLabels.size() + "  ·  " + Ui.tr("OK escolhe, Voltar cancela.", "OK picks, Back cancels."),
+                    hy, hintPaint());
         }
 
         private void drawList(Canvas c) {
@@ -1142,53 +1170,45 @@ public class SettingsActivity extends Activity {
             }
             String[] labels = settingLabels();
             String[] values = settingValues();
-            Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
-            listText(c, Ui.tr("Ajustes do Início", "Home Settings"), (LIST_TOP - 24) * k, heading);
+            subHeading(c, Ui.tr("Ajustes do Início", "Home Settings"));
+            float hy = subCard(c, labels.length);
             for (int i = 0; i < labels.length; i++) {
-                float y = (LIST_TOP + 20 + i * (LIST_ROW_H + LIST_ROW_GAP)) * k;
-                listRow(y, LIST_ROW_H * k);
-                float f = drawRowBackground(c, i);
-                rowLabel.setColor(blend(0xF2FFFFFF, INK, f));
+                float f = subRow(c, i);
                 boolean locked = i >= COIN_ROWS && !Prefs.quotes();
-                rowValue.setColor(blend(locked ? 0x59FFFFFF : 0xB3FFFFFF, locked ? 0x591C1C1E : 0xB31C1C1E, f));
-                if (locked) rowLabel.setColor(blend(0x73FFFFFF, 0x731C1C1E, f));
-                float base = rowRect.centerY() + Ui.halfCap(rowLabel);
-                atStart(c, labels[i], base, rowLabel);
-                atEnd(c, values[i], base, rowValue);
+                rowLabel.setColor(locked ? blend(0x73FFFFFF, 0x731C1C1E, f) : blend(0xF2FFFFFF, INK, f));
+                atStart(c, labels[i], rowRect.centerY() + Ui.halfCap(rowLabel), rowLabel);
+                // On/off settings are switches; the others are a value in a pill (‹ › while focused: the arrows change it).
+                if (i == WEATHER_ROW) drawSwitch(c, Prefs.weather(), f);
+                else if (i == QUOTES_ROW) drawSwitch(c, Prefs.quotes(), f);
+                else if (i >= COIN_ROWS) drawSwitch(c, Prefs.quotes() && Prefs.coin(i - COIN_ROWS), f);
+                else if (i == CITY_ROW) drawPill(c, values[i], f, 0);
+                else drawPill(c, f > 0.5f ? "‹  " + values[i] + "  ›" : values[i], f, 0);
             }
-            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
-            float hy = (LIST_TOP + 20 + labels.length * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
-            listText(c, Ui.tr("OK ou as setas mudam o valor.", "OK or the arrows change the value."), hy, hint);
+            listText(c, Ui.tr("OK ou as setas mudam o valor.", "OK or the arrows change the value."), hy, hintPaint());
         }
 
-        /** The remote's configurable buttons, nine at a time, each with what it does now. */
+        /** The remote's configurable buttons, twelve at a time, each with what it does now. */
         private void drawKeys(Canvas c) {
             List<RemoteKeys.Button> keys = RemoteKeys.buttons(getContext());
-            Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
             String remote = RemoteKeys.remoteName(getContext());
-            listText(c, Ui.tr("Botões do Controle", "Remote Buttons") + (remote.isEmpty() ? "" : "  ·  " + remote), (LIST_TOP - 24) * k, heading);
+            subHeading(c, Ui.tr("Botões do Controle", "Remote Buttons") + (remote.isEmpty() ? "" : "  ·  " + remote));
             int rows = rowCount();
+            float hy = subCard(c, rows);
             for (int i = 0; i < rows; i++) {
                 RemoteKeys.Button b = keys.get(keysScroll + i);
-                float y = (LIST_TOP + 20 + i * (LIST_ROW_H + LIST_ROW_GAP)) * k;
-                listRow(y, LIST_ROW_H * k);
-                float f = drawRowBackground(c, i);
+                float f = subRow(c, i);
                 rowLabel.setColor(blend(0xF2FFFFFF, INK, f));
-                rowValue.setColor(blend(0xB3FFFFFF, 0xB31C1C1E, f));
-                float base = rowRect.centerY() + Ui.halfCap(rowLabel);
-                atStart(c, b.name, base, rowLabel);
-                String value = TextUtils.ellipsize(describe(RemoteKeys.action(b)), new TextPaint(rowValue), 380 * k, TextUtils.TruncateAt.END).toString();
-                atEnd(c, value, base, rowValue);
+                atStart(c, b.name, rowRect.centerY() + Ui.halfCap(rowLabel), rowLabel);
+                drawPill(c, TextUtils.ellipsize(describe(RemoteKeys.action(b)), new TextPaint(rowValue), 340 * k,
+                        TextUtils.TruncateAt.END).toString(), f, 0);
             }
-            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
-            float hy = (LIST_TOP + 20 + rows * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
             String line = keys.isEmpty()
                     ? Ui.tr("Nenhum botão configurável: envie o remote.json do seu modelo (launcher-ui/config.sh --remote).",
                             "No configurable buttons: push your model's remote.json (launcher-ui/config.sh --remote).")
                     : (keysScroll + focus + 1) + " / " + keys.size() + "  ·  "
                             + Ui.tr("OK escolhe o que o botão faz. Os demais funcionam como sempre.",
                             "OK picks what the button does. The rest work as always.");
-            listText(c, line, hy, hint);
+            listText(c, line, hy, hintPaint());
         }
 
         /** The three switches on the main list. */
