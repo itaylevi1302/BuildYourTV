@@ -149,6 +149,7 @@ def load(path):
 
 BG, LINE, DIM, GREEN = "#15181e", "#2c313a", "#aab3bd", "#cfffcf"
 ORANGE = "#ff9a3c"  # the Halloween variant's mint
+GOLD = "#ffcc4d"  # the #1 in the trending heading, the website's gold
 W = 1600
 def f(size, wt):
     # A path that exists is not yet a font: Google Fonts serves Fredoka as a zip holding the variable
@@ -241,11 +242,27 @@ def decorate(card):
     card.alpha_composite(deco) if hasattr(card, "alpha_composite") and card.mode == "RGBA" else card.paste(deco, (0, 0), deco)
 
 
+def trending():
+    """The strip on top: '#1 TRENDING REPO OF THE WEEK' spaced like the other headings, the #1 in gold
+    (a thin # and a bold 1, so the # stays sharp), and the source in grey beneath."""
+    strip = Image.new("RGB", (W, 206), BG); d = ImageDraw.Draw(strip)
+    lab, thin, bold, sub = f(30, 500), f(36, 400), f(36, 650), f(28, 400)
+    rest, sp, gap, hg = "TRENDING REPO OF THE WEEK", 8, 22, 6
+    w = (d.textlength("#", font=thin) + hg + d.textlength("1", font=bold) + gap
+         + sum(d.textlength(c, font=lab) for c in rest) + sp * (len(rest) - 1))
+    x = (W - w) / 2; y = 62 + lab.getbbox("T")[3] - bold.getbbox("1")[3]  # the gold #1 sits on the heading's baseline
+    d.text((x, y), "#", font=thin, fill=GOLD); x += d.textlength("#", font=thin) + hg
+    d.text((x, y), "1", font=bold, fill=GOLD); x += d.textlength("1", font=bold) + gap
+    for c in rest: d.text((x, 62), c, font=lab, fill="#e6e9ee"); x += d.textlength(c, font=lab) + sp
+    d.text((W / 2, 140), "via trendshift.io  ·  Oct 19–25, 2026", font=sub, fill=DIM, anchor="mm")
+    return strip
+
+
 stats, featured = load("docs/stats-halloween.png" if HALLOWEEN else "docs/stats.png"), load("docs/featured.png")
 if HALLOWEEN:
     heading(featured, (650, 50, 950, 85))     # "FEATURED IN"
     tint(featured, (1090, 315, 1135, 352))    # the arrow after "412 articles"
-parts = [stats, featured, tv]
+parts = [trending(), stats, featured, tv]
 SEP = 24  # extra air on each side of a divider
 H = sum(p.height for p in parts) + 2 * SEP * (len(parts) - 1)
 card = Image.new("RGB", (W, H), BG); d = ImageDraw.Draw(card); y = 0

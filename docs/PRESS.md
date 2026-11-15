@@ -1,6 +1,6 @@
 # CleanYourTV in the press
 
-Every article about CleanYourTV (called tv-vibehack until 19 October 2026) that we could open and check: **546 articles**, 476 of them from outlets in 57 countries and 70 from newsletters, blogs and AI news sites. Headlines are in the language they were published in. Syndicated copies and auto-generated listings are left out. [673 videos](#videos) follow the articles.
+Every article about CleanYourTV (called tv-vibehack until 19 October 2026) that we could open and check: **546 articles**, 476 of them from outlets in 57 countries and 70 from newsletters, blogs and AI news sites. Headlines are in the language they were published in. Syndicated copies and auto-generated listings are left out. [674 videos](#videos) follow the articles.
 
 Wrote about it and not here? Open an issue or a pull request with the link.
 
@@ -848,6 +848,7 @@ On YouTube and Bilibili, newest first; views as of 14 Nov.
 
 | Channel | Video | Date | Views |
 | --- | --- | --- | --- |
+| Tamil Tech - MrTT | [😱 END of TV Brands⁉️ இத பண்ணா, இனி புது TV-யே தேவையில்ல 🔥](https://www.youtube.com/watch?v=BnYCCrD8wF4) | 14&nbsp;Nov | 4,507 |
 | Zadrig Technology | [Claude Code puede quitarle los anuncios a tu Smart TV](https://www.youtube.com/watch?v=EQz7yhYnEwM) | 12&nbsp;Nov | 18 |
 | Георгий Ривера | [Как убрать рекламу с Android TV: нейросеть сделает сама  #chatgpt #claude](https://www.youtube.com/watch?v=ouMz_gnMWPQ) | 10&nbsp;Nov | 7,022 |
 | Ринат Сулейманов &#124; AITron | [Clean Your TV: превратите Smart TV в Apple TV без рекламы и слежки](https://www.youtube.com/watch?v=w70FSk0OuSs) | 9&nbsp;Nov | 2,480 |

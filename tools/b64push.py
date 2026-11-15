@@ -2,17 +2,18 @@
 """Fallback file transfer: send a file to the TV as base64 chunks through plain shell commands.
 
 Usage: b64push.py <local file> <remote path>
+       b64push.py --help          this text; needs no TV
 
 The file is assembled under a temporary name next to the target and checked with md5sum; only a
 matching copy is moved over the target, so a failed or corrupted transfer leaves the old file alone.
 Where the TV refuses that move (some firmware refuses rename(2) in /data/local/tmp, #1588), the
 verified file is copied over the target and checked again. That copy is not atomic.
 
-Exit status: 0 the copy is on the TV, 1 a transfer failed (the target is as it was, unless that
-copy failed or was interrupted, which the message says), 2 nothing was sent: the arguments were
-refused, the local file could not be read, the packages in tools/requirements.txt are not installed,
-a TV_HOST or a TV_PORT that tools/tv.py refuses at import time (its own words are printed), or the
-connection failed in one of the ways tv.py explains (a refused port, a Wireless
+Exit status: 0 the copy is on the TV, or --help printed this text; 1 a transfer failed (the target is
+as it was, unless that copy failed or was interrupted, which the message says), 2 nothing was sent: the
+arguments were refused, the local file could not be read, the packages in tools/requirements.txt are
+not installed, a TV_HOST or a TV_PORT that tools/tv.py refuses at import time (its own words are
+printed), or the connection failed in one of the ways tv.py explains (a refused port, a Wireless
 debugging port, a handshake that timed out, a TV that cannot be reached). Why it stopped goes to
 stderr, which the scripts that throw the progress on stdout away still show.
 """
@@ -25,6 +26,17 @@ import sys
 CHUNK = 48 * 1024  # raw bytes per shell command (base64 grows it by 4/3); capped per TV in main()
 # adbd before Android 7 aborts the connection on an ADB "open" payload over 4096 bytes, which
 # Android 5.x TVs announce as their max data size. Newer adbd takes the full 48 KB.
+
+# One chunk travels as one shell command, and the ceiling a TV's adbd puts on one command is not
+# something the protocol announces. adb_shell's max_chunk_size is its filesync payload, negotiated as
+# 65536 on a modern TV, so a chunk sized from that alone was a ~65 KB command - and a Philips
+# 55PUS7503/12 on Android 8 stopped answering at that size: single commands of 49,200 bytes went
+# through 5 of 5, 57,000-byte ones timed out 3 of 3, and 32,800 bytes was the smallest length measured
+# and the one that held (#3871), where every attempt stopped at chunk 0. 32 KB per command is under
+# every length that TV took and is asked of a chunk that still carries 24 KB of the file, so a
+# transfer costs one extra round trip per 24 KB. A transport that states its own limit (the native
+# adapter, at 4088) keeps it.
+SHELL_COMMAND_LIMIT = 32 * 1024
 
 # The remote path is pasted into the TV's shell: absolute, plain characters, no "..".
 REMOTE_RE = re.compile(r"/[A-Za-z0-9._/-]+")
@@ -42,6 +54,16 @@ def q(path):
 
 def main():
     args = sys.argv[1:]
+    # -h/--help is a reader asking for this note, not an argument the run cannot use: tv.py, check.py,
+    # theme_restart.py, blocky_wallpapers.py and scenes_wallpapers.py answer it at 0 with the note on
+    # stdout. This one answered it with the two-line usage on stderr and 2, the status its own
+    # docstring gives to "the arguments were refused", so `tools/b64push.py --help | less` showed
+    # nothing and the md5sum and rename fallback the note explains were never printed by the command
+    # that asks for the note. (adb-closed.py answers 2 as well; tests/test_adb_closed_address_words.py
+    # pins that, since its help is read before the address is judged.)
+    if args[:1] in (["-h"], ["--help"]):
+        print((__doc__ or "").strip())
+        return 0
     if len(args) != 2:
         sys.stderr.write(USAGE)
         return 2
@@ -112,8 +134,14 @@ def main():
     # Sized before the try on purpose: a path this transport cannot carry is an argument error, and
     # a refusal raised inside would run the finally's staging cleanup, so the push would have
     # touched the TV after all.
-    # base64 of the chunk plus the echo (which names the staging file) must fit one payload
-    chunk = min(CHUNK, (dev.max_chunk_size - 85 - len(b64)) * 3 // 4)
+    # base64 of the chunk plus the echo (which names the staging file) must fit one payload.
+    # The command that carries a chunk is `echo '<base64>' >> '<staging>' && echo okN`, so the echo,
+    # the staging name and the marker are fixed overhead and the base64 is 4/3 of the chunk. Two
+    # budgets apply: the payload adb_shell will put on the wire, and the command its adbd will take.
+    # The chunk is sized from whichever is smaller, and the preflight below from the command budget.
+    command_limit = getattr(dev, "max_shell_command_size", SHELL_COMMAND_LIMIT)
+    chunk_budget = min(dev.max_chunk_size, command_limit)
+    chunk = min(CHUNK, (chunk_budget - 85 - len(b64)) * 3 // 4)
     chunk -= chunk % 3   # a multiple of 3, or each chunk ends in '=' padding mid-stream and base64 -d corrupts it
     if chunk < 256:
         # Under 256 raw bytes per chunk the transfer degenerates into one- and two-byte commands,
@@ -121,15 +149,13 @@ def main():
         # cleanup as the only thing that ran. The path is wrong for this transport, not the
         # transfer: refused like the argument errors above, before anything is sent.
         sys.stderr.write(f"refusing remote path {remote!r}: staged as {q(b64)} it leaves under 256 "
-                         f"bytes per chunk at this transport's {dev.max_chunk_size}-byte limit. "
+                         f"bytes per chunk at this transport's {chunk_budget}-byte limit. "
                          "Nothing was sent to the TV.\n")
         dev.close()
         return 2
     verify_command = f"base64 -d < {q(b64)} > {q(part)} && md5sum {q(part)}; rm -f {q(b64)}"
-    # This repeats the path four times and is longer than the other fixed commands. adb_shell's
-    # filesync chunk size is at most half its negotiated payload, not a shell command limit; the
-    # native adapter states its own limit. Leave room for the service prefix and terminating NUL.
-    command_limit = getattr(dev, "max_shell_command_size", 2 * dev.max_chunk_size - len(b"shell:\0"))
+    # This repeats the path four times and is longer than the other fixed commands, and it has to
+    # fit the same command budget as a chunk.
     verify_size = len(verify_command.encode("utf-8"))
     if verify_size > command_limit:
         sys.stderr.write(f"refusing remote path {remote!r}: verification needs a {verify_size}-byte "
