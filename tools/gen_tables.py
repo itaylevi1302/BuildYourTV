@@ -48,10 +48,12 @@ apply are on disk and the message names them, the tables are not regenerated, so
 its tv.json by hand and the script run again.
 """
 import argparse
+import errno
 import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -85,7 +87,10 @@ def check_cell(where, key, value):
     if not isinstance(value, str) or not value.strip():
         return [f"{where}: \"{key}\" must be a non-empty string"]
     out = []
-    if value != value.strip() or "\n" in value:
+    # A CR is a line ending to a Markdown reader, and `read_text` reads the table back with universal
+    # newlines, so a written CR would come back as an LF and `--check` would never agree with the run
+    # that had just written it. Both line endings are refused; a CRLF already carries the LF.
+    if value != value.strip() or "\n" in value or "\r" in value:
         out.append(f"{where}: \"{key}\" must be one line with no space at either end")
     if re.search(r"(?<!\\)\|", value):
         out.append(f"{where}: \"{key}\" has a | that would split the table cell; write \\| instead")
@@ -478,6 +483,26 @@ def adopt(root, patch_text):
     return out
 
 
+def stat_folder(path):
+    """(it is a folder, why the filesystem would not look at it or None) for one path.
+
+    The four errnos here are the answers `Path.is_dir()` itself gave before Python 3.14: ENOENT and
+    ENOTDIR, the two ordinary ways a path is not a folder, and ELOOP and EBADF, which it also read as
+    "no". Every other refusal to look - ENAMETOOLONG for a name over NAME_MAX, EACCES under a folder
+    this user may not traverse, EINVAL, EIO - came out of is_dir() as an OSError, and the caller below
+    names it. On 3.14 is_dir() answers False for those too (it swallows every OSError), so asking it
+    alone would put "not a folder" - the sentence for a typo - over a path that is there and could not
+    be read, and the refusal this file grew for that case (#4032) would not be printed at all.
+    """
+    try:
+        info = path.stat()
+    except OSError as e:
+        if e.errno in (errno.ENOENT, errno.ENOTDIR, errno.ELOOP, errno.EBADF):
+            return False, None
+        return False, (e.strerror or e)
+    return stat.S_ISDIR(info.st_mode), None
+
+
 def read_inputs(root, patch):
     """(the patch's text or None, the reason this run cannot start or None).
 
@@ -487,7 +512,17 @@ def read_inputs(root, patch):
     not there both ended in a FileNotFoundError traceback before, which is exit 1 - the one answer that
     says the generated files are stale when in fact nothing was read at all.
     """
-    if not root.is_dir():
+    # A `--root` the filesystem refuses to stat - a name longer than NAME_MAX, or a path under a folder
+    # this user may not traverse - used to end the run in an OSError as a traceback, exit 1: the answer
+    # this docstring keeps for tables that are out of date, over a run that read nothing. Both are the
+    # "cannot be read" case the exit paragraph names, and the sentence quotes the path either way.
+    # stat_folder() asks the filesystem rather than `Path.is_dir()`, which stopped raising for those on
+    # Python 3.14 and would answer "not a folder" for a path it never looked at.
+    is_folder, refused = stat_folder(root)
+    if refused:
+        return None, (f"--root '{root}': cannot be looked at ({refused}). "
+                      f"Nothing was read or written.")
+    if not is_folder:
         return None, f"--root '{root}': not a folder. Nothing was read or written."
     # examples/ is what it reads; the three OWNED files are the parts of the checkout it writes.
     needs = ["examples"] + list(OWNED)

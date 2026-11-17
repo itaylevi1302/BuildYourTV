@@ -16,6 +16,7 @@ import contextlib
 import errno
 import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -97,6 +98,41 @@ class RootTest(unittest.TestCase):
             code, _, err = run("--root", str(root), "--check")
             self.assertEqual(code, 2, err)
             self.assertIn(f"--root '{root}'", err)
+
+    def test_a_root_the_filesystem_refuses_to_stat_is_the_not_read_exit(self):
+        # A --root whose name is longer than NAME_MAX - or one under a folder this user may not
+        # traverse - used to end the run in an OSError as a traceback, exit 1: the answer the
+        # README-tables job reads as "the tables are out of date", over a run that read nothing at all.
+        # It is a stat this run asks for itself (stat_folder), not `Path.is_dir()`, which on Python
+        # 3.14 answers False for this name instead of raising: the case holds on every version.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / ("a" * 300)
+            try:
+                os.stat(root)
+            except OSError:
+                pass
+            else:
+                self.skipTest("this filesystem stats a 300-character name")
+            code, out, err = run("--root", str(root), "--check")
+            self.assertEqual(code, 2, err)
+            self.assertIn(f"--root '{root}'", err)
+            self.assertIn("cannot be looked at", err)
+            self.assertIn("Nothing was read or written", err)
+            self.assertNotIn("Traceback", err)
+            self.assertEqual(out, "")
+
+    def test_an_os_error_from_the_root_check_is_the_same_reason(self):
+        # The same branch without a filesystem that refuses one: a root this user may not look at, on
+        # any platform, in-process - the shape MetadataReadTest injects for the same reason. The stat
+        # is what read_inputs asks (stat_folder), not `Path.is_dir()`, which on Python 3.14 answers
+        # False for this error instead of raising it.
+        refused = PermissionError(errno.EACCES, "Permission denied")
+        with mock.patch.object(Path, "stat", side_effect=refused):
+            patch, reason = gen_tables.read_inputs(Path("/somebody elses checkout"), None)
+        self.assertIsNone(patch)
+        self.assertIn("/somebody elses checkout", reason)
+        self.assertIn("Permission denied", reason)
+        self.assertIn("Nothing was read or written", reason)
 
     def test_a_folder_that_is_not_a_checkout_names_what_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:

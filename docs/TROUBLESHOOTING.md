@@ -93,6 +93,22 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   listens for ADB there`, a set that cannot be reached prints `could not reach`, and
   `tools/adb-closed.py <tv ip>` answers it in its exit status - 0 the TV itself refused, 1 the port is
   open, 2 it could not tell.
+- **Debugging is off, so the closing check should say "closed", but it answers 2 again and again: the
+  set drops packets to closed ports instead of refusing them.** Seen on a [Philips 58PUS7304/12,
+  TPM191E (`PH9M_EA_5599`), Android TV 12,
+  `STT2.230526.001`](https://github.com/Gathin23/cleanyourtv/issues/3890) on Ethernet: USB debugging
+  off, authorisations revoked, `adb_wifi_enabled` 0, and that firmware has no Network or Wireless
+  debugging entry either. `tools/adb-closed.py <tv ip>` answered `could not check <tv ip>:5555: it did
+  not answer in 3 s` before and after a reboot and from an ordinary terminal, and ports 1 and 5556
+  timed out the same way, while 1925 accepted a connection in the same second - so the TV was awake
+  and reachable, and the silence was the set's own behaviour, not the network, the router or a VPN.
+  `adb connect <tv ip>:5555` gave `WSAETIMEDOUT` (10060) as well, and 5555 had accepted at once while
+  debugging was still on. On a board like this the closing step cannot reach "closed" by the letter of
+  the rule, and a timeout says nothing either way, so read it as unproven rather than as still open:
+  say that when you hand the TV back instead of reporting the port as confirmed closed, leave
+  debugging off, and check once more after the reboot. The one thing worth reading in that state is a
+  port that is known to be open on that board answering while 5555 does not - on a Philips that is 1925
+  (or 1926), the JointSpace API `tools/philips-api.py` reads.
 - **A cable to the computer gives no device in `adb devices`**: a TV's USB-A ports are usually host
   ports, for a drive, a keyboard or an Ethernet adapter, and the cable route in the bullet above needs
   one that carries ADB device mode instead - the exception, as on the Xiaomi boxes below. On the GX655
@@ -786,6 +802,31 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   MOKA `R4_GTV`, Google TV 14): the firmware re-enables setupwraith at every cold boot and its
   `.RecoveryActivity` takes Home. `logcat | grep RecoveryActivity` shows it starting several times a
   second. Re-enable launcherx as above. [Notes](devices/acer-r4g.md).
+- **The TV comes back on the setup wizard, then goes black after the language choice**, seen on a
+  TCL 55DC760 (product "Percee TV", `tcl_eu`, `mt5891`, Android TV 8.0,
+  `V8-T658T01-LF1V602` / `OTT1.180130.001`, the same platform as
+  [`tcl-50dp660`](../examples/tcl-50dp660/debloat.txt),
+  [#4071](https://github.com/Gathin23/cleanyourtv/issues/4071)). A list based on that folder's had
+  run for a week and through one control reboot, with `com.google.android.tvlauncher`,
+  `com.tcl.partnercustomizer`, `android.autoinstalls.config.tcl.device` and two of the three
+  PERSISTENT packages disabled and `com.gathin.tvhome` Home, when a spontaneous reboot landed on
+  the first-run wizard: the language choice works, and then the screen is black with only power
+  working, on every power cycle, and 5555 refuses. Nothing is bricked. With the stock launcher
+  disabled the wizard has no Home to hand over to, so it finishes into nothing, and
+  `tools/restore.sh` cannot run because `adb_enabled` is 0 again. The reading that fits all three
+  symptoms is Android's RescueParty, whose escalation resets saved settings to their defaults
+  before it offers a wipe: `user_setup_complete` and `adb_enabled` back to 0, the disabled packages
+  untouched. No log survived the recovery, so the cause is unproven, but this build carries
+  RescueParty (`getprop sys.rescue_boot_count` answered 1 on the reflashed set). No command reaches
+  a set in that state: the recovery menu's factory data reset turns every disabled package back on,
+  and on this platform the full firmware over USB does the same and re-provisions the vendor data
+  (step 3 of the NVM-reset sequence in [its notes](devices/tcl-50dp660.txt)). To avoid it on this
+  board, keep the stock launcher: the same unit rebuilt the list with
+  `com.google.android.tvlauncher`, `com.tcl.partnercustomizer`,
+  `android.autoinstalls.config.tcl.device` and all three PERSISTENT packages left enabled, reached
+  Home through `stock_home_redirect` with the key helper filtering Home presses and
+  `home_long_press_home`, and has come through three control reboots with `user_setup_complete`
+  and `adb_enabled` still 1.
 - **Black screen at every boot after the launcher change, LED on, remote dead** (Vision
   2024VISION43STV, CVTE, Android 13: [its list](../examples/vision-2024vision43stv/debloat.txt) has the
   details). With file-based encryption (`getprop ro.crypto.type` says `file`) Android starts Home before
@@ -1207,6 +1248,27 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   launcher, a key helper nor the debloat caused it, and a full rescan did not fix it. Switching HbbTV off in
   Live TV's settings menu did. Details in
   [the MOOQ0 note](devices/xiaomi-mitv-mooq0-android11.md#channel-updown-lands-two-channels-on-hbbtv-spanish-unit-build-8835).
+
+- **AirPlay never shows up on iPhones and Macs, though AirPlay is installed and running** (TCL Smart TV Pro,
+  `G08_4K_US`, Google TV 14, `UTT2.250416.001 AU14`). The set had no Apple AirPlay key: `logcat` repeats
+  `FAIRPLAY_CA: ... Failed to call MTTZ_MFI_CopyCertFromTEE()` every few seconds and
+  `ProxyBootupReceiver: FairplayKey status = false`, and `_airplay._tcp` is not advertised. It is not the debloat:
+  re-enabling every disabled package and rebooting changed nothing. Opening Settings > System > AirPlay and HomeKit
+  Settings > Apple AirPlay and HomeKit makes `com.tcl.airplay2` fetch the key from TCL and write it into the TEE
+  (`AirPlay_UpdateCert` in `logcat`; SELinux denials on `/dev/tee0` are logged during the write, but it succeeds).
+  The TV then advertises AirPlay, and the key stays through reboots, with `com.tcl.ttvs` disabled too. If AirPlay
+  disappears after a factory reset, open that page again.
+- **An app's server on the TV stops answering while the TV sleeps** (same set). Android 14's Low Power Standby
+  cuts the network for every app that is not allow-listed while the screen is off: `dumpsys netpolicy` shows
+  `blocked=LOW_POWER_STANDBY` for the app's uid, though the process is alive and still listening. TCL's Settings >
+  System > Power & Energy > Energy Modes > Increased ("Always connected") does not change that:
+  `low_power_standby_enabled` stays 1, and the firmware sets it back to 1 at every boot. Apps may not read or write
+  it on Android 12 and later; only the system and the shell can (`tools/tv.py 'settings put global
+  low_power_standby_enabled 0'`, again after each boot). It keeps more of the TV awake in standby.
+- **Wireless debugging shows "IP address & port: unavailable" after a reboot** (same set; the Q7C notes in
+  `examples/tcl-q7c-google-tv` saw it too). It happens when Wireless debugging is switched on before Wi-Fi is up,
+  as at boot: the TLS server never binds and `adb mdns services` lists no `_adb-tls-connect._tcp`. Switching it
+  off and on once Wi-Fi is connected brings the address back. Switch Wireless debugging off again when you are done.
 
 ## Accessibility helper enabled but the remote button does nothing
 
@@ -1940,6 +2002,52 @@ So when it happens, unplug the soundbar from the mains for about ten seconds; th
 two messages from colliding, the Switch 2's option to turn the TV on can be switched off and the TV turned on with
 its own remote first. That avoidance comes from one capture, and no TAB5305 firmware fix was found. Not checked:
 other soundbars and consoles, and other TV boards.
+
+## Starting a Shield or a console does not turn the TV on (TCL)
+
+The TV stays off when a device on HDMI starts, even with T-Link (HDMI-CEC) on and the device set to turn the TV
+on. Once the TV is on, it still switches to that device's input. Seen on a TCL G08 ("Smart TV Pro", Google TV 14,
+`UTT2.250416.001`) with an NVIDIA Shield on HDMI 1 and a Steam Machine on HDMI 2, before and after the debloat.
+The TV hears the request and refuses it. `<Feature Abort>` here is the TV answering "refused", and
+`tv_wake_on_one_touch_play` reads `0`, which is this firmware's default:
+
+```sh
+tools/tv.py 'dumpsys hdmi_control' | grep -E "tv_wake_on_one_touch_play|Text View On|Image View On|Feature Abort" | tail -10
+#   tv_wake_on_one_touch_play (int): 0 (default: 0) [modifiable]
+#   [R] ... message=<Text View On> 40:0D
+#   [S] ... message=<Feature Abort> 04:00:0D:04 (ACK)
+```
+
+Turning it on is one setting, and it survives a restart:
+
+```sh
+tools/tv.py 'cmd hdmi_control cec_setting set tv_wake_on_one_touch_play 1'
+```
+
+This writes Android's own setting, `hdmi_control_auto_wakeup_enabled`. TCL also keeps a global setting of its own
+with the same name, `tv_wake_on_one_touch_play`, which still reads `0` afterwards. The T-Link menu shows every
+option, TV auto power on included, as on both before and after the change, so the menu does not reveal this
+setting. Nothing CEC-related was disabled; CEC on this set runs in `system_server` (`TclHdmiControlService`).
+To undo it, set it back to `0`. Three things came up on the same set once the TV was allowed to wake:
+
+- **The TV turns off, and every device sleeps, the moment the Shield is woken with its remote while the TV is
+  already on.** The Shield remote's IR control sends the TV's IR power code whenever a button press wakes the
+  Shield, Back included. The TV is already on, so the code toggles it off, and the TV then sends `<Standby>` to
+  everything. The log shows `powerPress ... Going to sleep due to power_button` half a second before the Shield's
+  `<Text View On>`. `getevent -lt` shows `KEY_POWER` arriving on `MTK Smart TV IR Receiver`, not on the TCL
+  Bluetooth remote. To fix it, turn off IR control in the Shield's remote settings. CEC turns the TV on and switches
+  the input without it.
+- **A console that wakes itself a few seconds after going to sleep now turns the TV back on each time.** The CEC
+  history shows the console sending `<Standby>`, then 5 to 30 seconds later announcing itself again with
+  `<Image View On>`, with no message from the TV in between. Before the change the TV refused that message, so
+  the loop went unnoticed. On the Steam Machine it was a SteamOS bug, fixed by an update. It is not a TV setting.
+- **`tv_send_standby_on_sleep 0` is not a way to stop the TV sleeping its devices.** On this firmware it also
+  makes the TV refuse an incoming `<Standby>` (`<Feature Abort> 08:00:36:00`), so the device going to sleep no
+  longer turns the TV off. Leave it at `1`.
+
+With these in place, a device that starts while another is on screen takes over the input, and the TV sends the
+first device `<Standby>` itself. Not checked: other TCL boards, and whether the Shield turns the TV off when it
+sleeps.
 
 ## Moonlight: two controllers both drive player 1, or a DualSense button opens the exit prompt
 

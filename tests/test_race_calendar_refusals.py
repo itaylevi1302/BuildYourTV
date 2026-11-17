@@ -518,6 +518,37 @@ with mock.patch.object(urllib.request, 'urlopen', side_effect=lambda *a, **k: io
         self.assert_refused(status, stderr, "there is no theme folder at", str(picture))
         self.urlopen.assert_not_called()
 
+    def test_a_theme_path_the_filesystem_refuses_to_stat_is_named(self):
+        # A theme path whose name is longer than NAME_MAX - or one under a folder this user may not
+        # traverse - used to end the run in an OSError as a traceback, exit 1: the code this script
+        # keeps for "no race left this season", over a path it never looked at. It is a stat this run
+        # asks for itself (stat_folder), not `Path.is_dir()`, which on Python 3.14 answers False for
+        # this name instead of raising: the case holds on every version.
+        self.stub()
+        word = str(Path(self.tmp.name) / ("t" * 300))
+        try:
+            os.stat(word)
+        except OSError:
+            pass
+        else:
+            self.skipTest("this filesystem stats a 300-character name")
+        status, stderr = self.run_main(word, "--season", "2026")
+        self.assert_refused(status, stderr, "could not look at", "File name too long")
+        self.assertEqual(self.out.getvalue(), "")
+        self.urlopen.assert_not_called()
+
+    def test_a_theme_path_this_user_may_not_look_at_is_the_same_refusal(self):
+        # The same branch on any platform, in-process: a folder the run may not open (another user's
+        # home, a mount that denies) answers PermissionError out of the stat this run asks, which is
+        # what stat_folder() does rather than `Path.is_dir()` - that one answers False for it on
+        # Python 3.14, which would read as a theme folder that is not there.
+        self.stub()
+        with mock.patch.object(Path, "stat", side_effect=PermissionError(errno.EACCES, "Permission denied")):
+            status, stderr = self.run_main(str(self.theme), "--season", "2026")
+        self.assert_refused(status, stderr, "could not look at", "Permission denied")
+        self.assertEqual(self.out.getvalue(), "")
+        self.urlopen.assert_not_called()
+
     def test_an_empty_theme_name_is_not_the_directory_it_is_run_from(self):
         # `race_calendar.py "$THEME"` with THEME unset passes the empty word, and Path("") is Path("."):
         # a folder that is always there, so the folder check let it through, the run wrote a config.json
@@ -648,6 +679,24 @@ with mock.patch.object(urllib.request, 'urlopen', side_effect=lambda *a, **k: io
                                                 "Service Unavailable", {}, None))
         status, stderr = self.run_main(str(self.theme), "--season", "2026")
         self.assert_refused(status, stderr, "Jolpica answered 503 Service Unavailable")
+
+    def test_the_answer_it_refuses_is_closed(self):
+        # urllib raises the 503 with the response inside it, body and all, so the connection belongs to
+        # whoever caught it. Refusing without close() leaves it to the collector, and Python 3.14's
+        # addbase then prints `ResourceWarning: Implicitly cleaning up <HTTPError 503: ...>` after the
+        # refusal; 3.12 prints nothing, which is why the case reads a close rather than a warning.
+        class Answer(urllib.error.HTTPError):
+            was_closed = False
+
+            def close(self):
+                type(self).was_closed = True
+                super().close()
+
+        self.stub(raises=Answer(race_calendar.API.format(season="2026"), 503, "Service Unavailable",
+                                {}, io.BytesIO(b"unavailable")))
+        status, stderr = self.run_main(str(self.theme), "--season", "2026")
+        self.assert_refused(status, stderr, "Jolpica answered 503 Service Unavailable")
+        self.assertTrue(Answer.was_closed, "the 503 the script refused was left open")
 
     def test_a_body_that_is_not_json_is_named_as_such(self):
         self.stub(body=b"<html><body>502 Bad Gateway</body></html>")

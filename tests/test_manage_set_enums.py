@@ -138,6 +138,43 @@ class SetEnumTest(unittest.TestCase):
                 self.assertIsNone(self.set_key(key, value), f"{key} is free text, so {value!r} is fine")
                 self.assertEqual(self.written()[key], value)
 
+    def test_festival_until_refuses_a_date_the_launcher_cannot_read(self):
+        # Festival.parse() drops the whole skin for a date LocalDate.parse() rejects.
+        for value in ("tomorrow", "2026-11-31", "20261130", "2026-W48-1", "2026-1-5", "26-11-30", "2026-11-30T10:00",
+                      " 2026-11-30"):
+            with self.subTest(value=value):
+                refusal = self.set_key("festival_until", value)
+                self.assertIsNotNone(refusal, f"{value!r} was written, and the launcher turns the skin off for it")
+                self.assertIn("festival_until", refusal)
+                self.assertIn("Nothing was written or pushed", refusal)
+                self.assertIsNone(self.written())
+
+    def test_festival_until_takes_a_real_date_or_nothing(self):
+        for value in ("2026-11-30", " 2026-11-30 ", "\t2026-11-30\n", "2028-02-29", ""):
+            with self.subTest(value=value):
+                self.assertIsNone(self.set_key("festival_until", value))
+                self.assertEqual(self.written()["festival_until"], value)
+
+    def test_a_festival_name_over_40_characters_is_refused(self):
+        # Festival.parse() answers NONE for a trimmed name longer than 40, which turns the skin off.
+        for key in ("festival", "seasonal_skin"):
+            with self.subTest(key=key):
+                self.assertIsNone(self.set_key(key, "a" * 40))
+                self.assertIsNone(self.set_key(key, "  " + "a" * 40 + "  "))
+                self.config.unlink()
+                refusal = self.set_key(key, "a" * 41)
+                self.assertIsNotNone(refusal, "a 41-character name was written, and the launcher drops the skin")
+                self.assertIn(key, refusal)
+                self.assertIn("40", refusal)
+                self.assertIn("Nothing was written or pushed", refusal)
+                self.assertIsNone(self.written())
+                # Java counts UTF-16 units: 20 emoji are 40 units, 21 are 42.
+                self.assertIsNone(self.set_key(key, "\U0001f389" * 20))
+                self.config.unlink()
+                self.assertIsNotNone(self.set_key(key, "\U0001f389" * 21))
+                # Java trim() keeps a no-break space, so it counts toward the 40.
+                self.assertIsNotNone(self.set_key(key, " " + "a" * 40))
+
     def test_a_number_key_is_unaffected(self):
         self.assertIsNone(self.set_key("columns", "4"))
         self.assertEqual(self.written()["columns"], 4)
