@@ -9,6 +9,8 @@ import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.os.Build;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
@@ -25,8 +27,21 @@ import java.util.function.Supplier;
 final class Ui {
     private Ui() {}
 
-    /** Android 9 to 11: older TVs and boxes, whose GPUs need the cheaper drawing paths (Shadows, rounded images). */
-    static final boolean LEGACY = Build.VERSION.SDK_INT < 31;
+    /** Cheaper drawing paths for older Android versions and TVs with less than 3 GiB of usable RAM. */
+    static final boolean LEGACY = Build.VERSION.SDK_INT < 31 || smallMemory();
+
+    private static boolean smallMemory() {
+        // LEGACY is initialized before Ui.init provides a Context.
+        try (BufferedReader reader = new BufferedReader(new FileReader("/proc/meminfo"))) {
+            String line = reader.readLine();
+            if (line != null && line.startsWith("MemTotal:")) {
+                return Long.parseLong(line.replaceAll("\\D+", "")) < 3L * 1024 * 1024;
+            }
+        } catch (IOException | NumberFormatException | SecurityException ignored) {
+        }
+        return false;
+    }
+
     static final Locale RU = new Locale("ru", "RU");
     static final Locale PT = new Locale("pt", "BR");
     static final Locale TR = new Locale("tr", "TR");
