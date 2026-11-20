@@ -26,7 +26,7 @@ a workflow brings in CleanYourTV's changes every day ([`sync-upstream.yml`](.git
 | "Watch on…" | — | Opens the app | Opens **the title** in the app (Netflix, Disney+, Apple TV, Max, Prime) when Wikidata knows its id |
 | Remote buttons | `app_keys` in a theme | — | A `remote.json` per model + a settings screen on the TV |
 | Configuration | The theme's `config.json` | Settings on the TV | A `config.json` pushed from the computer + settings on the TV |
-| Language | English | Several | English and Portuguese, plus Spanish, German, Russian, French and Turkish; follows the TV |
+| Language | English | Several | English and Portuguese, plus Spanish, German, Russian, Ukrainian, French and Turkish; follows the TV |
 | Cost for an AI assistant to adapt | Low | Medium | **Higher**: more code, network and screens, more tokens |
 
 Just want a clean TV and a minimal home? Use CleanYourTV's `launcher/`. Want the home screen without the debloat? Use
