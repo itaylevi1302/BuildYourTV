@@ -54,11 +54,10 @@ public class TmdbLoginActivity extends Activity {
 
     private void showSignedIn() {
         box.removeAllViews();
-        box.addView(line(56, TvUi.INK, Ui.tr("Conta TMDB conectada", "TMDB account connected")));
+        box.addView(line(56, TvUi.INK, Strings.get(R.string.tmdb_account_connected)));
         box.addView(line(30, TvUi.DIM, Tmdb.accountName(this)));
-        box.addView(line(26, TvUi.DIM, Ui.tr("Minha lista e as notas vêm da sua conta e são salvas nela.",
-                "My list and ratings come from your account and are saved to it.")));
-        TextView out = TvUi.button(this, k, Ui.tr("Desconectar", "Disconnect"), v -> {
+        box.addView(line(26, TvUi.DIM, Strings.get(R.string.tmdb_list_and_ratings_synced)));
+        TextView out = TvUi.button(this, k, Strings.get(R.string.disconnect), v -> {
             Tmdb.signOut(this);
             finish();
         });
@@ -70,8 +69,8 @@ public class TmdbLoginActivity extends Activity {
 
     private void start() {
         box.removeAllViews();
-        box.addView(line(56, TvUi.INK, Ui.tr("Conectar sua conta TMDB", "Connect your TMDB account")));
-        status = line(28, TvUi.DIM, Ui.tr("Preparando…", "Getting ready…"));
+        box.addView(line(56, TvUi.INK, Strings.get(R.string.connect_your_tmdb_account)));
+        status = line(28, TvUi.DIM, Strings.get(R.string.getting_ready));
         box.addView(status);
         new Thread(() -> {
             try {
@@ -88,18 +87,17 @@ public class TmdbLoginActivity extends Activity {
                         return;
                     }
                 }
-                main.post(() -> status.setText(Ui.tr("O link expirou. Volte e abra de novo.", "The link expired. Go back and open it again.")));
+                main.post(() -> status.setText(Strings.get(R.string.the_link_expired_go_back_and_open_it_again)));
             } catch (Exception e) {
-                main.post(() -> status.setText(Ui.tr("Não deu para conectar: ", "Couldn't connect: ") + e.getMessage()));
+                main.post(() -> status.setText(Strings.get(R.string.couldnt_connect_prefix) + e.getMessage()));
             }
         }).start();
     }
 
     private void showCode(String url, Bitmap qr) {
         box.removeAllViews();
-        box.addView(line(56, TvUi.INK, Ui.tr("Conectar sua conta TMDB", "Connect your TMDB account")));
-        box.addView(line(28, TvUi.DIM, Ui.tr("Aponte a câmera do celular, entre no TMDB e toque em Aprovar.",
-                "Point your phone's camera, sign in to TMDB and tap Approve.")));
+        box.addView(line(56, TvUi.INK, Strings.get(R.string.connect_your_tmdb_account)));
+        box.addView(line(28, TvUi.DIM, Strings.get(R.string.tmdb_approval_qr_hint)));
         ImageView img = new ImageView(this);
         img.setImageBitmap(qr);
         img.setBackgroundColor(Color.WHITE);
@@ -110,7 +108,7 @@ public class TmdbLoginActivity extends Activity {
         lp.bottomMargin = Math.round(20 * k);
         box.addView(img, lp);
         box.addView(line(24, TvUi.FAINT, url));
-        status = line(28, TvUi.DIM, Ui.tr("Aguardando a aprovação…", "Waiting for approval…"));
+        status = line(28, TvUi.DIM, Strings.get(R.string.waiting_for_approval));
         box.addView(status);
     }
 

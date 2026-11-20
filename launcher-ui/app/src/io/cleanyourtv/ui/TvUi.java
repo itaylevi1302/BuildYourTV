@@ -328,12 +328,12 @@ final class TvUi {
         arrow.setText("›");
         arrow.setGravity(Gravity.CENTER);
         TextView label = text(a, k, 26, Ui.medium, INK);
-        label.setText(Ui.tr("Ver mais", "See more"));
+        label.setText(Strings.get(R.string.see_more));
         label.setGravity(Gravity.CENTER);
         label.setPadding(0, Math.round(12 * k), 0, 0);
         card.addView(arrow);
         card.addView(label);
-        card.setContentDescription(Ui.tr("Ver mais", "See more"));
+        card.setContentDescription(Strings.get(R.string.see_more));
         card.setOnClickListener(v -> open.run());
         focusable(card, k, 14 * k);
         cell.addView(card, new LinearLayout.LayoutParams(w, h));
@@ -480,7 +480,7 @@ final class TvUi {
         View root = a.getWindow().getDecorView();
         int w = root.getWidth(), h = root.getHeight();
         Rect middle = new Rect(w / 2, h / 2, w / 2, h / 2 + 1);
-        popover(a, root, middle, question, new String[] {yes, Ui.tr("Cancelar", "Cancel")}, which -> { if (which == 0) ok.run(); });
+        popover(a, root, middle, question, new String[] {yes, Strings.get(R.string.cancel)}, which -> { if (which == 0) ok.run(); });
     }
 
     /**

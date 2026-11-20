@@ -95,14 +95,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private static final float L_PLATTER_TOP = 814, L_TILE_H = 126;
     private static final float L_DATE_BASE = 330, L_CLOCK_BASE = 540, L_WEATHER_BASE = 626, L_QUOTES_BASE = 694;
     private static final int L_INK = 0xFF1D1D1F, L_DIM = 0xFF6E6E73, L_FAINT = 0xFF8E8E93;
-    private static final String[] TABS = {"Explorar", "Filmes", "Séries"};
-    private static final String[] TABS_RU = {"Обзор", "Фильмы", "Сериалы"};
-    private static final String[] TABS_EN = {"Explore", "Movies", "Shows"};
-    private static final String[] TABS_ES = {"Explorar", "Películas", "Series"};
-    private static final String[] TABS_DE = {"Entdecken", "Filme", "Serien"};
-    private static final String[] TABS_FR = {"Explorer", "Films", "Séries"};
-    private static final String[] TABS_TR = {"Keşfet", "Filmler", "Diziler"};
-    private static final String[] TABS_HE = {"גילוי", "סרטים", "סדרות"};
+    private static final int[] TABS = {R.string.home_tab_explore, R.string.home_tab_movies, R.string.home_tab_shows};
     private static final String[] TAB_KIND = {null, "movie", "tv"};
     private static final int Z_TOP = 4, Z_CARDS = 5;
 
@@ -480,13 +473,9 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     /** The three corner buttons, with their names in the current language. */
     private void makeLightButtons() {
         lightButtons.clear();
-        lightButtons.add(HomeApps.action(HomeApps.EXPLORE, "explore", Ui.tr("Explorar filmes e séries", "Explore movies and shows"), "play"));
-        lightButtons.add(HomeApps.action(HomeApps.INPUTS, "inputs", Ui.tr("Entradas HDMI", "HDMI Inputs"), "hdmi"));
-        lightButtons.add(HomeApps.action(HomeApps.SETTINGS, "settings", Ui.tr("Configurações", "Settings"), "settings"));
-    }
-
-    private static String[] tabs() {
-        return Ui.he ? TABS_HE : Ui.ru ? TABS_RU : Ui.es ? TABS_ES : Ui.de ? TABS_DE : Ui.fr ? TABS_FR : Ui.tur ? TABS_TR : Ui.en ? TABS_EN : TABS;
+        lightButtons.add(HomeApps.action(HomeApps.EXPLORE, "explore", Strings.get(R.string.explore_movies_and_shows), "play"));
+        lightButtons.add(HomeApps.action(HomeApps.INPUTS, "inputs", Strings.get(R.string.hdmi_inputs), "hdmi"));
+        lightButtons.add(HomeApps.action(HomeApps.SETTINGS, "settings", Strings.get(R.string.settings_2), "settings"));
     }
 
     @Override public void onData() {
@@ -1529,8 +1518,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         hourTemp.setColor(drawerInk(0.95f));
         pricePaint.setColor(drawerInk(0.95f));
         float titleBase = ROW_TITLE * k;
-        if (drawerInputs > 0) drawRowTitle(c, Ui.tr("Entradas", "Inputs"), drawerRects[0], titleBase);
-        if (drawerInputs < drawerItems.size()) drawRowTitle(c, Ui.tr("Atalhos", "Shortcuts"), drawerRects[drawerInputs], titleBase);
+        if (drawerInputs > 0) drawRowTitle(c, Strings.get(R.string.inputs), drawerRects[0], titleBase);
+        if (drawerInputs < drawerItems.size()) drawRowTitle(c, Strings.get(R.string.shortcuts), drawerRects[drawerInputs], titleBase);
         int top = -1;
         for (int i = 0; i < drawerItems.size(); i++) if (drawerFocus[i].value > 0.02f && (top < 0 || drawerFocus[i].value > drawerFocus[top].value)) top = i;
         for (int i = 0; i < drawerItems.size(); i++) if (i != top) drawDrawerTile(c, i);
@@ -1592,7 +1581,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         c.drawText(weatherTitle, x, r.top + 54 * k, cardTitle);
         HomeData.Weather wx = textWeather;
         if (Double.isNaN(wx.temp)) {
-            c.drawText(Ui.tr("Sem dados do clima agora.", "No weather data right now."), x, r.top + 120 * k, cardDim);
+            c.drawText(Strings.get(R.string.no_weather_data_right_now), x, r.top + 120 * k, cardDim);
             return;
         }
         String symbol = Symbols.weather(wx.code, wx.isDay);
@@ -1624,28 +1613,22 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         textLanguage = Ui.language;
         if (wx != textWeather || settings) {
             textWeather = wx;
-            weatherTitle = Prefs.city().isEmpty() ? Ui.tr("Clima", "Weather") : Prefs.city();
+            weatherTitle = Prefs.city().isEmpty() ? Strings.get(R.string.weather) : Prefs.city();
             nowTemp = HomeData.degrees(wx.temp);
-            highLow = Ui.he ? "מקס' " + HomeData.degrees(wx.max) + "   מינ' " + HomeData.degrees(wx.min)
-                    : Ui.ru ? "Макс. " + HomeData.degrees(wx.max) + "   Мин. " + HomeData.degrees(wx.min)
-                    : Ui.en ? "H:" + HomeData.degrees(wx.max) + "   L:" + HomeData.degrees(wx.min)
-                    : Ui.de ? "H:" + HomeData.degrees(wx.max) + "   T:" + HomeData.degrees(wx.min)
-                    : Ui.fr ? "Max. " + HomeData.degrees(wx.max) + "   Min. " + HomeData.degrees(wx.min)
-                    : Ui.tur ? "Y:" + HomeData.degrees(wx.max) + "   D:" + HomeData.degrees(wx.min)
-                    : "Máx. " + HomeData.degrees(wx.max) + "   Mín. " + HomeData.degrees(wx.min);
+            highLow = Strings.get(R.string.weather_range_wide, HomeData.degrees(wx.max), HomeData.degrees(wx.min));
             for (int i = 0; i < wx.hours.size() && i < 6; i++) {
                 hourText[i] = HomeData.hour(wx.hours.get(i));
                 hourTempText[i] = HomeData.degrees(wx.hourTemp.get(i));
             }
-            sunriseText = Ui.tr("Nascer ", "Sunrise ") + Ui.time(wx.sunrise);
-            sunsetText = Ui.tr("Pôr do sol ", "Sunset ") + Ui.time(wx.sunset);
+            sunriseText = Strings.get(R.string.sunrise_prefix) + Ui.time(wx.sunrise);
+            sunsetText = Strings.get(R.string.sunset_prefix) + Ui.time(wx.sunset);
         }
         long minute = System.currentTimeMillis() / 60_000;
         if (data.pricesAt != textPricesAt || minute != textMinute || settings) {
             textPricesAt = data.pricesAt;
             textMinute = minute;
             String stale = HomeData.staleness(data.pricesAt, 5 * 60_000L);
-            staleText = stale.isEmpty() ? Ui.tr("variação em 24 h", "24h change") : Ui.tr("de ", "", "de ") + stale;
+            staleText = stale.isEmpty() ? Strings.get(R.string.label_24h_change) : Strings.get(R.string.stale_quote_prefix) + stale;
             for (int i = 0; i < HomeData.COINS.length; i++) {
                 priceText[i] = HomeData.brl(data.prices[i]);
                 changeText[i] = HomeData.change(data.changes[i]);
@@ -1707,7 +1690,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private void drawPrices(Canvas c, RectF r) {
         float x = r.left + 34 * k, right = r.right - 34 * k;
         refreshDrawerText();
-        c.drawText(Ui.tr("Cotações", "Crypto"), x, r.top + 54 * k, cardTitle);
+        c.drawText(Strings.get(R.string.crypto), x, r.top + 54 * k, cardTitle);
         c.drawText(staleText, right, r.top + 54 * k, cardDimRight);
         float cap = Ui.cap(cardText);
         int[] coins = HomeData.active();
@@ -1810,7 +1793,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private void drawSheet(Canvas c) {
         c.drawColor(0xA8000000);
         float shift = scroll.value * GRID_ROW * k;
-        c.drawText(Ui.tr("Todos os Apps", "All Apps"), w / 2f, 124 * k - shift, sheetTitle);
+        c.drawText(Strings.get(R.string.all_apps), w / 2f, 124 * k - shift, sheetTitle);
         int n = others.size();
         if (gridLabels == null || gridLabels.length != n) {
             gridLabels = new String[n];
@@ -2210,7 +2193,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
         boolean opened = HomeApps.open(activity, it, this, Math.round(r.left), Math.round(r.top),
                 Math.round(r.width()), Math.round(r.height()));
-        if (!opened) showToast(Ui.tr("Não deu para abrir ", "Couldn't open ") + it.label + ".");
+        if (!opened) showToast(Strings.get(R.string.couldnt_open_prefix) + it.label + ".");
     }
 
     // MARK: - Moving apps on the shelf
@@ -2250,21 +2233,21 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
         if (movable) {
-            labels.add(Ui.tr("Mover", "Move"));
+            labels.add(Strings.get(R.string.move));
             actions.add(this::startReorder);
         }
-        labels.add(Ui.tr("Logo e cor", "Logo and color"));
+        labels.add(Strings.get(R.string.logo_and_color));
         actions.add(() -> CustomTiles.edit(activity, it.pkg, it.label, this::reload));
-        labels.add(Ui.tr("Configurações do app", "App settings"));
+        labels.add(Strings.get(R.string.app_settings));
         actions.add(() -> {
             try {
                 activity.startActivity(new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                         android.net.Uri.parse("package:" + it.pkg)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
             } catch (Exception e) {
-                showToast(Ui.tr("Esta TV não abre os ajustes do app.", "This TV can't open the app's settings."));
+                showToast(Strings.get(R.string.this_tv_cant_open_the_apps_settings));
             }
         });
-        labels.add(Ui.tr("Sair", "Close"));
+        labels.add(Strings.get(R.string.close));
         actions.add(() -> {});
         RectF r = sheetOpen ? focusedCell : tileRects[shelfIndex];
         int[] at = new int[2];
@@ -2286,8 +2269,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         reorderAt = SystemClock.uptimeMillis();
         moveLift.target = 1;
         click.open();
-        showToast(Ui.tr("← → para mover · OK para soltar · Voltar para cancelar",
-                "← → to move · OK to drop · Back to cancel"));
+        showToast(Strings.get(R.string.to_move_ok_to_drop_back_to_cancel));
         retarget(false);    // TalkBack reads "Moving <app>, position i of n"
     }
 
@@ -2470,15 +2452,15 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         switch (group) {
             case GRID:
                 if (i >= others.size()) return "";
-                return label(others, i) + ", " + (i + 1) + Ui.tr(" de ", " of ") + others.size();
+                return label(others, i) + ", " + (i + 1) + Strings.get(R.string.of_suffix_prefix) + others.size();
             case Z_TOP:
                 if (i >= 3) return label(lightButtons, i - 3);
-                return tabs()[i] + Ui.tr(", aba ", ", tab ") + (i + 1) + Ui.tr(" de 3", " of 3");
+                return Strings.get(TABS[i]) + Strings.get(R.string.tab_prefix) + (i + 1) + Strings.get(R.string.of_3_suffix);
             case Z_CARDS: return i < cards.size() ? pickText(cards.get(i)) : "";
             case Z_SHELF:
                 if (reordering && i == shelfIndex) {
-                    return Ui.tr("Movendo ", "Moving ", "Moviendo ") + label(shelf, i)
-                            + Ui.tr(", posição ", ", position ", ", posición ") + (i + 1) + Ui.tr(" de ", " of ") + shelf.size();
+                    return Strings.get(R.string.moving_prefix) + label(shelf, i)
+                            + Strings.get(R.string.position_prefix) + (i + 1) + Strings.get(R.string.of_suffix_prefix) + shelf.size();
                 }
                 return label(shelf, i);
             case Z_DRAWER: return label(drawerItems, i);
@@ -2631,27 +2613,27 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
 
     /** The weather card as TalkBack reads it: what it shows, in the same words and units. */
     private String weatherText() {
-        StringBuilder s = new StringBuilder(Prefs.city().isEmpty() ? Ui.tr("Clima", "Weather") : Prefs.city());
+        StringBuilder s = new StringBuilder(Prefs.city().isEmpty() ? Strings.get(R.string.weather) : Prefs.city());
         HomeData.Weather wx = data.weather;
-        if (Double.isNaN(wx.temp)) return s.append(". ").append(Ui.tr("Sem dados do clima agora.", "No weather data right now.")).toString();
+        if (Double.isNaN(wx.temp)) return s.append(". ").append(Strings.get(R.string.no_weather_data_right_now)).toString();
         s.append(". ").append(HomeData.degrees(wx.temp)).append(", ").append(HomeData.condition(wx.code, wx.isDay))
-                .append(Ui.tr(". Máxima ", ". High ")).append(HomeData.degrees(wx.max))
-                .append(Ui.tr(", mínima ", ", low ")).append(HomeData.degrees(wx.min)).append('.');
+                .append(Strings.get(R.string.high_prefix)).append(HomeData.degrees(wx.max))
+                .append(Strings.get(R.string.low_prefix)).append(HomeData.degrees(wx.min)).append('.');
         int hours = Math.min(6, wx.hours.size());
-        if (hours > 0) s.append(Ui.tr(" Próximas horas: ", " Next hours: "));
+        if (hours > 0) s.append(Strings.get(R.string.next_hours_suffix_prefix));
         for (int i = 0; i < hours; i++) {
             s.append(HomeData.hour(wx.hours.get(i))).append(' ').append(HomeData.degrees(wx.hourTemp.get(i))).append(i < hours - 1 ? ", " : ".");
         }
-        if (wx.sunrise != 0) s.append(Ui.tr(" Nascer do sol ", " Sunrise ")).append(Ui.time(wx.sunrise)).append('.');
-        if (wx.sunset != 0) s.append(Ui.tr(" Pôr do sol ", " Sunset ")).append(Ui.time(wx.sunset)).append('.');
+        if (wx.sunrise != 0) s.append(Strings.get(R.string.sunrise_suffix_prefix)).append(Ui.time(wx.sunrise)).append('.');
+        if (wx.sunset != 0) s.append(Strings.get(R.string.sunset_suffix_prefix)).append(Ui.time(wx.sunset)).append('.');
         return s.toString();
     }
 
     /** The quotes card as TalkBack reads it: each coin with its price and 24 h change. */
     private String quotesText() {
-        StringBuilder s = new StringBuilder(Ui.tr("Cotações", "Crypto"));
+        StringBuilder s = new StringBuilder(Strings.get(R.string.crypto));
         String stale = HomeData.staleness(data.pricesAt, 5 * 60_000L);
-        s.append(", ").append(stale.isEmpty() ? Ui.tr("variação em 24 h", "24h change") : Ui.tr("de ", "", "de ") + stale).append('.');
+        s.append(", ").append(stale.isEmpty() ? Strings.get(R.string.label_24h_change) : Strings.get(R.string.stale_quote_prefix) + stale).append('.');
         for (int i : HomeData.active()) {
             s.append(' ').append(HomeData.coinName(i)).append(' ').append(HomeData.brl(data.prices[i]));
             if (!Double.isNaN(data.changes[i])) s.append(", ").append(HomeData.change(data.changes[i]));
@@ -2668,7 +2650,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         float pad = 26 * k, tabTop = L_TABBAR_TOP * k, tabBottom = (L_TABBAR_TOP + L_TABBAR_H) * k;
         float x = MARGIN * k - pad;
         for (int i = 0; i < 3; i++) {
-            float tw = Math.max(lTabOn.measureText(tabs()[i]), lTab.measureText(tabs()[i]));
+            float tw = Math.max(lTabOn.measureText(Strings.get(TABS[i])), lTab.measureText(Strings.get(TABS[i])));
             topRects[i].set(x, tabTop, x + tw + 2 * pad, tabBottom);
             x = topRects[i].right + 4 * k;
         }
@@ -2811,7 +2793,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             if (HomeData.coinCount() > 0) drawQuotes(c);
             return;
         }
-        String hello = Ui.tr("Para você", "For You");
+        String hello = Strings.get(R.string.for_you);
         float helloX = Ui.he ? CONTENT_R * k - lTitle.measureText(hello) : MARGIN * k - Ui.leftBearing(lTitle, hello);
         c.drawText(hello, helloX, L_TITLE_BASE * k, lTitle);
         // Text tabs (the selected one in bold, in the main text color); with focus on the tabs, the selected one gets
@@ -2836,7 +2818,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             }
             Paint p = i == tab ? lTabOn : lTab;
             if (i == tab) lTabOn.setColor(blend(tone(L_INK, WHITE), L_INK, focus));   // always dark on the white pill
-            c.drawText(tabs()[i], r.centerX() - p.measureText(tabs()[i]) / 2, r.centerY() + Ui.halfCap(p), p);
+            c.drawText(Strings.get(TABS[i]), r.centerX() - p.measureText(Strings.get(TABS[i])) / 2, r.centerY() + Ui.halfCap(p), p);
         }
         int top = -1;
         for (int i = 0; i < 3; i++) if (cardFocus[i].value > 0.02f && (top < 0 || cardFocus[i].value > cardFocus[top].value)) top = i;
@@ -2860,13 +2842,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             weatherLinePrefs = Prefs.version;
             weatherLineLanguage = Ui.language;
             weatherLine = HomeData.degrees(wx.temp) + "  " + HomeData.condition(wx.code, wx.isDay) + "   "
-                    + (Ui.he ? "מקס' " + HomeData.degrees(wx.max) + "  מינ' " + HomeData.degrees(wx.min)
-                    : Ui.ru ? "Макс. " + HomeData.degrees(wx.max) + "  Мин. " + HomeData.degrees(wx.min)
-                    : Ui.en ? "H:" + HomeData.degrees(wx.max) + "  L:" + HomeData.degrees(wx.min)
-                    : Ui.de ? "H:" + HomeData.degrees(wx.max) + "  T:" + HomeData.degrees(wx.min)
-                    : Ui.fr ? "Max. " + HomeData.degrees(wx.max) + "  Min. " + HomeData.degrees(wx.min)
-                    : Ui.tur ? "Y:" + HomeData.degrees(wx.max) + "  D:" + HomeData.degrees(wx.min)
-                    : "Máx. " + HomeData.degrees(wx.max) + "  Mín. " + HomeData.degrees(wx.min));
+                    + Strings.get(R.string.weather_range, HomeData.degrees(wx.max), HomeData.degrees(wx.min));
         }
         float size = 40 * k, base = L_WEATHER_BASE * k;
         String symbol = Symbols.weather(wx.code, wx.isDay);

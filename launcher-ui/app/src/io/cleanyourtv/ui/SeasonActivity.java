@@ -53,7 +53,7 @@ public class SeasonActivity extends Activity {
         h.setText(getIntent().getStringExtra(NAME));
         list.addView(h);
         TextView sub = TvUi.text(this, k, 28, Ui.medium, TvUi.DIM);
-        sub.setText(season == 0 ? Ui.tr("Especiais", "Specials") : Ui.tr("Temporada ", "Season ") + season);
+        sub.setText(season == 0 ? Strings.get(R.string.specials) : Strings.get(R.string.season_prefix) + season);
         sub.setPadding(0, Math.round(10 * k), 0, Math.round(26 * k));
         list.addView(sub);
         scroll.addView(list);
@@ -64,7 +64,7 @@ public class SeasonActivity extends Activity {
                 JSONObject o = Tmdb.get("/tv/" + series + "/season/" + season);
                 main.post(() -> { if (!isFinishing()) show(o); });
             } catch (Exception e) {
-                main.post(() -> sub.setText(Ui.tr("Não deu para abrir a temporada: ", "Couldn't open the season: ") + e.getMessage()));
+                main.post(() -> sub.setText(Strings.get(R.string.couldnt_open_the_season_prefix) + e.getMessage()));
             }
         }).start();
     }
@@ -144,7 +144,7 @@ public class SeasonActivity extends Activity {
 
     private void rate(int number, String name) {
         if (!Tmdb.signedIn(this)) {
-            Toast.makeText(this, Ui.tr("Conecte sua conta TMDB em Ajustes para dar nota.", "Connect your TMDB account in Settings to rate."), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, Strings.get(R.string.connect_your_tmdb_account_in_settings_to_rate), Toast.LENGTH_LONG).show();
             return;
         }
         String[] items = new String[10];

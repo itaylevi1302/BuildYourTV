@@ -27,7 +27,7 @@ final class Prefs {
 
     static void init(Context c) {
         app = c.getApplicationContext();
-        Ui.applyLanguage();   // the language picked on the TV, now that it can be read
+        Ui.applyLanguage(app);   // the language picked on the TV, now that it can be read
     }
 
     private static SharedPreferences sp() {
@@ -46,15 +46,15 @@ final class Prefs {
 
     // MARK: - Language and units
 
-    /** "auto", "pt", "en", "es", "de", "ru", "fr", "tr" or "he". */
+    /** "auto", "pt", "en", "es", "de", "ru", "uk", "fr", "tr" or "he". */
     static String language() {
         String v = app == null ? Config.LANGUAGE : sp().getString("language", Config.LANGUAGE);
         v = v.trim().toLowerCase(Locale.ROOT);
-        return v.startsWith("ru") ? "ru" : v.startsWith("pt") ? "pt" : v.startsWith("es") ? "es" : v.startsWith("de") ? "de"
+        return v.startsWith("ru") ? "ru" : v.startsWith("uk") ? "uk" : v.startsWith("pt") ? "pt" : v.startsWith("es") ? "es" : v.startsWith("de") ? "de"
                 : v.startsWith("fr") ? "fr" : v.startsWith("tr") ? "tr" : v.startsWith("he") || v.startsWith("iw") ? "he" : v.startsWith("en") ? "en" : "auto";
     }
 
-    static void setLanguage(String v) { put("language", v); Ui.applyLanguage(); }
+    static void setLanguage(String v) { put("language", v); Ui.applyLanguage(app); }
 
     /** "auto", "C" or "F". */
     static String temperature() {
@@ -132,7 +132,7 @@ final class Prefs {
     static void reload() {
         if (app == null) return;
         app.getSharedPreferences("settings", Context.MODE_MULTI_PROCESS);
-        Ui.applyLanguage();
+        Ui.applyLanguage(app);
     }
 
     // MARK: - City

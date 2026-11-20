@@ -75,12 +75,12 @@ final class RemoteKeys {
                 }
             }
             if (text == null && VESTEL) {
-                out.add(new Button("k" + KeyEvent.KEYCODE_STEM_1, Ui.tr("Botão Netflix", "Netflix button"), "com.netflix.ninja"));
+                out.add(new Button("k" + KeyEvent.KEYCODE_STEM_1, Strings.get(R.string.netflix_button), "com.netflix.ninja"));
             } else if (text == null && TCL) {
-                out.add(new Button("k4062", Ui.tr("Botão Netflix", "Netflix button"), "com.netflix.ninja"));
-                out.add(new Button("k190", Ui.tr("Botão YouTube", "YouTube button"), "com.google.android.youtube.tv"));
-                out.add(new Button("k4099", Ui.tr("Botão Prime Video", "Prime Video button"), "com.amazon.amazonvideo.livingroom"));
-                out.add(new Button("k4020", Ui.tr("Botão TCL Channel", "TCL Channel button"), ""));
+                out.add(new Button("k4062", Strings.get(R.string.netflix_button), "com.netflix.ninja"));
+                out.add(new Button("k190", Strings.get(R.string.youtube_button), "com.google.android.youtube.tv"));
+                out.add(new Button("k4099", Strings.get(R.string.prime_video_button), "com.amazon.amazonvideo.livingroom"));
+                out.add(new Button("k4020", Strings.get(R.string.tcl_channel_button), ""));
             }
             cached = out;
             return out;

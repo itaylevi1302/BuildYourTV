@@ -89,7 +89,7 @@ logged, never guessed. [`config.example.json`](config.example.json) has them all
 |---|---|---|
 | `tmdb_key` | TMDB API key or read access token | Free at themoviedb.org → Settings → API. The picks, Explore and the TMDB sign-in need it. Can also be typed on the TV under TMDB account. |
 | `tmdb_region` | `"auto"` or two letters (`"BR"`, `"US"`) | Which titles are on which streaming app. `auto` is the TV's country. |
-| `language` | `auto`, `pt`, `en`, `es`, `de`, `ru`, `fr`, `tr`, `he` | `auto` follows the TV. Hebrew (`he`) also mirrors the home screen right to left. |
+| `language` | `auto`, `pt`, `en`, `es`, `de`, `ru`, `uk`, `fr`, `tr`, `he` | `auto` (default) follows the TV. English is the fallback. Hebrew (`he`) also mirrors the home screen right to left. |
 | `shelf` | list of packages | The apps on the home screen, in order. |
 | `dock_apps` | list of packages | CleanYourTV's name for `shelf`, read when `shelf` is absent, so a theme's `config.json` works. |
 | `hidden_apps` | list of packages | Apps never shown. |
@@ -110,6 +110,12 @@ logged, never guessed. [`config.example.json`](config.example.json) has them all
 
 A button's action is a package, `input:<TV input id>`, `live`, `settings`, `home`, `tmdb:explore`, `tmdb:watchlist`,
 or `""` for what the button did before.
+
+## Translations
+
+Edit the English defaults in [`app/res/values/strings.xml`](app/res/values/strings.xml)
+and use the same resource names in each language's `app/res/values-<language>/strings.xml`.
+Use Android plurals for counts, and keep format arguments such as `%1$s` in translated strings.
 
 ## More
 

@@ -78,7 +78,7 @@ public class DetailActivity extends Activity {
         content.setPadding(Math.round(96 * k), Math.round(90 * k), 0, Math.round(80 * k));
         content.setClipToPadding(false);
         TextView loading = TvUi.text(this, k, 30, Ui.regular, TvUi.DIM);
-        loading.setText(Ui.tr("Carregando…", "Loading…"));
+        loading.setText(Strings.get(R.string.loading));
         content.addView(loading);
         scroll.addView(content);
         root.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -111,7 +111,7 @@ public class DetailActivity extends Activity {
                     show(o, col, rev);
                 });
             } catch (Exception e) {
-                main.post(() -> loading.setText(Ui.tr("Não deu para abrir este título: ", "Couldn't open this title: ") + e.getMessage()));
+                main.post(() -> loading.setText(Strings.get(R.string.couldnt_open_this_title_prefix) + e.getMessage()));
             }
         }).start();
     }
@@ -132,14 +132,14 @@ public class DetailActivity extends Activity {
         List<String> meta = new ArrayList<>();
         String cert = certification(o);
         if (!cert.isEmpty()) meta.add(cert);
-        meta.add(movie ? Ui.tr("Filme", "Movie") : Ui.tr("Série", "Show"));
+        meta.add(movie ? Strings.get(R.string.movie) : Strings.get(R.string.show));
         if (!year.isEmpty()) meta.add(year);
         JSONArray genres = o.optJSONArray("genres");
         for (int i = 0; genres != null && i < genres.length() && i < 3; i++) meta.add(genres.optJSONObject(i).optString("name"));
         int runtime = o.optInt("runtime");
-        if (movie && runtime > 0) meta.add(runtime >= 60 ? (runtime / 60) + " h " + (runtime % 60) + " min" : runtime + " min");
+        if (movie && runtime > 0) meta.add(Strings.duration(runtime));
         int seasons = o.optInt("number_of_seasons");
-        if (!movie && seasons > 0) meta.add(seasons == 1 ? Ui.tr("1 temporada", "1 season") : seasons + Ui.tr(" temporadas", " seasons"));
+        if (!movie && seasons > 0) meta.add(Strings.quantity(R.plurals.seasons, seasons));
         double vote = o.optDouble("vote_average");
         if (vote > 0) meta.add(String.format(Ui.PT, "★ %.1f (%d)", vote, o.optInt("vote_count")));
         TextView m = TvUi.text(this, k, 28, Ui.medium, TvUi.DIM);
@@ -187,7 +187,7 @@ public class DetailActivity extends Activity {
         TvUi.Flow actions = new TvUi.Flow(this, Math.round(20 * k), Math.round(20 * k));
         actions.setPadding(Math.round(14 * k), Math.round(36 * k), Math.round(96 * k), Math.round(16 * k));
         if (watchApp != null) {
-            actions.addView((TvUi.button(this, k, "▶  " + Ui.tr("Assistir em ", "Watch on ") + watchApp[1], v -> watch(watchApp[0]))));
+            actions.addView((TvUi.button(this, k, "▶  " + Strings.get(R.string.watch_on_prefix) + watchApp[1], v -> watch(watchApp[0]))));
         }
         listButton = TvUi.button(this, k, "", v -> toggleList());
         actions.addView((listButton));
@@ -199,14 +199,14 @@ public class DetailActivity extends Activity {
             actions.addView((favButton));
             rateButton = TvUi.button(this, k, "", v -> rate());
             actions.addView((rateButton));
-            if (movie) actions.addView((TvUi.button(this, k, "≡  " + Ui.tr("Lista", "List"), v -> addToList())));
+            if (movie) actions.addView((TvUi.button(this, k, "≡  " + Strings.get(R.string.list), v -> addToList())));
         }
         String trailer = trailer(o);
-        if (trailer != null) actions.addView((TvUi.button(this, k, Ui.tr("Trailer", "Trailer"), v -> playTrailer(trailer))));
+        if (trailer != null) actions.addView((TvUi.button(this, k, Strings.get(R.string.trailer), v -> playTrailer(trailer))));
         content.addView(actions, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         labels();
 
-        content.addView(header(Ui.tr("Onde assistir", "Where to watch")));
+        content.addView(header(Strings.get(R.string.where_to_watch)));
         content.addView(whereToWatch(region), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TvUi.OnTitle open = t -> DetailActivity.open(this, t.kind, t.id);
@@ -214,13 +214,13 @@ public class DetailActivity extends Activity {
             List<Tmdb.Title> seasonCards = seasons(o);
             if (!seasonCards.isEmpty()) {
                 TvUi.OnTitle season = t -> SeasonActivity.open(this, id, t.id, name);
-                content.addView(TvUi.row(this, k, Ui.tr("Temporadas", "Seasons"), seasonCards, season,
-                        () -> GridActivity.show(this, name + " · " + Ui.tr("Temporadas", "Seasons"), seasonCards, season), Math.round(96 * k)));
+                content.addView(TvUi.row(this, k, Strings.get(R.string.seasons), seasonCards, season,
+                        () -> GridActivity.show(this, name + " · " + Strings.get(R.string.seasons), seasonCards, season), Math.round(96 * k)));
             }
         }
         List<Tmdb.Title> cast = cast(o, movie);
-        if (!cast.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Elenco", "Cast"), cast, open,
-                () -> GridActivity.show(this, name + " · " + Ui.tr("Elenco", "Cast"), cast, open), Math.round(96 * k)));
+        if (!cast.isEmpty()) content.addView(TvUi.row(this, k, Strings.get(R.string.cast), cast, open,
+                () -> GridActivity.show(this, name + " · " + Strings.get(R.string.cast), cast, open), Math.round(96 * k)));
         if (collection != null) {
             List<Tmdb.Title> parts = Tmdb.titles(collection, "parts", "movie");
             parts.sort((a, b) -> a.year.compareTo(b.year));
@@ -228,17 +228,17 @@ public class DetailActivity extends Activity {
         }
         View keywords = keywords(o, movie);
         if (keywords != null) {
-            content.addView(header(Ui.tr("Palavras-chave", "Keywords")));
+            content.addView(header(Strings.get(R.string.keywords)));
             content.addView(keywords, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
         if (reviews != null && reviews.length() > 0) {
-            content.addView(header(Ui.tr("Resenhas", "Reviews")));
+            content.addView(header(Strings.get(R.string.reviews)));
             for (int i = 0; i < reviews.length() && i < 2; i++) content.addView(review(reviews.optJSONObject(i)));
         }
         JSONObject recs = o.optJSONObject("recommendations");
         List<Tmdb.Title> similar = recs == null ? new ArrayList<>() : Tmdb.titles(recs, kind);
-        if (!similar.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Você também pode gostar", "You may also like"), similar, open,
-                () -> GridActivity.open(this, Ui.tr("Parecidos com ", "Like ") + name, "/" + kind + "/" + id + "/recommendations", kind), Math.round(96 * k)));
+        if (!similar.isEmpty()) content.addView(TvUi.row(this, k, Strings.get(R.string.you_may_also_like), similar, open,
+                () -> GridActivity.open(this, Strings.get(R.string.like_prefix) + name, "/" + kind + "/" + id + "/recommendations", kind), Math.round(96 * k)));
         View first = actions.getChildAt(0);
         if (first != null) first.requestFocus();
         new Thread(() -> {
@@ -257,7 +257,7 @@ public class DetailActivity extends Activity {
                     JSONArray dates = r.getJSONArray("release_dates");
                     for (int j = 0; j < dates.length(); j++) {
                         String c = dates.getJSONObject(j).optString("certification");
-                        if (!c.isEmpty()) return c.equals("L") ? Ui.tr("Livre", "All ages") : c + "+";
+                        if (!c.isEmpty()) return c.equals("L") ? Strings.get(R.string.all_ages) : c + "+";
                     }
                 }
             } else {
@@ -266,7 +266,7 @@ public class DetailActivity extends Activity {
                     JSONObject r = results.getJSONObject(i);
                     if (Tmdb.region().equals(r.optString("iso_3166_1"))) {
                         String c = r.optString("rating");
-                        return c.equals("L") ? Ui.tr("Livre", "All ages") : c.isEmpty() ? "" : c + "+";
+                        return c.equals("L") ? Strings.get(R.string.all_ages) : c.isEmpty() ? "" : c + "+";
                     }
                 }
             }
@@ -283,13 +283,13 @@ public class DetailActivity extends Activity {
                 JSONObject c = crew.optJSONObject(i);
                 if ("Director".equals(c.optString("job")) && !names.contains(c.optString("name"))) names.add(c.optString("name"));
             }
-            return names.isEmpty() ? "" : Ui.tr("Direção: ", "Directed by ") + TextUtils.join(", ", names);
+            return names.isEmpty() ? "" : Strings.get(R.string.directed_by_prefix) + TextUtils.join(", ", names);
         }
         JSONArray created = o.optJSONArray("created_by");
         for (int i = 0; created != null && i < created.length(); i++) names.add(created.optJSONObject(i).optString("name"));
         JSONArray networks = o.optJSONArray("networks");
         String net = networks != null && networks.length() > 0 ? networks.optJSONObject(0).optString("name") : "";
-        String who = names.isEmpty() ? "" : Ui.tr("Criação: ", "Created by ") + TextUtils.join(", ", names);
+        String who = names.isEmpty() ? "" : Strings.get(R.string.created_by_prefix) + TextUtils.join(", ", names);
         return net.isEmpty() ? who : who.isEmpty() ? net : who + "  ·  " + net;
     }
 
@@ -300,11 +300,11 @@ public class DetailActivity extends Activity {
         if (next != null) {
             String d = next.optString("air_date");
             String when = d.length() == 10 ? d.substring(8) + "/" + d.substring(5, 7) : d;
-            return Ui.tr("Próximo episódio: ", "Next episode: ") + "T" + next.optInt("season_number") + "E" + next.optInt("episode_number") + " · " + when;
+            return Strings.get(R.string.next_episode_prefix) + "T" + next.optInt("season_number") + "E" + next.optInt("episode_number") + " · " + when;
         }
         String s = o.optString("status");
-        if (s.equals("Ended")) return Ui.tr("Série encerrada", "Ended");
-        if (s.equals("Canceled")) return Ui.tr("Série cancelada", "Canceled");
+        if (s.equals("Ended")) return Strings.get(R.string.ended);
+        if (s.equals("Canceled")) return Strings.get(R.string.canceled);
         return "";
     }
 
@@ -314,9 +314,9 @@ public class DetailActivity extends Activity {
         for (int i = 0; list != null && i < list.length(); i++) {
             JSONObject s = list.optJSONObject(i);
             int n = s.optInt("season_number");
-            String label = n == 0 ? Ui.tr("Especiais", "Specials") : Ui.tr("Temporada ", "Season ") + n;
+            String label = n == 0 ? Strings.get(R.string.specials) : Strings.get(R.string.season_prefix) + n;
             String poster = s.optString("poster_path");
-            out.add(new Tmdb.Title("season", n, label + " · " + s.optInt("episode_count") + Ui.tr(" ep.", " ep."),
+            out.add(new Tmdb.Title("season", n, label + " · " + s.optInt("episode_count") + Strings.get(R.string.ep_suffix),
                     "null".equals(poster) ? "" : poster, "", "", 0));
         }
         out.sort((a, b) -> a.id == 0 ? 1 : b.id == 0 ? -1 : Integer.compare(a.id, b.id));
@@ -352,7 +352,7 @@ public class DetailActivity extends Activity {
             JSONObject w = list.optJSONObject(i);
             String word = w.optString("name");
             int wid = w.optInt("id");
-            line.addView(TvUi.button(this, k, word, v -> GridActivity.open(this, Ui.tr("Com o tema “", "Tagged “") + word + "”",
+            line.addView(TvUi.button(this, k, word, v -> GridActivity.open(this, Strings.get(R.string.tagged) + word + "”",
                     "/discover/" + kind + "?with_keywords=" + wid + "&sort_by=popularity.desc", kind)));
         }
         return line;
@@ -390,11 +390,11 @@ public class DetailActivity extends Activity {
     }
 
     private void labels() {
-        listButton.setText(inList ? "✓  " + Ui.tr("Na minha lista", "In my list") : "+  " + Ui.tr("Minha lista", "My list"));
+        listButton.setText(inList ? "✓  " + Strings.get(R.string.in_my_list) : "+  " + Strings.get(R.string.my_list));
         boolean seen = Tmdb.isSeen(this, kind, id);
-        seenButton.setText(seen ? "✓  " + Ui.tr("Assistido", "Seen") : Ui.tr("Já assisti", "I've seen it"));
-        if (favButton != null) favButton.setText(favorite ? "♥  " + Ui.tr("Favorito", "Favorite") : "♡  " + Ui.tr("Favoritar", "Favorite"));
-        if (rateButton != null) rateButton.setText(myRating > 0 ? "★  " + Ui.tr("Sua nota: ", "Your rating: ") + myRating : "★  " + Ui.tr("Avaliar", "Rate"));
+        seenButton.setText(seen ? "✓  " + Strings.get(R.string.seen) : Strings.get(R.string.ive_seen_it));
+        if (favButton != null) favButton.setText(favorite ? "♥  " + Strings.get(R.string.favorite) : "♡  " + Strings.get(R.string.mark_favorite));
+        if (rateButton != null) rateButton.setText(myRating > 0 ? "★  " + Strings.get(R.string.your_rating_prefix) + myRating : "★  " + Strings.get(R.string.rate));
     }
 
     /** The first subscription or free service with an app on the TV: {package, service name}. */
@@ -420,8 +420,8 @@ public class DetailActivity extends Activity {
         box.setOrientation(LinearLayout.VERTICAL);
         whereLine = new TvUi.Flow(this, Math.round(18 * k), Math.round(18 * k));
         whereLine.setPadding(0, Math.round(14 * k), Math.round(96 * k), Math.round(14 * k));
-        String[][] types = {{"flatrate", Ui.tr("Assinatura", "Subscription")}, {"free", Ui.tr("Grátis", "Free")},
-                {"ads", Ui.tr("Grátis com anúncios", "Free with ads")}, {"rent", Ui.tr("Aluguel", "Rent")}, {"buy", Ui.tr("Compra", "Buy")}};
+        String[][] types = {{"flatrate", Strings.get(R.string.subscription)}, {"free", Strings.get(R.string.free)},
+                {"ads", Strings.get(R.string.free_with_ads)}, {"rent", Strings.get(R.string.rent)}, {"buy", Strings.get(R.string.buy)}};
         Set<String> added = new HashSet<>();
         for (String[] type : types) {
             JSONArray list = region == null ? null : region.optJSONArray(type[0]);
@@ -434,7 +434,7 @@ public class DetailActivity extends Activity {
         }
         if (whereLine.getChildCount() == 0) {
             TextView none = TvUi.text(this, k, 26, Ui.regular, TvUi.DIM);
-            none.setText(Ui.tr("Não está em nenhum serviço de streaming no Brasil agora.", "Not on any streaming service in the region right now."));
+            none.setText(Strings.get(R.string.not_on_any_streaming_service_in_the_region_right_now));
             box.addView(none);
         }
         box.addView(whereLine, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -456,7 +456,7 @@ public class DetailActivity extends Activity {
             }
             String pkg = iptvShown;
             iptvChip = chipBox(img, Providers.label(this, pkg), chipSub("movie".equals(kind)
-                    ? Ui.tr("Buscar filme via IPTV", "Search movie via IPTV") : Ui.tr("Buscar série via IPTV", "Search show via IPTV")));
+                    ? Strings.get(R.string.search_movie_via_iptv) : Strings.get(R.string.search_show_via_iptv)));
             iptvChip.setOnClickListener(v -> searchOrOpen(pkg));
             whereLine.addView(iptvChip, 0);
         }
@@ -494,10 +494,9 @@ public class DetailActivity extends Activity {
         Prefs.setIptvFallbackWarnCount(Prefs.iptvFallbackWarnCount() + 1);
         new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle(Providers.label(this, pkg))
-                .setMessage(Ui.tr("O app não respondeu à busca. Quer abrir assim mesmo, ou trocar o app em Ajustes › Serviços?",
-                        "The app didn't answer the search. Open it anyway, or switch the app in Settings › Services?"))
-                .setPositiveButton(Ui.tr("Abrir assim mesmo", "Open anyway"), (d, w) -> openIptv(pkg))
-                .setNegativeButton(Ui.tr("Ir pra Ajustes", "Go to Settings"), (d, w) -> startActivity(new Intent(this, ServicesActivity.class)))
+                .setMessage(Strings.get(R.string.iptv_search_unavailable))
+                .setPositiveButton(Strings.get(R.string.open_anyway), (d, w) -> openIptv(pkg))
+                .setNegativeButton(Strings.get(R.string.go_to_settings), (d, w) -> startActivity(new Intent(this, ServicesActivity.class)))
                 .show();
     }
 
@@ -505,13 +504,12 @@ public class DetailActivity extends Activity {
         String app = Providers.app(this, pid, name);
         ImageView img = new ImageView(this);
         Images.load(img, logo.isEmpty() ? null : Tmdb.LOGO + logo);
-        TextView s = chipSub(type + "  ·  " + (app != null ? Ui.tr("abre ", "opens ") + Providers.label(this, app) : Ui.tr("sem app na TV", "no app on the TV")));
+        TextView s = chipSub(type + "  ·  " + (app != null ? Strings.get(R.string.opens_prefix) + Providers.label(this, app) : Strings.get(R.string.no_app_on_the_tv)));
         if (app != null) chipNotes.add(new Object[] {app, s, type});
         View chip = chipBox(img, name, s);
         chip.setOnClickListener(v -> {
             if (app != null) watch(app);
-            else Toast.makeText(this, Ui.tr("Nenhum app para " + name + ". Escolha um em Ajustes › Serviços.",
-                    "No app for " + name + ". Pick one in Settings › Services."), Toast.LENGTH_LONG).show();
+            else Toast.makeText(this, Strings.get(R.string.service_app_missing, name), Toast.LENGTH_LONG).show();
         });
         return chip;
     }
@@ -561,7 +559,7 @@ public class DetailActivity extends Activity {
     private void linksKnown(java.util.Map<String, String> links) {
         for (Object[] n : chipNotes) {
             String app = (String) n[0];
-            if (links.containsKey(app)) ((TextView) n[1]).setText(n[2] + "  ·  " + Ui.tr("abre o título em ", "opens the title in ") + Providers.label(this, app));
+            if (links.containsKey(app)) ((TextView) n[1]).setText(n[2] + "  ·  " + Strings.get(R.string.opens_the_title_in_prefix) + Providers.label(this, app));
         }
     }
 
@@ -581,7 +579,7 @@ public class DetailActivity extends Activity {
     private void toggleList() {
         if (title == null) return;
         boolean want = !inList;
-        background(Ui.tr("Não deu para salvar: ", "Couldn't save: "), () -> {
+        background(Strings.get(R.string.couldnt_save_prefix), () -> {
             Tmdb.setWatchlist(this, title, want);
             inList = want;
         });
@@ -596,7 +594,7 @@ public class DetailActivity extends Activity {
     private void toggleFavorite() {
         if (title == null) return;
         boolean want = !favorite;
-        background(Ui.tr("Não deu para favoritar: ", "Couldn't favorite: "), () -> {
+        background(Strings.get(R.string.couldnt_favorite_prefix), () -> {
             Tmdb.setFavorite(this, title, want);
             favorite = want;
         });
@@ -605,10 +603,10 @@ public class DetailActivity extends Activity {
     private void rate() {
         String[] items = new String[myRating > 0 ? 11 : 10];
         for (int i = 0; i < 10; i++) items[i] = "★ " + (10 - i);
-        if (myRating > 0) items[10] = Ui.tr("Remover minha nota", "Remove my rating");
+        if (myRating > 0) items[10] = Strings.get(R.string.remove_my_rating);
         new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle(Ui.tr("Sua nota para ", "Your rating for ") + title.name)
-                .setItems(items, (d, which) -> background(Ui.tr("Não deu para salvar a nota: ", "Couldn't save the rating: "), () -> {
+                .setTitle(Strings.get(R.string.your_rating_for_prefix) + title.name)
+                .setItems(items, (d, which) -> background(Strings.get(R.string.couldnt_save_the_rating_prefix), () -> {
                     if (which == 10) {
                         Tmdb.unrate(this, title);
                         myRating = 0;
@@ -650,7 +648,7 @@ public class DetailActivity extends Activity {
             try {
                 startActivity(new Intent(Intent.ACTION_VIEW, url).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             } catch (Exception ignored) {
-                Toast.makeText(this, Ui.tr("Nenhum app para abrir o trailer.", "No app to open the trailer."), Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, Strings.get(R.string.no_app_to_open_the_trailer), Toast.LENGTH_SHORT).show();
             }
         }
     }
