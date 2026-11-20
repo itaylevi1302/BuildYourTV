@@ -87,6 +87,17 @@ def fake_pillow():
 
 
 class HighlightTest(unittest.TestCase):
+    def test_unnamed_slices_keep_their_time_and_nested_highlight_accounting(self):
+        q = fake_trace()
+        q("update slice set name = NULL where id = 2")
+        rows = flamechart.lanes(q, PKG, ["main"], 0, 2000 * MS)[0][1]
+        # TrackEvent's name is optional: Perfetto exposes an omitted name as SQL NULL.
+        self.assertEqual([row["id"] for row in rows], [1, 2, 3, 4, 5])
+        total, hit = flamechart.highlighted(rows, re.compile("^inflate$"), 0, 2000 * MS)
+        self.assertEqual((total, hit), (10, {3}))
+        total, hit = flamechart.highlighted(rows, re.compile(".*"), 0, 2000 * MS)
+        self.assertEqual((total, hit), (55, {1, 2, 3, 4, 5}))
+
     def test_nested_work_is_counted_once_and_drawn_magenta(self):
         q = fake_trace()
         rows = flamechart.lanes(q, PKG, ["main"], 0, 2000 * MS)[0][1]
@@ -488,7 +499,7 @@ class InputPanelsTest(unittest.TestCase):
         q = first_frame_trace(int(Path(path).read_text(encoding="utf-8")))
         return q, q.close
 
-    def run_chart(self, inputs):
+    def run_chart(self, inputs, *extra):
         self.opened.clear()
         with mock.patch.dict(sys.modules, {"PIL": mock.MagicMock()}), \
                 mock.patch.object(flamechart.trace_report, "opener", return_value=self.open_trace) as opener, \
@@ -496,8 +507,55 @@ class InputPanelsTest(unittest.TestCase):
                 mock.patch.object(flamechart, "lanes", return_value=[]), \
                 mock.patch.object(flamechart, "draw", return_value=(1600, 100)) as draw, \
                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-            code = flamechart.main([*map(str, inputs), "--out", str(self.folder / "chart.png")])
+            code = flamechart.main([*map(str, inputs), "--out", str(self.folder / "chart.png"), *extra])
         return code, draw.call_args.args[0], opener
+
+    def assert_family_refused(self, inputs):
+        out = self.folder / "chart.png"
+        out.write_bytes(b"previous chart")
+        with mock.patch.dict(sys.modules, {"PIL": mock.MagicMock()}), \
+                mock.patch.object(flamechart.trace_report, "opener", return_value=self.open_trace) as opener, \
+                mock.patch.object(flamechart, "window", return_value=(0, MS)), \
+                mock.patch.object(flamechart, "lanes", return_value=[]), \
+                mock.patch.object(flamechart, "draw") as draw, \
+                contextlib.redirect_stdout(io.StringIO()), \
+                self.assertRaisesRegex(SystemExit, "nav.*start.*separately"):
+            flamechart.main([*map(str, inputs), "--out", str(out)])
+        opener.assert_not_called()
+        draw.assert_not_called()
+        self.assertEqual(out.read_bytes(), b"previous chart")
+
+    def test_nav_and_start_panels_are_refused_in_both_orders(self):
+        nav = self.folder / "nav-1.pftrace"
+        nav.write_text("100", encoding="utf-8")
+        start = self.before / "home-1.pftrace"
+        for inputs in ((start, nav), (nav, start), (self.before, nav), (nav, self.before)):
+            with self.subTest(inputs=inputs):
+                self.assert_family_refused(inputs)
+
+    def test_a_mixed_folder_is_refused_before_selecting_its_median(self):
+        nav = self.before / "nav-4.pftrace"
+        nav.write_text("100", encoding="utf-8")
+        self.assert_family_refused([self.before])
+
+    def test_a_sidecar_can_make_a_folder_mixed_despite_matching_names(self):
+        (self.before / "home-2.json").write_text('{"scenario":"nav"}', encoding="utf-8")
+        self.assert_family_refused([self.before])
+
+    def test_a_sidecar_can_make_different_names_valid_start_panels(self):
+        renamed = self.folder / "nav-copied.pftrace"
+        renamed.write_text("100", encoding="utf-8")
+        renamed.with_suffix(".json").write_text('{"scenario":"cold"}', encoding="utf-8")
+        code, panels, _ = self.run_chart([self.before, renamed])
+        self.assertIsNone(code)
+        self.assertEqual(len(panels), 2)
+
+    def test_mixed_panels_can_explicitly_draw_whole_recordings(self):
+        nav = self.folder / "nav-1.pftrace"
+        nav.write_text("100", encoding="utf-8")
+        code, panels, _ = self.run_chart([self.before, nav], "--window", "all")
+        self.assertIsNone(code)
+        self.assertEqual(len(panels), 2)
 
     def alias_in_folder(self, kind):
         original = self.before / "home-2.pftrace"
@@ -544,6 +602,20 @@ class InputPanelsTest(unittest.TestCase):
 
 @unittest.skipUnless(importlib.util.find_spec("PIL"), "drawing needs Pillow (tools/requirements-perf.txt)")
 class DrawTest(unittest.TestCase):
+    def test_draws_a_trace_with_an_unnamed_slice_as_well_as_named_work(self):
+        from PIL import Image
+        q = fake_trace()
+        q("update slice set name = NULL where id = 2")
+        panel = {"label": "Run", "note": "", "t0": 1000 * MS, "t1": 1065 * MS,
+                 "lanes": flamechart.lanes(q, PKG, ["main", "RenderThread"], 1000 * MS, 1065 * MS)}
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp, "chart.png")
+            size = flamechart.draw([panel], re.compile("^inflate$"), "t", "s", out)
+            with Image.open(out) as image:
+                self.assertEqual(image.size, size)
+                self.assertEqual(image.format, "PNG")
+                image.verify()
+
     def test_main_reports_a_written_unicode_path_on_limited_and_utf8_consoles(self):
         from PIL import Image
         with tempfile.TemporaryDirectory() as tmp:

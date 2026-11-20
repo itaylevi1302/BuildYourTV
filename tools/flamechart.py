@@ -81,7 +81,8 @@ def lanes(q, package, names, t0, t1):
         if utid in seen:
             continue
         seen.add(utid)
-        rows = q(f"select s.id, s.ts, s.dur, s.depth, s.name, s.parent_id from slice s join thread_track tt "
+        # TrackEvent names are optional; keep unnamed slices, with an empty label for regexes and drawing.
+        rows = q(f"select s.id, s.ts, s.dur, s.depth, coalesce(s.name, '') as name, s.parent_id from slice s join thread_track tt "
                  f"on s.track_id = tt.id where tt.utid = {utid} and s.ts < {t1} and s.ts + s.dur > {t0} "
                  f"and s.dur > 0 order by s.ts")
         out.append(("main thread" if name == "main" else name, rows))
@@ -322,6 +323,14 @@ def main(argv=None):
         sets = [trace_report.unique_traces(paths) for paths in sets]
     except ValueError as e:
         sys.exit(str(e))
+    # Nav always uses the whole recording; a start uses its first-frame or requested window.
+    # Unlike windows cannot give a meaningful highlighted-time change; --window all makes them alike.
+    families = [{"nav" if trace_report.scenario_of(path) == "nav" else "start" for path in paths}
+                for paths in sets]
+    if any(len(family) > 1 for family in families):
+        sys.exit("cannot mix nav and start traces in one set; draw them separately")
+    if args.window != "all" and any(family != families[0] for family in families[1:]):
+        sys.exit("cannot compare nav and start windows; use --window all or draw them separately")
     try:
         import PIL  # noqa: F401
     except ImportError:
