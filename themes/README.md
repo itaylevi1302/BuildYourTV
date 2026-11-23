@@ -87,6 +87,12 @@ is ignored, and a file that doesn't parse is ignored as a whole, so a theme can 
 larger than 64 KB is ignored as a whole too, which is why `tools/theme.sh` refuses one instead of pushing
 it: the launcher would drop the theme and go back to its built-in config.
 
+One thing is not dropped as a whole: inside a list, `Config.stringList()` keeps the entries that are
+non-empty strings and skips the rest one at a time - so a `dock_apps` hand-written with a number or an
+empty entry in it applies without that app, and nothing on the TV says so. Every row whose Type is
+`list of package names` is read that way, and `tools/manage.py`'s `set` refuses such a list before
+writing it.
+
 Each key has (or is waiting for) a screenshot of it on a real TV in [`docs/switches.md`](../docs/switches.md).
 A new key needs one there in the same pull request.
 
@@ -164,7 +170,7 @@ A new key needs one there in the same pull request.
 | `wallpaper_dim` | 0 to 90 | Black overlay over wallpaper images, in percent; 0 by default and no shade view at all |
 | `dock_opacity` | 30 to 100 | Opacity of the dock's band, in percent, so a wallpaper shows through it; 100 by default (the cinematic shelf keeps its own translucent band). Launcher settings on the TV offers 100, 70, 50 or 30, which wins until the next theme push or Follow theme |
 | `wallpaper_captions` | bool | With a rotating collection, the shown picture's name under the top-right buttons, from `wallpapers/captions.txt` (`001.jpg<TAB>Dusk over the peaks`, one per line); a picture without a line shows no name (`false` by default) |
-| `wallpaper_moods` | object | A rotating collection grouped by time of day: `{"morning": [...], "evening": [...], "night": [...]}` with file names from `wallpapers/`. Morning runs from sunrise to noon, evening until half an hour after sunset, night the rest, with the sun at config.xml's `latitude` and `longitude` (07:00 and 18:30 without them); a missing group rotates through every picture, and so does a group whose names are not the pictures in `wallpapers/` (a renamed picture, a suffix the launcher does not read), since those names are dropped one by one; every group is read by these three names only. Unset by default |
+| `wallpaper_moods` | object | A rotating collection grouped by time of day: `{"morning": [...], "evening": [...], "night": [...]}` with file names from `wallpapers/`. Morning runs from sunrise to noon, evening until half an hour after sunset, night the rest, with the sun at config.xml's `latitude` and `longitude` (07:00 and 18:30 without them); a missing group rotates through every picture, and so does a group whose names are not the pictures in `wallpapers/` (a renamed picture, a suffix the launcher does not read), since those names are dropped one by one; every group is read by these three names only, so `tools/manage.py`'s `set` refuses a group or a name the launcher would drop before it writes it. Unset by default |
 | `tile_menu` | bool | Hold OK or press the remote's Menu key on a tile to open a small menu: Move, Remove from Home (with `app_library`) and App info. `true` by default since launcher 3.3; `false` keeps holding OK as a shortcut to the app's App info page and leaves Menu unchanged |
 | `festival` | string | Turns on a festive skin: the network pill becomes a diya whose flame follows the connection, Inputs a temple bell, Settings a marigold, and the first Home of the day gets a petal shower. `dussehra` and `diwali` have built-in greetings. `halloween` has its own skin: a jack-o'-lantern whose carved face glows while the TV is online and goes dark when it drops, a bat for Inputs that flaps when focused, a ghost for Settings that floats up, bats flying up over the first Home of the day, "Happy Halloween" and a pumpkin-orange glow. Launchers before it show any name as the diya skin, so a Halloween theme names it with `seasonal_skin` instead |
 | `seasonal_skin` | string | Names a festive skin like `festival` (`halloween`), read only when `festival` is empty or missing. Launchers that predate it ignore the key, so a theme that sets it shows the rest of its look there without the wrong skin; `festival_until`, `greeting` and `accent_color` apply to it as to `festival` |
@@ -311,10 +317,13 @@ it today rather than the rule: `tests/test_readme_theme_count.py` counts the fol
 `config.json` and fails on a page whose number is not that count, naming the page, so its list is the one
 a page that starts stating the count joins.
 
-Two sentences a row may state are read back by `tests/test_theme_row_claims.py`: a rotation ("a new one
-every 20 minutes") against that theme's `wallpaper_rotation_minutes`, and a licence ("CC BY, not MIT")
-against its `CREDITS.md` - a row that states a licence while the folder ships no `CREDITS.md` is reported,
-because the file is what the claim rests on.
+The layout, the rotation and the licence a row states are read back by `tests/test_theme_row_claims.py`:
+a column count ("six columns", "six smaller tiles per row") against that theme's `columns`, a grid row
+under the dock ("no grid rows below", "one row of the grid under the dock") against `rows_below_dock` -
+or against the built-in `config.xml` value when the theme sets neither key, which is what the TV draws -
+a rotation ("a new one every 20 minutes") against `wallpaper_rotation_minutes`, and a licence ("CC BY,
+not MIT") against its `CREDITS.md` - a row that states a licence while the folder ships no `CREDITS.md`
+is reported, because the file is what the claim rests on.
 
 Keep the dock list generic (the big streaming apps) unless the theme is for a specific TV,
 and say which TV you tried it on in the PR description.

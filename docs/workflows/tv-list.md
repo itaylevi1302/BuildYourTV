@@ -33,7 +33,7 @@
    ```
    `tv` and `os` fill the folder's row in the TV tables, `brand` the README's brand grid (spelled as it is there),
    `notes` the Notes cell in `examples/README.md`: one line of Markdown, links relative to `examples/`, `\|`
-   for a pipe. Two things in it are read back: a package named in backticks with `kept`, `disabled` or
+   for a pipe. Three things in it are read back: a package named in backticks with `kept`, `disabled` or
    `refused` straight after it is a claim about what the list does, and
    `tests/test_example_readme_package_fates.py` holds it to the lists the folder ships - `kept` and `refused`
    have to be off an active line of every one of them, `disabled` on an active line of any (the stock launcher
@@ -41,7 +41,11 @@
    `disabled` however the comment reads, a package any list still sends is not `kept`, and a package a second
    list turns off can be stated as `disabled`. The other is a package count ("19 packages"), which the same
    test compares with the number of packages `debloat.txt` sends, so a line commented out of `debloat.txt` moves
-   the number in the row with it - a row that also counts a second list says which list it means. Any other
+   the number in the row with it - a row that also counts a second list says which list it means. The third is
+   the name of every list in the folder: a folder that ships a `debloat-*.txt` beside `debloat.txt` (step 2)
+   names that file in `notes`, because the row is the only place a reader browsing the tables learns the list
+   exists, and a row that names a list the folder does not ship is refused the same way -
+   `tests/test_second_lists_named_in_row.py` holds both directions. Any other
    wording after the name claims nothing, which is
    how `notes` stays free prose. `readme_os` is the one optional key: it is the OS cell of the two-column
    table in `README.nl.md`,
@@ -85,8 +89,10 @@
    `TV_HOST=<tv ip> tools/theme.sh examples/philips-google-tv-ta7/theme`. Both checks that read a shipped `config.json`
    (`tests/test_shipped_config_keys_are_read.py` and `tests/test_shipped_config_values.py`) walk
    `examples/` at any depth, so a key or a value in that subfolder is judged where it sits rather than
-   skipped, and `tools/theme.sh` is handed the folder that holds the `config.json` - the subfolder, not
-   the list folder, which has none.
+   skipped. `tools/theme.sh` is handed the folder that holds the `config.json` you are pushing, which for
+   a theme is the subfolder. `examples/xiaomi-mitv-afmu0` is the one of the six that also keeps a
+   `config.json` at the folder's own root, from a second unit of the same board: the subfolder is the
+   theme its `README.md` has the owner push, and the root file is that other unit's dock and button map.
    A package count ("The 38 packages that were disabled", "the debloat list disables 71 packages", "The
    list disables **N packages**", "The list contains N packages", "`debloat.txt` is the list: N
    packages") is compared with what `tools/disable.sh` would send for the list, so a line added or

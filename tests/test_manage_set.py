@@ -19,6 +19,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 import manage  # noqa: E402
+import tables  # noqa: E402  the one Markdown-table reader in the repo, which manage.py imports
 
 
 def keys_table_types():
@@ -26,9 +27,9 @@ def keys_table_types():
     text = (ROOT / "themes" / "README.md").read_text(encoding="utf-8")
     part = text[text.index("## Keys"):]
     out = {}
-    for row in manage.table_rows(part, "| Key |"):
+    for row in tables.table_rows(part, "| Key |"):
         for key in re.findall(r"`([a-z_]+)`", row[0]):
-            out[key] = manage.plain(row[1]) if len(row) > 1 else ""
+            out[key] = tables.plain(row[1]) if len(row) > 1 else ""
     return out
 
 
@@ -189,8 +190,12 @@ class SetValueTest(unittest.TestCase):
         self.assertIn("wallpaper_moods", refusal)
         self.assertIn("object", refusal)
         self.assertIsNone(self.written())
-        self.assertIsNone(self.set_key("wallpaper_moods", '{"morning": "a.jpg"}'))
-        self.assertEqual({"morning": "a.jpg"}, self.written()["wallpaper_moods"])
+        # An object of groups naming pictures the theme ships, which is the value Config.moods() reads; the shapes
+        # it drops are held by tests/test_manage_set_wallpaper_moods.py.
+        (self.theme / "wallpapers").mkdir()
+        (self.theme / "wallpapers" / "a.jpg").write_bytes(b"picture")
+        self.assertIsNone(self.set_key("wallpaper_moods", '{"morning": ["a.jpg"]}'))
+        self.assertEqual({"morning": ["a.jpg"]}, self.written()["wallpaper_moods"])
 
     def test_a_string_key_takes_a_number_as_its_text(self):
         # string() takes a String only, so a number here would leave the key at its default.
@@ -360,13 +365,13 @@ class SetThemeFolderTest(unittest.TestCase):
         long_name = (Path(self.tmp.name) / ("a" * 300)).resolve()
         try:
             os.stat(long_name)
-        except OSError:
-            pass
+        except OSError as e:
+            too_long = e.strerror
         else:
             self.skipTest("this filesystem accepts a 300-character name")
         refusal = self.set_key(folder=long_name)
         self.assertIn(f"{long_name} cannot be looked at", refusal)
-        self.assertIn("File name too long", refusal)
+        self.assertIn(too_long, refusal)
         self.assertIn("Nothing was written or pushed", refusal)
         self.push.assert_not_called()
 

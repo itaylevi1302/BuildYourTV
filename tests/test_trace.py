@@ -170,8 +170,8 @@ class ArgumentTest(unittest.TestCase):
             out = Path(tmp) / ("a" * 300)
             try:
                 os.stat(out)
-            except OSError:
-                pass
+            except OSError as e:
+                too_long = e.strerror
             else:
                 self.skipTest("this filesystem stats a 300-character name")
             err = self.parse_error(["nav", "--out", str(out)])
@@ -184,7 +184,7 @@ class ArgumentTest(unittest.TestCase):
             err = self.parse_error(["nav", "--out", str(out / "before")])
             self.assertIn(str(out), err)
             self.assertIn("cannot be looked at", err)
-            self.assertIn("File name too long", err)
+            self.assertIn(too_long, err)
 
     def test_a_folder_or_a_new_folder_is_still_accepted(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -513,6 +513,48 @@ class RecordPreservationTest(unittest.TestCase):
                 self.assertEqual(self.snapshot(path.parent), before, "only the recording changes")
                 self.assertEqual([c[0] for c in device.calls[-2:]], ["pull", "shell"])
                 self.assertEqual(device.calls[-1][1], f"rm -f {trace.REMOTE}")
+
+    def test_local_cleanup_failure_keeps_a_published_recording_successful(self):
+        for existing in (False, True):
+            with self.subTest(existing=existing), self.files(existing) as (path, before):
+                error = PermissionError(13, "staging folder is busy")
+                with mock.patch.object(tempfile.TemporaryDirectory, "_rmtree", side_effect=error), \
+                     contextlib.redirect_stderr(io.StringIO()) as warnings:
+                    self.assertEqual(self.record(self.device(), path), 5)
+                self.assertEqual(path.read_bytes(), b"trace")
+                self.assertIn(str(path), warnings.getvalue())
+                self.assertIn("warning:", warnings.getvalue())
+                self.assertEqual(len(list(path.parent.glob(".trace-*"))), 1)
+                self.assertEqual((path.parent / "unrelated.txt").read_bytes(), b"keep this too")
+
+    def test_main_finishes_metadata_and_later_runs_after_local_cleanup_failures(self):
+        for failed in ({1}, {2}, {1, 2, 3, 4}):
+            with self.subTest(cleanups=failed), self.files() as (path, before):
+                device = self.device()
+                remove = tempfile.TemporaryDirectory._rmtree
+                calls = []
+
+                def cleanup(folder, *args, **kwargs):
+                    calls.append(folder)
+                    if len(calls) in failed:
+                        raise PermissionError(13, "staging folder is busy")
+                    return remove(folder, *args, **kwargs)
+
+                with self.main_modules(device), mock.patch.object(trace.time, "sleep"), \
+                     mock.patch.object(tempfile.TemporaryDirectory, "_rmtree", side_effect=cleanup), \
+                     contextlib.redirect_stdout(io.StringIO()) as output, \
+                     contextlib.redirect_stderr(io.StringIO()) as warnings:
+                    self.assertIsNone(trace.main(["home", "--app", OTHER, "--runs", "2",
+                                                  "--out", str(path.parent)]))
+                self.assertTrue(device.closed)
+                for run in (1, 2):
+                    recording = path.with_name(f"home-{run}.pftrace")
+                    self.assertEqual(recording.read_bytes(), b"trace")
+                    data = json.loads(recording.with_suffix(".json").read_text())
+                    self.assertEqual((data["scenario"], data["run"]), ("home", run))
+                    self.assertIn(f"{recording}: 5 bytes", output.getvalue())
+                self.assertEqual(warnings.getvalue().count("warning:"), len(failed))
+                self.assertEqual(len(list(path.parent.glob(".trace-*"))), len(failed))
 
     def test_failed_downloads_preserve_existing_files_or_leave_no_new_file(self):
         for how in ("before", "partial", "empty", "startup", "cleanup"):
