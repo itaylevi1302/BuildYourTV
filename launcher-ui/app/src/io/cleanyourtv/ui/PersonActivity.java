@@ -50,7 +50,7 @@ public class PersonActivity extends Activity {
         content.setPadding(Math.round(96 * k), Math.round(80 * k), 0, Math.round(80 * k));
         content.setClipToPadding(false);
         TextView loading = TvUi.text(this, k, 30, Ui.regular, TvUi.DIM);
-        loading.setText(Ui.tr("Carregando…", "Loading…"));
+        loading.setText(Strings.get(R.string.loading));
         content.addView(loading);
         scroll.addView(content);
         root.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -63,7 +63,7 @@ public class PersonActivity extends Activity {
                 String biography = bio;
                 main.post(() -> { if (!isFinishing()) show(o, biography); });
             } catch (Exception e) {
-                main.post(() -> loading.setText(Ui.tr("Não deu para abrir esta pessoa: ", "Couldn't open this person: ") + e.getMessage()));
+                main.post(() -> loading.setText(Strings.get(R.string.couldnt_open_this_person_prefix) + e.getMessage()));
             }
         }).start();
     }
@@ -89,17 +89,17 @@ public class PersonActivity extends Activity {
         String dept = o.optString("known_for_department");
         if (!dept.isEmpty()) meta.add(department(dept));
         String birth = o.optString("birthday");
-        if (birth.length() >= 4 && !"null".equals(birth)) meta.add(Ui.tr("Nascimento: ", "Born: ") + date(birth));
+        if (birth.length() >= 4 && !"null".equals(birth)) meta.add(Strings.get(R.string.born_prefix) + date(birth));
         String place = o.optString("place_of_birth");
         if (!place.isEmpty() && !"null".equals(place)) meta.add(place);
         String death = o.optString("deathday");
-        if (death.length() >= 4 && !"null".equals(death)) meta.add(Ui.tr("Morte: ", "Died: ") + date(death));
+        if (death.length() >= 4 && !"null".equals(death)) meta.add(Strings.get(R.string.died_prefix) + date(death));
         TextView m = TvUi.text(this, k, 27, Ui.medium, TvUi.DIM);
         m.setText(TextUtils.join("  ·  ", meta));
         m.setPadding(0, Math.round(16 * k), 0, Math.round(20 * k));
         text.addView(m);
         TextView bio = TvUi.text(this, k, 26, Ui.regular, TvUi.DIM);
-        bio.setText(biography.isEmpty() ? Ui.tr("Sem biografia no TMDB.", "No biography on TMDB.") : biography);
+        bio.setText(biography.isEmpty() ? Strings.get(R.string.no_biography_on_tmdb) : biography);
         bio.setMaxLines(9);
         bio.setEllipsize(TextUtils.TruncateAt.END);
         bio.setLineSpacing(8 * k, 1);
@@ -113,9 +113,9 @@ public class PersonActivity extends Activity {
         collect(credits == null ? null : credits.optJSONArray("cast"), movies, shows, seen);
         collect(credits == null ? null : credits.optJSONArray("crew"), crew, crew, seen);
         TvUi.OnTitle open = t -> DetailActivity.open(this, t.kind, t.id);
-        if (!movies.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Filmes", "Movies"), movies, open, null, Math.round(96 * k)));
-        if (!shows.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Séries", "Shows"), shows, open, null, Math.round(96 * k)));
-        if (!crew.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Por trás das câmeras", "Behind the camera"), crew, open, null, Math.round(96 * k)));
+        if (!movies.isEmpty()) content.addView(TvUi.row(this, k, Strings.get(R.string.movies), movies, open, null, Math.round(96 * k)));
+        if (!shows.isEmpty()) content.addView(TvUi.row(this, k, Strings.get(R.string.shows), shows, open, null, Math.round(96 * k)));
+        if (!crew.isEmpty()) content.addView(TvUi.row(this, k, Strings.get(R.string.behind_the_camera), crew, open, null, Math.round(96 * k)));
         View first = content.findFocus();
         if (first == null && content.getChildCount() > 1) content.getChildAt(1).requestFocus();
     }
@@ -141,10 +141,10 @@ public class PersonActivity extends Activity {
 
     private static String department(String d) {
         switch (d) {
-            case "Acting": return Ui.tr("Atuação", "Acting");
-            case "Directing": return Ui.tr("Direção", "Directing");
-            case "Writing": return Ui.tr("Roteiro", "Writing");
-            case "Production": return Ui.tr("Produção", "Production");
+            case "Acting": return Strings.get(R.string.acting);
+            case "Directing": return Strings.get(R.string.directing);
+            case "Writing": return Strings.get(R.string.writing);
+            case "Production": return Strings.get(R.string.production);
             default: return d;
         }
     }

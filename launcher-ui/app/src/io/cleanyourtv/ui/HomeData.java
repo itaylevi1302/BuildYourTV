@@ -80,7 +80,7 @@ final class HomeData {
     }
 
     static String coinName(int i) {
-        return i == 3 ? Ui.tr("Dólar", "Dollar") : COIN_NAMES[i];
+        return i == 3 ? Strings.get(R.string.dollar) : COIN_NAMES[i];
     }
 
     private static String pricesUrl() {
@@ -336,100 +336,16 @@ final class HomeData {
     /** The weather in words, from Open-Meteo's WMO code. */
     static String condition(int code, boolean day) {
         if (code < 0) return "";
-        if (Ui.en) {
-            if (code == 0) return "Clear";
-            if (code == 1) return day ? "Mostly Sunny" : "Mostly Clear";
-            if (code == 2) return "Partly Cloudy";
-            if (code == 3) return "Cloudy";
-            if (code == 45 || code == 48) return "Fog";
-            if (code >= 51 && code <= 57) return "Drizzle";
-            if (code == 65 || code == 67 || code == 82) return "Heavy Rain";
-            if (code >= 71 && code <= 77 || code == 85 || code == 86) return "Snow";
-            if (code >= 95) return "Thunderstorms";
-            return "Rain";
-        }
-        if (Ui.he) {
-            if (code == 0) return day ? "שמשי" : "בהיר";
-            if (code == 1) return day ? "שמשי ברובו" : "בהיר ברובו";
-            if (code == 2) return "מעונן חלקית";
-            if (code == 3) return "מעונן";
-            if (code == 45 || code == 48) return "ערפל";
-            if (code >= 51 && code <= 57) return "טפטוף";
-            if (code == 65 || code == 67 || code == 82) return "גשם כבד";
-            if (code >= 71 && code <= 77 || code == 85 || code == 86) return "שלג";
-            if (code >= 95) return "סופות רעמים";
-            return "גשם";
-        }
-        if (Ui.ru) {
-            if (code == 0) return "Ясно";
-            if (code == 1) return "Малооблачно";
-            if (code == 2) return "Переменная облачность";
-            if (code == 3) return "Облачно";
-            if (code == 45 || code == 48) return "Туман";
-            if (code >= 51 && code <= 57) return "Морось";
-            if (code == 65 || code == 67 || code == 82) return "Сильный дождь";
-            if (code >= 71 && code <= 77 || code == 85 || code == 86) return "Снег";
-            if (code >= 95) return "Гроза";
-            return "Дождь";
-        }
-        if (Ui.es) {
-            if (code == 0) return day ? "Despejado" : "Noche despejada";
-            if (code == 1) return "Mayormente despejado";
-            if (code == 2) return "Parcialmente nublado";
-            if (code == 3) return "Nublado";
-            if (code == 45 || code == 48) return "Niebla";
-            if (code >= 51 && code <= 57) return "Llovizna";
-            if (code == 65 || code == 67 || code == 82) return "Lluvia fuerte";
-            if (code >= 71 && code <= 77 || code == 85 || code == 86) return "Nieve";
-            if (code >= 95) return "Tormenta";
-            return "Lluvia";
-        }
-        if (Ui.de) {
-            if (code == 0) return day ? "Sonnig" : "Klar";
-            if (code == 1) return day ? "Überwiegend sonnig" : "Überwiegend klar";
-            if (code == 2) return "Teilweise bewölkt";
-            if (code == 3) return "Bewölkt";
-            if (code == 45 || code == 48) return "Nebel";
-            if (code >= 51 && code <= 57) return "Nieselregen";
-            if (code == 65 || code == 67 || code == 82) return "Starker Regen";
-            if (code >= 71 && code <= 77 || code == 85 || code == 86) return "Schnee";
-            if (code >= 95) return "Gewitter";
-            return "Regen";
-        }
-        if (Ui.fr) {
-            if (code == 0) return day ? "Ensoleillé" : "Dégagé";
-            if (code == 1) return day ? "Plutôt ensoleillé" : "Plutôt dégagé";
-            if (code == 2) return "Partiellement nuageux";
-            if (code == 3) return "Nuageux";
-            if (code == 45 || code == 48) return "Brouillard";
-            if (code >= 51 && code <= 57) return "Bruine";
-            if (code == 65 || code == 67 || code == 82) return "Forte pluie";
-            if (code >= 71 && code <= 77 || code == 85 || code == 86) return "Neige";
-            if (code >= 95) return "Orages";
-            return "Pluie";
-        }
-        if (Ui.tur) {
-            if (code == 0) return day ? "Güneşli" : "Açık";
-            if (code == 1) return day ? "Çoğunlukla güneşli" : "Çoğunlukla açık";
-            if (code == 2) return "Parçalı bulutlu";
-            if (code == 3) return "Bulutlu";
-            if (code == 45 || code == 48) return "Sis";
-            if (code >= 51 && code <= 57) return "Çisenti";
-            if (code == 65 || code == 67 || code == 82) return "Şiddetli yağmur";
-            if (code >= 71 && code <= 77 || code == 85 || code == 86) return "Kar";
-            if (code >= 95) return "Gök gürültülü fırtına";
-            return "Yağmur";
-        }
-        if (code == 0) return day ? "Céu limpo" : "Noite limpa";
-        if (code == 1) return "Poucas nuvens";
-        if (code == 2) return "Parcialmente nublado";
-        if (code == 3) return "Nublado";
-        if (code == 45 || code == 48) return "Neblina";
-        if (code >= 51 && code <= 57) return "Garoa";
-        if (code == 65 || code == 67 || code == 82) return "Chuva forte";
-        if (code >= 71 && code <= 77 || code == 85 || code == 86) return "Neve";
-        if (code >= 95) return "Tempestade";
-        return "Chuva";
+        if (code == 0) return Strings.get(day ? R.string.weather_clear_day : R.string.weather_clear_night);
+        if (code == 1) return Strings.get(day ? R.string.weather_mostly_clear_day : R.string.weather_mostly_clear_night);
+        if (code == 2) return Strings.get(R.string.weather_partly_cloudy);
+        if (code == 3) return Strings.get(R.string.weather_cloudy);
+        if (code == 45 || code == 48) return Strings.get(R.string.weather_fog);
+        if (code >= 51 && code <= 57) return Strings.get(R.string.weather_drizzle);
+        if (code == 65 || code == 67 || code == 82) return Strings.get(R.string.weather_heavy_rain);
+        if (code >= 71 && code <= 77 || code == 85 || code == 86) return Strings.get(R.string.weather_snow);
+        if (code >= 95) return Strings.get(R.string.weather_thunderstorms);
+        return Strings.get(R.string.weather_rain);
     }
 
     private static String currencySymbol() {
@@ -465,7 +381,7 @@ final class HomeData {
 
     static String hour(long at) {
         return Ui.once("hour", at, () -> Ui.en ? new SimpleDateFormat("h a", Locale.US).format(new java.util.Date(at))
-                : new SimpleDateFormat(Ui.es || Ui.ru || Ui.tur || Ui.he ? "HH:mm" : Ui.de ? "HH 'Uhr'" : "HH'h'", Ui.locale()).format(new java.util.Date(at)));
+                : new SimpleDateFormat(Ui.es || Ui.ru || Ui.uk || Ui.tur || Ui.he ? "HH:mm" : Ui.de ? "HH 'Uhr'" : "HH'h'", Ui.locale()).format(new java.util.Date(at)));
     }
 
     /** How long ago the data was fetched, if it's stale (no internet): "12 min ago". */
@@ -474,13 +390,7 @@ final class HomeData {
         long age = System.currentTimeMillis() - at;
         if (age < every * 2) return "";
         long minutes = age / 60_000;
-        if (Ui.en) return minutes < 60 ? minutes + " min ago" : (minutes / 60) + " h ago";
-        if (Ui.he) return minutes < 60 ? "לפני " + minutes + " דק'" : "לפני " + (minutes / 60) + " שע'";
-        if (Ui.ru) return minutes < 60 ? minutes + " мин назад" : (minutes / 60) + " ч назад";
-        if (Ui.es) return minutes < 60 ? "hace " + minutes + " min" : "hace " + (minutes / 60) + " h";
-        if (Ui.de) return minutes < 60 ? "vor " + minutes + " Min." : "vor " + (minutes / 60) + " Std.";
-        if (Ui.fr) return minutes < 60 ? "il y a " + minutes + " min" : "il y a " + (minutes / 60) + " h";
-        if (Ui.tur) return minutes < 60 ? minutes + " dk önce" : (minutes / 60) + " sa önce";
-        return minutes < 60 ? "há " + minutes + " min" : "há " + (minutes / 60) + " h";
+        return minutes < 60 ? Strings.get(R.string.weather_minutes_ago, minutes)
+                : Strings.get(R.string.weather_hours_ago, minutes / 60);
     }
 }

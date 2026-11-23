@@ -84,10 +84,10 @@ public class GridActivity extends Activity {
             open = (TvUi.OnTitle) list[1];
             grid = new TvUi.Grid(this, k, COLUMNS, open);
             grid.add(titles);
-            status.setText(titles.size() == 1 ? Ui.tr("1 título", "1 title") : titles.size() + Ui.tr(" títulos", " titles"));
+            status.setText(Strings.quantity(R.plurals.titles, titles.size()));
         } else {
             grid = new TvUi.Grid(this, k, COLUMNS, open);
-            status.setText(Ui.tr("Carregando…", "Loading…"));
+            status.setText(Strings.get(R.string.loading));
             more();
         }
         content.addView(grid);
@@ -120,15 +120,15 @@ public class GridActivity extends Activity {
                     int total = o.optInt("total_results", 0);
                     boolean first = grid.count == 0;
                     grid.add(titles);
-                    status.setText(grid.count == 0 ? Ui.tr("Nada encontrado.", "Nothing found.")
-                            : total > 0 ? total + Ui.tr(" títulos · dados do TMDB", " titles · data from TMDB") : "");
+                    status.setText(grid.count == 0 ? Strings.get(R.string.nothing_found)
+                            : total > 0 ? Strings.get(R.string.count_from_tmdb, Strings.quantity(R.plurals.titles, total)) : "");
                     loading = false;
                     if (first && grid.getChildCount() > 0) grid.getChildAt(0).requestFocus();
                 });
             } catch (Exception e) {
                 main.post(() -> {
                     loading = false;
-                    if (grid.count == 0) status.setText(Ui.tr("Não deu para carregar: ", "Couldn't load: ") + e.getMessage());
+                    if (grid.count == 0) status.setText(Strings.get(R.string.couldnt_load_prefix) + e.getMessage());
                 });
             }
         }).start();

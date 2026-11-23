@@ -129,34 +129,34 @@ final class CustomTiles {
         form.setPadding(pad, pad, pad, 0);
         EditText url = new EditText(a);
         url.setSingleLine(true);
-        url.setHint(Ui.tr("URL de um PNG (vazio: ícone do app)", "A PNG's URL (empty: the app's icon)"));
+        url.setHint(Strings.get(R.string.a_pngs_url_empty_the_apps_icon));
         url.setText(now == null ? "" : now[0]);
         EditText color = new EditText(a);
         color.setSingleLine(true);
-        color.setHint(Ui.tr("Cor de fundo, ex.: #E53935", "Background color, e.g. #E53935"));
+        color.setHint(Strings.get(R.string.background_color_e_g_e53935));
         color.setText(now == null ? "" : now[1]);
         form.addView(url);
         form.addView(color);
         new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle(Ui.tr("Logo e cor: ", "Logo and color: ") + label)
+                .setTitle(Strings.get(R.string.logo_and_color_prefix) + label)
                 .setView(form)
-                .setPositiveButton(Ui.tr("Salvar", "Save"), (d, w) -> {
+                .setPositiveButton(Strings.get(R.string.save), (d, w) -> {
                     String hex = color.getText().toString().trim();
                     if (!hex.isEmpty() && !hex.startsWith("#")) hex = "#" + hex;
                     try {
                         if (!hex.isEmpty()) Color.parseColor(hex);
                     } catch (IllegalArgumentException e) {
-                        Toast.makeText(a, Ui.tr("Cor inválida: use #RRGGBB.", "Invalid color: use #RRGGBB."), Toast.LENGTH_LONG).show();
+                        Toast.makeText(a, Strings.get(R.string.invalid_color_use_rrggbb), Toast.LENGTH_LONG).show();
                         return;
                     }
                     Prefs.setTile(pkg, url.getText().toString(), hex.isEmpty() ? "#1C1C1E" : hex);
                     if (saved != null) saved.run();
                 })
-                .setNeutralButton(Ui.tr("Original", "Original"), (d, w) -> {
+                .setNeutralButton(Strings.get(R.string.original), (d, w) -> {
                     Prefs.setTile(pkg, null, null);
                     if (saved != null) saved.run();
                 })
-                .setNegativeButton(Ui.tr("Cancelar", "Cancel"), null)
+                .setNegativeButton(Strings.get(R.string.cancel), null)
                 .show();
     }
 }

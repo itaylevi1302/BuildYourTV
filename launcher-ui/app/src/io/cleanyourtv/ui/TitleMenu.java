@@ -45,26 +45,26 @@ final class TitleMenu {
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
         boolean seen = Tmdb.isSeen(a, t.kind, t.id);
-        labels.add(seen ? Ui.tr("Desmarcar “Já assisti”", "Unmark as seen") : "✓  " + Ui.tr("Já assisti", "Mark as seen"));
+        labels.add(seen ? Strings.get(R.string.unmark_as_seen) : "✓  " + Strings.get(R.string.mark_as_seen));
         actions.add(() -> {
             Tmdb.setSeen(a, t, !seen);
-            changed(a, seen ? Ui.tr("Desmarcado", "Unmarked") : Ui.tr("Marcado como assistido", "Marked as seen"), false);
+            changed(a, seen ? Strings.get(R.string.unmarked) : Strings.get(R.string.marked_as_seen), false);
         });
-        labels.add(inList ? Ui.tr("Remover da Minha lista", "Remove from My list") : "+  " + Ui.tr("Adicionar à Minha lista", "Add to My list"));
-        actions.add(() -> background(a, Ui.tr("Não deu para salvar: ", "Couldn't save: "), () -> Tmdb.setWatchlist(a, t, !inList),
-                inList ? Ui.tr("Removido da Minha lista", "Removed from My list") : Ui.tr("Adicionado à Minha lista", "Added to My list")));
+        labels.add(inList ? Strings.get(R.string.remove_from_my_list) : "+  " + Strings.get(R.string.add_to_my_list));
+        actions.add(() -> background(a, Strings.get(R.string.couldnt_save_prefix), () -> Tmdb.setWatchlist(a, t, !inList),
+                inList ? Strings.get(R.string.removed_from_my_list) : Strings.get(R.string.added_to_my_list)));
         if (account) {
-            labels.add(favorite ? Ui.tr("Remover dos favoritos", "Remove from favorites") : "♥  " + Ui.tr("Favoritar", "Favorite"));
-            actions.add(() -> background(a, Ui.tr("Não deu para favoritar: ", "Couldn't favorite: "), () -> Tmdb.setFavorite(a, t, !favorite),
-                    favorite ? Ui.tr("Removido dos favoritos", "Removed from favorites") : Ui.tr("Adicionado aos favoritos", "Added to favorites")));
+            labels.add(favorite ? Strings.get(R.string.remove_from_favorites) : "♥  " + Strings.get(R.string.mark_favorite));
+            actions.add(() -> background(a, Strings.get(R.string.couldnt_favorite_prefix), () -> Tmdb.setFavorite(a, t, !favorite),
+                    favorite ? Strings.get(R.string.removed_from_favorites) : Strings.get(R.string.added_to_favorites)));
             if ("movie".equals(t.kind)) {   // TMDB's v3 lists hold movies only
-                labels.add("≡  " + Ui.tr("Adicionar a uma lista…", "Add to a list…"));
+                labels.add("≡  " + Strings.get(R.string.add_to_a_list));
                 actions.add(() -> addToList(a, t.id));
             }
         }
-        labels.add(Ui.tr("Ver detalhes", "Details"));
+        labels.add(Strings.get(R.string.details));
         actions.add(() -> DetailActivity.open(a, t.kind, t.id));
-        labels.add(Ui.tr("Cancelar", "Cancel"));
+        labels.add(Strings.get(R.string.cancel));
         actions.add(null);
         int[] xy = new int[2];
         anchor.getLocationInWindow(xy);
@@ -90,26 +90,26 @@ final class TitleMenu {
     private static void pickList(Activity a, int movie, List<String[]> lists) {
         String[] items = new String[lists.size() + 1];
         for (int i = 0; i < lists.size(); i++) items[i] = lists.get(i)[1] + "  (" + lists.get(i)[2] + ")";
-        items[lists.size()] = "+  " + Ui.tr("Nova lista…", "New list…");
+        items[lists.size()] = "+  " + Strings.get(R.string.new_list);
         new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle(Ui.tr("Adicionar a uma lista", "Add to a list"))
+                .setTitle(Strings.get(R.string.add_to_a_list_2))
                 .setItems(items, (d, which) -> {
                     if (which < lists.size()) {
                         String list = lists.get(which)[0], name = lists.get(which)[1];
-                        background(a, Ui.tr("Não deu para adicionar: ", "Couldn't add: "), () -> Tmdb.addToList(a, list, movie),
-                                Ui.tr("Adicionado a ", "Added to ") + name);
+                        background(a, Strings.get(R.string.couldnt_add_prefix), () -> Tmdb.addToList(a, list, movie),
+                                Strings.get(R.string.added_to_prefix) + name);
                         return;
                     }
                     EditText field = new EditText(a);
                     field.setSingleLine(true);
-                    field.setHint(Ui.tr("Nome da lista", "List name"));
+                    field.setHint(Strings.get(R.string.list_name));
                     new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                            .setTitle(Ui.tr("Nova lista", "New list"))
+                            .setTitle(Strings.get(R.string.new_list_2))
                             .setView(field)
-                            .setPositiveButton(Ui.tr("Criar", "Create"), (d2, w2) -> background(a, Ui.tr("Não deu para criar: ", "Couldn't create: "),
+                            .setPositiveButton(Strings.get(R.string.create), (d2, w2) -> background(a, Strings.get(R.string.couldnt_create_prefix),
                                     () -> Tmdb.addToList(a, Tmdb.createList(a, field.getText().toString().trim()), movie),
-                                    Ui.tr("Lista criada", "List created")))
-                            .setNegativeButton(Ui.tr("Cancelar", "Cancel"), null)
+                                    Strings.get(R.string.list_created)))
+                            .setNegativeButton(Strings.get(R.string.cancel), null)
                             .show();
                 })
                 .show();
