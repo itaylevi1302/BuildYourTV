@@ -270,7 +270,7 @@
     <string name="the_link_expired_go_back_and_open_it_again">"Bağlantının süresi doldu. Geri dönüp yeniden açın."</string>
     <string name="the_tvs_own">"TV Varsayılanı"</string>
     <string name="theme">"Tema"</string>
-    <string name="this_afternoon">"BU ÖĞLEDEN SONRA"</string>
+    <string name="this_afternoon">"ÖĞLEDEN SONRA"</string>
     <string name="this_morning">"BU SABAH"</string>
     <string name="tmdb_attribution">"Bu ürün TMDB API\'sini kullanır ancak TMDB tarafından onaylanmamıştır."</string>
     <string name="this_tv_cant_open_the_apps_settings">"Bu TV uygulamanın ayarlarını açamıyor."</string>
