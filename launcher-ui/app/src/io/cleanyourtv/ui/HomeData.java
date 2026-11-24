@@ -39,8 +39,10 @@ final class HomeData {
         String currency = Prefs.currency();
         return currency.equals("USD") ? "USDT" : currency;
     }
-    private static final String WEATHER_QUERY = "&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset"
-            + "&hourly=temperature_2m,weather_code,is_day&timezone=auto&forecast_days=2";
+    // Both forecasts in one answer, the next 48 hours and today plus 5 days: Home Settings → Forecast switches without
+    // asking again, and offline too.
+    private static final String WEATHER_QUERY = "&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,weather_code"
+            + "&hourly=temperature_2m,weather_code,is_day&timezone=auto&forecast_days=6&forecast_hours=48";
 
     private static String weatherPlace() {
         return Prefs.latitude() + "," + Prefs.longitude();
@@ -81,6 +83,21 @@ final class HomeData {
         weatherFailedAt = 0;
     }
 
+    /** 0 = raining now, > 0 = hours until the next rain, -1 = none in the next hours (the 6 the card shows). */
+    static int rainInHours(Weather w, long now) {
+        if (isRain(w.code)) return 0;
+        for (int i = 0; i < w.hourCode.size() && i < w.hours.size(); i++) {
+            if (!isRain(w.hourCode.get(i))) continue;
+            return Math.max(1, Math.round((w.hours.get(i) - now) / 3_600_000f));
+        }
+        return -1;
+    }
+
+    /** WMO drizzle, rain, showers and thunderstorms (snow is not rain). */
+    private static boolean isRain(int code) {
+        return (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95;
+    }
+
     static String coinName(int i) {
         return i == 3 ? Strings.get(R.string.dollar) : COIN_NAMES[i];
     }
@@ -102,6 +119,11 @@ final class HomeData {
         final List<Double> hourTemp = new ArrayList<>();
         final List<Integer> hourCode = new ArrayList<>();
         final List<Boolean> hourDay = new ArrayList<>();
+        // The next 5 days (from tomorrow): noon of each day on the TV's clock, high, low and code.
+        final List<Long> days = new ArrayList<>();
+        final List<Double> dayMax = new ArrayList<>();
+        final List<Double> dayMin = new ArrayList<>();
+        final List<Integer> dayCode = new ArrayList<>();
     }
 
     private static HomeData instance;
@@ -136,7 +158,8 @@ final class HomeData {
             // The cached forecast is for the city it was fetched for; another city means fetch again.
             if (w != null && weatherPlace().equals(cache.getString("weatherPlace", ""))) {
                 weather = parseWeather(w);
-                weatherAt = cache.getLong("weatherAt", 0);
+                // Fetched with another query (an older version, without the days): shown, and fetched again now.
+                weatherAt = WEATHER_QUERY.equals(cache.getString("weatherQuery", "")) ? cache.getLong("weatherAt", 0) : 0;
             }
         } catch (Exception ignored) {}
         // As for the picks: a fetch made before the Wi-Fi is up (the TV just started) is tried again when it comes.
@@ -190,7 +213,8 @@ final class HomeData {
                     String body = get(weatherUrl());
                     weather = parseWeather(body);
                     weatherAt = System.currentTimeMillis();
-                    cache.edit().putString("weather", body).putLong("weatherAt", weatherAt).putString("weatherPlace", weatherPlace()).apply();
+                    cache.edit().putString("weather", body).putLong("weatherAt", weatherAt).putString("weatherPlace", weatherPlace())
+                            .putString("weatherQuery", WEATHER_QUERY).apply();
                     notifyListeners();
                 } catch (Exception e) {
                     weatherFailedAt = System.currentTimeMillis();
@@ -257,6 +281,18 @@ final class HomeData {
                 w.hourCode.add(codes.getInt(i));
                 w.hourDay.add(days == null || days.optInt(i, 1) == 1);
             }
+        }
+        JSONArray dates = daily.getJSONArray("time"), highs = daily.getJSONArray("temperature_2m_max"),
+                lows = daily.getJSONArray("temperature_2m_min"), dailyCodes = daily.optJSONArray("weather_code");
+        long today = System.currentTimeMillis();
+        for (int i = 0; dailyCodes != null && i < dates.length() && w.days.size() < 5; i++) {
+            String date = dates.getString(i);
+            // Only days that haven't started at the city: today, and past days in a forecast kept offline, are left out.
+            if (localTime(date + "T12:00", zone) - 12 * 3600_000L <= today) continue;
+            w.days.add(localTime(date + "T12:00", TimeZone.getDefault()));   // its noon on the TV's clock: named right anywhere
+            w.dayMax.add(highs.optDouble(i));   // a null shows "—" instead of dropping the forecast
+            w.dayMin.add(lows.optDouble(i));
+            w.dayCode.add(dailyCodes.optInt(i, -1));
         }
         return w;
     }
@@ -401,6 +437,20 @@ final class HomeData {
     static String hour(long at) {
         return Ui.once("hour", at, () -> Ui.en ? new SimpleDateFormat("h a", Locale.US).format(new java.util.Date(at))
                 : new SimpleDateFormat(Ui.es || Ui.ru || Ui.uk || Ui.tur || Ui.he ? "HH:mm" : Ui.de ? "HH 'Uhr'" : "HH'h'", Ui.locale()).format(new java.util.Date(at)));
+    }
+
+    /** "Mon", "Seg", "Mo": a day's short name for the card, without the trailing dot some languages add. */
+    static String weekday(long at) {
+        return Ui.once("weekday", at, () -> {
+            String s = new SimpleDateFormat("EEE", Ui.locale()).format(new java.util.Date(at));
+            if (s.endsWith(".")) s = s.substring(0, s.length() - 1);
+            return s.isEmpty() ? s : s.substring(0, 1).toUpperCase(Ui.locale()) + s.substring(1);
+        });
+    }
+
+    /** "Monday", "segunda-feira": a day's full name, for TalkBack. */
+    static String weekdayName(long at) {
+        return Ui.once("weekdayName", at, () -> new SimpleDateFormat("EEEE", Ui.locale()).format(new java.util.Date(at)));
     }
 
     /** How long ago the data was fetched, if it's stale (no internet): "12 min ago". */

@@ -316,6 +316,13 @@
     <string name="weather_range_wide">"Max. %1$s   Min. %2$s"</string>
     <string name="weather_minutes_ago">"il y a %1$d min"</string>
     <string name="weather_hours_ago">"il y a %1$d h"</string>
+    <string name="weather_rain_now">"Il pleut"</string>
+    <string name="weather_rain_in_hours">"Pluie dans %1$d h"</string>
+    <string name="weather_day_range">"%1$s : maximum %2$s, minimum %3$s"</string>
+    <string name="next_days_suffix_prefix">" Prochains jours : "</string>
+    <string name="forecast">"Prévisions"</string>
+    <string name="forecast_next_hours">"Prochaines heures"</string>
+    <string name="forecast_next_5_days">"5 prochains jours"</string>
     <string name="duration_minutes">"%1$d min"</string>
     <string name="duration_hours_minutes">"%1$d h %2$d min"</string>
 </resources>

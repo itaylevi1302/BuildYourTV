@@ -99,6 +99,7 @@ logged, never guessed. [`config.example.json`](config.example.json) has them all
 | `theme` | `auto`, `light`, `dark` | `auto` is dark from sunset to sunrise. |
 | `temperature` | `auto`, `C`, `F` | |
 | `clock` | `auto`, `24h`, `12h` | |
+| `forecast` | `hours`, `days` | The weather card: the next 6 hours (default) or the next 5 days. Also Home Settings → Forecast. |
 | `screensaver` | `photos`, `aurora`, `google` | `google` is Google TV's own screensaver (a Google Photos album): it needs dreamx enabled and `adb shell pm grant io.cleanyourtv.ui android.permission.WRITE_SECURE_SETTINGS`, or only the choice is saved. |
 | `weather` | `true` / `false` | The weather widget. |
 | `show_crypto` | `true` / `false` | The quotes widget (Binance). |

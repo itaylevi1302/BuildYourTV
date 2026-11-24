@@ -199,6 +199,9 @@ final class Prefs {
 
     static boolean weather() { return sp().getBoolean("weather", true); }
     static void setWeather(boolean on) { put("weather", on); }
+    /** The weather card's forecast: "hours" (the next 6 hours, as before) or "days" (the next 5 days). */
+    static String forecast() { return "days".equals(sp().getString("forecast", "hours")) ? "days" : "hours"; }
+    static void setForecast(String v) { put("forecast", v); }
 
     static boolean quotes() { return sp().getBoolean("quotes", Config.SHOW_CRYPTO); }
     static void setQuotes(boolean on) { put("quotes", on); }

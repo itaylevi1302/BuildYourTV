@@ -345,6 +345,13 @@
     <string name="weather_range_wide">"Y:%1$s   D:%2$s"</string>
     <string name="weather_minutes_ago">"%1$d dk önce"</string>
     <string name="weather_hours_ago">"%1$d sa önce"</string>
+    <string name="weather_rain_now">"Şu an yağmur yağıyor"</string>
+    <string name="weather_rain_in_hours">"%1$d sa sonra yağmur"</string>
+    <string name="weather_day_range">"%1$s: en yüksek %2$s, en düşük %3$s"</string>
+    <string name="next_days_suffix_prefix">" Önümüzdeki günler: "</string>
+    <string name="forecast">"Tahmin"</string>
+    <string name="forecast_next_hours">"Önümüzdeki saatler"</string>
+    <string name="forecast_next_5_days">"Önümüzdeki 5 gün"</string>
     <string name="duration_minutes">"%1$d dk"</string>
     <string name="duration_hours_minutes">"%1$d sa %2$d dk"</string>
 </resources>

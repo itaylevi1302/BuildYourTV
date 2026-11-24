@@ -248,14 +248,23 @@ public class SettingsActivity extends Activity {
             }
         }
 
+        /** Home Settings with 12 rows (reais add the dollar) packs them 6 px closer, so the last row and the hint stay on screen. */
+        private boolean tightList() {
+            return screen == HOME_SETTINGS && settingLabels().length > 11;
+        }
+
+        private float listPitch() { return tightList() ? 68 : LIST_ROW_H + LIST_ROW_GAP; }
+
+        private float listRowH() { return tightList() ? 62 : LIST_ROW_H; }
+
         private RectF rowBox(int row) {
             float top, height;
             if (screen == MAIN) {
                 top = LIST_TOP + row * (ROW_H + ROW_GAP);
                 height = ROW_H;
             } else {
-                top = LIST_TOP + 20 + row * (LIST_ROW_H + LIST_ROW_GAP);
-                height = LIST_ROW_H;
+                top = LIST_TOP + 20 + row * listPitch();
+                height = listRowH();
             }
             focusBox.set(LIST_X * k, top * k, LIST_R * k, (top + height) * k);
             return focusBox;
@@ -526,8 +535,8 @@ public class SettingsActivity extends Activity {
 
         private static final String[] LANGUAGES = {"auto", "pt", "en", "es", "de", "ru", "uk", "fr", "tr", "he"}, UNITS = {"auto", "C", "F"}, THEMES = {"auto", "light", "dark"};
         private static final String[] CLOCKS = {"auto", "24h", "12h"}, STYLES = {"photos", "aurora", "google"};
-        /** Home Settings: language, temperature, theme, clock, weather, city, quotes, then one row per coin. */
-        private static final int CLOCK_ROW = 3, WEATHER_ROW = 4, CITY_ROW = 5, QUOTES_ROW = 6, COIN_ROWS = 7;
+        /** Home Settings: language, temperature, theme, clock, weather, city, forecast, quotes, then one row per coin. */
+        private static final int CLOCK_ROW = 3, WEATHER_ROW = 4, CITY_ROW = 5, FORECAST_ROW = 6, QUOTES_ROW = 7, COIN_ROWS = 8;
 
         private static String styleName(String style) {
             return style.equals("aurora") ? Strings.get(R.string.clock_and_aurora)
@@ -546,6 +555,7 @@ public class SettingsActivity extends Activity {
             l.add(Strings.get(R.string.clock_format));
             l.add(Strings.get(R.string.weather_widget));
             l.add(Strings.get(R.string.city));
+            l.add(Strings.get(R.string.forecast));
             l.add(Strings.get(R.string.quotes_widget));
             l.add("Bitcoin");
             l.add("Ethereum");
@@ -570,6 +580,7 @@ public class SettingsActivity extends Activity {
                     : Strings.get(R.string.automatic);
             v[WEATHER_ROW] = onOff(Prefs.weather());
             v[CITY_ROW] = !cityStatus.isEmpty() ? cityStatus : Prefs.city().isEmpty() ? "—" : Prefs.city();
+            v[FORECAST_ROW] = Prefs.forecast().equals("days") ? Strings.get(R.string.forecast_next_5_days) : Strings.get(R.string.forecast_next_hours);
             v[QUOTES_ROW] = onOff(Prefs.quotes());
             // No quotes widget, nowhere to show prices: the coins read as off (and stay locked) until it is back on.
             for (int i = COIN_ROWS; i < v.length; i++) v[i] = onOff(Prefs.quotes() && Prefs.coin(i - COIN_ROWS));
@@ -655,6 +666,9 @@ public class SettingsActivity extends Activity {
                 }
                 case WEATHER_ROW: Prefs.setWeather(!Prefs.weather()); break;
                 case CITY_ROW: return;
+                case FORECAST_ROW:   // both are in memory: nothing to fetch
+                    Prefs.setForecast(Prefs.forecast().equals("days") ? "hours" : "days");
+                    return;
                 case QUOTES_ROW: Prefs.setQuotes(!Prefs.quotes()); break;
                 default:
                     if (!Prefs.quotes()) return;
@@ -886,9 +900,10 @@ public class SettingsActivity extends Activity {
             String[] values = settingValues();
             Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
             c.drawText(Strings.get(R.string.home_settings), LIST_X * k + 30 * k, (LIST_TOP - 24) * k, heading);
+            float pitch = listPitch(), rowH = listRowH();
             for (int i = 0; i < labels.length; i++) {
-                float y = (LIST_TOP + 20 + i * (LIST_ROW_H + LIST_ROW_GAP)) * k;
-                rowRect.set(LIST_X * k, y, LIST_R * k, y + LIST_ROW_H * k);
+                float y = (LIST_TOP + 20 + i * pitch) * k;
+                rowRect.set(LIST_X * k, y, LIST_R * k, y + rowH * k);
                 float f = drawRowBackground(c, i);
                 rowLabel.setColor(blend(0xF2FFFFFF, INK, f));
                 boolean locked = i >= COIN_ROWS && !Prefs.quotes();
@@ -899,7 +914,7 @@ public class SettingsActivity extends Activity {
                 c.drawText(values[i], rowRect.right - 30 * k, base, rowValue);
             }
             Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
-            float hy = (LIST_TOP + 20 + labels.length * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
+            float hy = (LIST_TOP + 20 + labels.length * pitch + 36) * k;
             c.drawText(Strings.get(R.string.ok_or_the_arrows_change_the_value), LIST_X * k + 30 * k, hy, hint);
         }
 

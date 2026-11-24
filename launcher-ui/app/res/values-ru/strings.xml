@@ -377,6 +377,13 @@
     <string name="weather_range_wide">"Макс. %1$s   Мин. %2$s"</string>
     <string name="weather_minutes_ago">"%1$d мин назад"</string>
     <string name="weather_hours_ago">"%1$d ч назад"</string>
+    <string name="weather_rain_now">"Сейчас дождь"</string>
+    <string name="weather_rain_in_hours">"Дождь через %1$d ч"</string>
+    <string name="weather_day_range">"%1$s: максимум %2$s, минимум %3$s"</string>
+    <string name="next_days_suffix_prefix">" Ближайшие дни: "</string>
+    <string name="forecast">"Прогноз"</string>
+    <string name="forecast_next_hours">"Ближайшие часы"</string>
+    <string name="forecast_next_5_days">"Ближайшие 5 дней"</string>
     <string name="duration_minutes">"%1$d мин"</string>
     <string name="duration_hours_minutes">"%1$d ч %2$d мин"</string>
 </resources>

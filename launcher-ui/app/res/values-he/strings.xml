@@ -324,6 +324,13 @@
     <string name="weather_range_wide">"מקס\' %1$s   מינ\' %2$s"</string>
     <string name="weather_minutes_ago">"לפני %1$d דק\'"</string>
     <string name="weather_hours_ago">"לפני %1$d שע\'"</string>
+    <string name="weather_rain_now">"יורד גשם עכשיו"</string>
+    <string name="weather_rain_in_hours">"גשם בעוד %1$d שע\'"</string>
+    <string name="weather_day_range">"%1$s: מקסימום %2$s, מינימום %3$s"</string>
+    <string name="next_days_suffix_prefix">" הימים הקרובים: "</string>
+    <string name="forecast">"תחזית"</string>
+    <string name="forecast_next_hours">"השעות הקרובות"</string>
+    <string name="forecast_next_5_days">"5 הימים הקרובים"</string>
     <string name="duration_minutes">"%1$d דק\'"</string>
     <string name="duration_hours_minutes">"%1$d שע\' %2$d דק\'"</string>
 </resources>

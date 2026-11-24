@@ -375,6 +375,13 @@
     <string name="weather_range_wide">"H:%1$s   L:%2$s"</string>
     <string name="weather_minutes_ago">"%1$d min ago"</string>
     <string name="weather_hours_ago">"%1$d h ago"</string>
+    <string name="weather_rain_now">"Raining now"</string>
+    <string name="weather_rain_in_hours">"Rain in %1$d h"</string>
+    <string name="weather_day_range">"%1$s: high %2$s, low %3$s"</string>
+    <string name="next_days_suffix_prefix">" Next days: "</string>
+    <string name="forecast">"Forecast"</string>
+    <string name="forecast_next_hours">"Next hours"</string>
+    <string name="forecast_next_5_days">"Next 5 days"</string>
     <string name="duration_minutes">"%1$dm"</string>
     <string name="duration_hours_minutes">"%1$dh %2$dm"</string>
 </resources>

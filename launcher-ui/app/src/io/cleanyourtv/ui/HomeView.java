@@ -243,7 +243,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private boolean okDown, backDown;
 
     private Paint labelPaint, metaPaint, clockPaint, buttonPaint, capsuleText, tipPaint, quotePaint, staleQuote;
-    private Paint rowTitle, drawerLabel, cardTitle, cardText, cardDim, cardDimRight, bigTemp, hourPaint, hourTemp;
+    private Paint rowTitle, drawerLabel, cardTitle, cardText, cardDim, cardDimRight, rainPaint, bigTemp, hourPaint, hourTemp, dayLow;
     private Paint pricePaint, changePaint, sheetTitle;
     private TextPaint titlePaint, gridLabel, toastPaint;
     private final Paint bitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
@@ -272,11 +272,13 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private float veilAmount = -1;
     private int veilColor;
     private HomeData.Weather textWeather;
-    private long textPricesAt = -1, textMinute = -1;
+    private long textPricesAt = -1, textMinute = -1, textRainMinute = -1;
     private int textPrefs = -1;
     private String textLanguage;
-    private String weatherTitle, nowTemp, highLow, sunriseText, sunsetText, staleText;
+    private String weatherTitle, nowTemp, highLow, rainText = "", sunriseText, sunsetText, staleText;
     private final String[] hourText = new String[6], hourTempText = new String[6];
+    private final String[] dayText = new String[5], dayMaxText = new String[5], dayMinText = new String[5];
+    private boolean textDays;   // the weather card shows the next days (Home Settings → Forecast) and has them
     private final String[] priceText = new String[HomeData.COINS.length], changeText = new String[HomeData.COINS.length];
 
     /** What the hero shows: a recommendation or, without any, the date, the time and the weather. */
@@ -644,6 +646,10 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         hourPaint.setTextAlign(Paint.Align.CENTER);
         hourTemp = Ui.numbers(Ui.medium, 26 * k, 0xF2FFFFFF);
         hourTemp.setTextAlign(Paint.Align.CENTER);
+        dayLow = Ui.numbers(Ui.medium, 22 * k, 0xADFFFFFF);
+        dayLow.setTextAlign(Paint.Align.CENTER);
+        rainPaint = Ui.numbers(Ui.medium, 23 * k, 0x99FFFFFF);
+        rainPaint.setTextAlign(Paint.Align.RIGHT);
         pricePaint = Ui.numbers(Ui.medium, 26 * k, 0xF2FFFFFF);
         pricePaint.setTextAlign(Paint.Align.RIGHT);
         changePaint = Ui.numbers(Ui.semibold, 21 * k, 0xFFFFFFFF);
@@ -1611,6 +1617,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         bigTemp.setColor(drawerInk(1));
         hourPaint.setColor(tone(L_DIM, 0xADFFFFFF));
         hourTemp.setColor(drawerInk(0.95f));
+        dayLow.setColor(tone(L_DIM, 0xADFFFFFF));
+        rainPaint.setColor(tone(L_FAINT, 0x99FFFFFF));   // the card's quiet tone, as the prices' note beside it
         pricePaint.setColor(drawerInk(0.95f));
         float titleBase = ROW_TITLE * k;
         if (drawerInputs > 0) drawRowTitle(c, Strings.get(R.string.inputs), drawerRects[0], titleBase);
@@ -1663,7 +1671,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         drawerLabel.setTextSize(23 * k);
     }
 
-    /** Weather for your location: now (large), the next 6 hours, and sunrise and sunset. */
+    /** Weather for your location: now (large), the next rain, the next 6 hours or 5 days, and sunrise and sunset. */
     private void drawWeatherCard(Canvas c, RectF r) {
         drawerCard(c, r);
         if (Ui.LEGACY) weatherSnapshot.draw(c, r, drawerCardsKey(), cc -> drawWeather(cc, r));
@@ -1679,6 +1687,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             c.drawText(Strings.get(R.string.no_weather_data_right_now), x, r.top + 120 * k, cardDim);
             return;
         }
+        if (!rainText.isEmpty()) c.drawText(rainText, r.right - 34 * k, r.top + 54 * k, rainPaint);
         String symbol = Symbols.weather(wx.code, wx.isDay);
         float sw = Symbols.width(getContext(), symbol, 52 * k);
         Symbols.draw(getContext(), c, symbol, x + sw / 2, r.top + 132 * k, 52 * k, drawerInk(0.95f));
@@ -1689,16 +1698,37 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         fill.setShader(null);
         fill.setColor(tone(0x1A000000, 0x24FFFFFF));
         c.drawRoundRect(split - k, r.top + 34 * k, split + k, r.bottom - 34 * k, k, k, fill);
-        float hx = split + 30 * k, hw = (r.right - 30 * k - hx) / 6;
-        for (int i = 0; i < wx.hours.size() && i < 6; i++) {
-            float hc = hx + hw * (i + 0.5f);
-            c.drawText(hourText[i], hc, r.top + 96 * k, hourPaint);
-            Symbols.draw(getContext(), c, Symbols.weather(wx.hourCode.get(i), wx.hourDay.get(i)), hc, r.top + 142 * k, 30 * k, drawerInk(0.9f));
-            c.drawText(hourTempText[i], hc, r.top + 196 * k, hourTemp);
+        float hx = split + 30 * k;
+        if (textDays) {
+            float hw = (r.right - 30 * k - hx) / 5;
+            for (int i = 0; i < wx.days.size() && i < 5; i++) {
+                float hc = hx + hw * (i + 0.5f);
+                c.drawText(dayText[i], hc, r.top + 96 * k, hourPaint);
+                Symbols.draw(getContext(), c, Symbols.weather(wx.dayCode.get(i), true), hc, r.top + 142 * k, 30 * k, drawerInk(0.9f));
+                // The high, then the low dimmed, centered together (closer than the next day, so the pairs read apart).
+                float maxW = hourTemp.measureText(dayMaxText[i]), minW = dayLow.measureText(dayMinText[i]), gap = 6 * k;
+                float left = hc - (maxW + gap + minW) / 2;
+                c.drawText(dayMaxText[i], left + maxW / 2, r.top + 196 * k, hourTemp);
+                c.drawText(dayMinText[i], left + maxW + gap + minW / 2, r.top + 196 * k, dayLow);
+            }
+        } else {
+            float hw = (r.right - 30 * k - hx) / 6;
+            for (int i = 0; i < wx.hours.size() && i < 6; i++) {
+                float hc = hx + hw * (i + 0.5f);
+                c.drawText(hourText[i], hc, r.top + 96 * k, hourPaint);
+                Symbols.draw(getContext(), c, Symbols.weather(wx.hourCode.get(i), wx.hourDay.get(i)), hc, r.top + 142 * k, 30 * k, drawerInk(0.9f));
+                c.drawText(hourTempText[i], hc, r.top + 196 * k, hourTemp);
+            }
         }
         float sx = hx, base = r.top + 258 * k;
         if (wx.sunrise != 0) sx = sunItem(c, "sunrise", sunriseText, sx, base) + 36 * k;
         if (wx.sunset != 0) sunItem(c, "sunset", sunsetText, sx, base);
+    }
+
+    /** "Raining now", "Rain in 3 h", or "" when the next 6 hours are dry. */
+    private static String rainText(HomeData.Weather wx) {
+        int rain = HomeData.rainInHours(wx, System.currentTimeMillis());
+        return rain < 0 ? "" : rain == 0 ? Strings.get(R.string.weather_rain_now) : Strings.get(R.string.weather_rain_in_hours, rain);
     }
 
     private void refreshDrawerText() {
@@ -1708,10 +1738,17 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         textLanguage = Ui.language;
         if (wx != textWeather || settings) {
             textWeather = wx;
+            textRainMinute = -1;   // new weather or a new language: the rain text is built again, not a minute later
             weatherTitle = Prefs.city().isEmpty() ? Strings.get(R.string.weather) : Prefs.city();
             nowTemp = HomeData.degrees(wx.temp);
             highLow = Strings.get(R.string.weather_range_wide, HomeData.degrees(wx.max), HomeData.degrees(wx.min));
-            for (int i = 0; i < wx.hours.size() && i < 6; i++) {
+            textDays = Prefs.forecast().equals("days") && !wx.days.isEmpty();   // no days yet (an older forecast, offline): the hours
+            for (int i = 0; textDays && i < wx.days.size() && i < 5; i++) {
+                dayText[i] = HomeData.weekday(wx.days.get(i));
+                dayMaxText[i] = HomeData.degrees(wx.dayMax.get(i));
+                dayMinText[i] = HomeData.degrees(wx.dayMin.get(i));
+            }
+            for (int i = 0; !textDays && i < wx.hours.size() && i < 6; i++) {
                 hourText[i] = HomeData.hour(wx.hours.get(i));
                 hourTempText[i] = HomeData.degrees(wx.hourTemp.get(i));
             }
@@ -1719,6 +1756,12 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             sunsetText = Strings.get(R.string.sunset_prefix) + Ui.time(wx.sunset);
         }
         long minute = System.currentTimeMillis() / 60_000;
+        // From the hours already fetched: the first rain in them, and the count down to it ("Rain in 1 h"). Once a
+        // minute: the count moves, and the text must not be built again on every frame.
+        if (minute != textRainMinute) {
+            textRainMinute = minute;
+            rainText = rainText(wx);
+        }
         if (data.pricesAt != textPricesAt || minute != textMinute || settings) {
             textPricesAt = data.pricesAt;
             textMinute = minute;
@@ -2756,10 +2799,22 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         s.append(". ").append(HomeData.degrees(wx.temp)).append(", ").append(HomeData.condition(wx.code, wx.isDay))
                 .append(Strings.get(R.string.high_prefix)).append(HomeData.degrees(wx.max))
                 .append(Strings.get(R.string.low_prefix)).append(HomeData.degrees(wx.min)).append('.');
-        int hours = Math.min(6, wx.hours.size());
-        if (hours > 0) s.append(Strings.get(R.string.next_hours_suffix_prefix));
-        for (int i = 0; i < hours; i++) {
-            s.append(HomeData.hour(wx.hours.get(i))).append(' ').append(HomeData.degrees(wx.hourTemp.get(i))).append(i < hours - 1 ? ", " : ".");
+        String rain = rainText(wx);
+        if (!rain.isEmpty()) s.append(' ').append(rain).append('.');
+        if (Prefs.forecast().equals("days") && !wx.days.isEmpty()) {   // as the card: the hours until there are days
+            int days = Math.min(5, wx.days.size());
+            s.append(Strings.get(R.string.next_days_suffix_prefix));
+            for (int i = 0; i < days; i++) {
+                // "Monday: high 25°, low 18°; Tuesday: …": the whole day name, since "Sun" and "Sat" are words of their own.
+                s.append(Strings.get(R.string.weather_day_range, HomeData.weekdayName(wx.days.get(i)),
+                        HomeData.degrees(wx.dayMax.get(i)), HomeData.degrees(wx.dayMin.get(i)))).append(i < days - 1 ? "; " : ".");
+            }
+        } else {
+            int hours = Math.min(6, wx.hours.size());
+            if (hours > 0) s.append(Strings.get(R.string.next_hours_suffix_prefix));
+            for (int i = 0; i < hours; i++) {
+                s.append(HomeData.hour(wx.hours.get(i))).append(' ').append(HomeData.degrees(wx.hourTemp.get(i))).append(i < hours - 1 ? ", " : ".");
+            }
         }
         if (wx.sunrise != 0) s.append(Strings.get(R.string.sunrise_suffix_prefix)).append(Ui.time(wx.sunrise)).append('.');
         if (wx.sunset != 0) s.append(Strings.get(R.string.sunset_suffix_prefix)).append(Ui.time(wx.sunset)).append('.');
