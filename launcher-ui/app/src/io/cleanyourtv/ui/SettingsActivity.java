@@ -131,6 +131,7 @@ public class SettingsActivity extends Activity {
         private final Scene scene = new Scene();
         private final Handler handler = new Handler(Looper.getMainLooper());
         private final Spring[] pop = new Spring[20];
+        private boolean playingAllowed;   // NowPlaying.allowed: read when the settings show (a binder call, not per frame)
         private final List<String> appPkgs = new ArrayList<>(), appLabels = new ArrayList<>();
         // The list picker (the app of a remote button): what it shows, which one is in use, where we are.
         private final List<String> pickLabels = new ArrayList<>();
@@ -236,7 +237,7 @@ public class SettingsActivity extends Activity {
                 }
                 case HOME_SETTINGS: {
                     String[] labels = settingLabels(), values = settingValues();
-                    return row < labels.length ? labels[row] + ", " + values[row] : "";
+                    return row < labels.length ? labels[row] + ", " + values[row] + (row == NOW_PLAYING_ROW ? ". " + playingHint() : "") : "";
                 }
                 case REMOTE_KEYS: {
                     List<RemoteKeys.Button> keys = RemoteKeys.buttons(getContext());
@@ -299,6 +300,7 @@ public class SettingsActivity extends Activity {
             lastNanos = 0;
             // Once here, so the first frame already shows it (as before); then every 2 s off the UI thread.
             showRecs(Recs.status(getContext()));
+            playingAllowed = NowPlaying.allowed(getContext());
             handler.postDelayed(poll, 2000);
             invalidate();
             spoken.readAgain();
@@ -560,8 +562,8 @@ public class SettingsActivity extends Activity {
 
         private static final String[] LANGUAGES = {"auto", "pt", "en", "es", "de", "ru", "uk", "fr", "tr", "he"}, UNITS = {"auto", "C", "F"}, THEMES = {"auto", "light", "dark"};
         private static final String[] CLOCKS = {"auto", "24h", "12h"}, STYLES = {"photos", "aurora", "google"};
-        /** Home Settings: language, temperature, theme, top of the screen, clock, at power-on, system apps, OK on the screensaver, weather, city, forecast, quotes, then one row per coin. */
-        private static final int TOP_ROW = 3, CLOCK_ROW = 4, POWER_ON_ROW = 5, SYSTEM_APPS_ROW = 6, SAVER_OK_ROW = 7, WEATHER_ROW = 8, CITY_ROW = 9, FORECAST_ROW = 10, QUOTES_ROW = 11, COIN_ROWS = 12;
+        /** Home Settings: language, temperature, theme, top of the screen, clock, at power-on, system apps, OK on the screensaver, weather, city, forecast, quotes, now playing, then one row per coin. */
+        private static final int TOP_ROW = 3, CLOCK_ROW = 4, POWER_ON_ROW = 5, SYSTEM_APPS_ROW = 6, SAVER_OK_ROW = 7, WEATHER_ROW = 8, CITY_ROW = 9, FORECAST_ROW = 10, QUOTES_ROW = 11, NOW_PLAYING_ROW = 12, COIN_ROWS = 13;
 
         private static String styleName(String style) {
             return style.equals("aurora") ? Strings.get(R.string.clock_and_aurora)
@@ -586,6 +588,7 @@ public class SettingsActivity extends Activity {
             l.add(Strings.get(R.string.city));
             l.add(Strings.get(R.string.forecast));
             l.add(Strings.get(R.string.quotes_widget));
+            l.add(Strings.get(R.string.now_playing_widget));
             l.add("Bitcoin");
             l.add("Ethereum");
             l.add("Solana");
@@ -617,9 +620,20 @@ public class SettingsActivity extends Activity {
             v[CITY_ROW] = !cityStatus.isEmpty() ? cityStatus : Prefs.city().isEmpty() ? "—" : Prefs.city();
             v[FORECAST_ROW] = Prefs.forecast().equals("days") ? Strings.get(R.string.forecast_next_5_days) : Strings.get(R.string.forecast_next_hours);
             v[QUOTES_ROW] = onOff(Prefs.quotes());
+            v[NOW_PLAYING_ROW] = playingValue();
             // No quotes widget, nowhere to show prices: the coins read as off (and stay locked) until it is back on.
             for (int i = COIN_ROWS; i < v.length; i++) v[i] = onOff(Prefs.quotes() && Prefs.coin(i - COIN_ROWS));
             return v;
+        }
+
+        /** On or Off where the listener was allowed (NOW_PLAYING=1); Not allowed otherwise, and OK does nothing (#67). */
+        private String playingValue() {
+            return playingAllowed ? onOff(Prefs.nowPlaying()) : Strings.get(R.string.now_playing_not_allowed);
+        }
+
+        /** The hint under the list on that row: what it reads, or how to allow it. */
+        private String playingHint() {
+            return Strings.get(playingAllowed ? R.string.now_playing_hint : R.string.now_playing_hint_not_allowed);
         }
 
         private static String onOff(boolean on) {
@@ -715,6 +729,9 @@ public class SettingsActivity extends Activity {
                     Prefs.setForecast(Prefs.forecast().equals("days") ? "hours" : "days");
                     return;
                 case QUOTES_ROW: Prefs.setQuotes(!Prefs.quotes()); break;
+                case NOW_PLAYING_ROW:   // shows or hides it; the permission itself comes only from NOW_PLAYING=1
+                    if (playingAllowed) Prefs.setNowPlaying(!Prefs.nowPlaying());
+                    return;
                 default:
                     if (!Prefs.quotes()) return;
                     Prefs.setCoin(focus - COIN_ROWS, !Prefs.coin(focus - COIN_ROWS));
@@ -1045,7 +1062,7 @@ public class SettingsActivity extends Activity {
                 rowRect.set(LIST_X * k, y, LIST_R * k, y + rowH * k);
                 float f = drawRowBackground(c, i);
                 rowLabel.setColor(blend(0xF2FFFFFF, INK, f));
-                boolean locked = i >= COIN_ROWS && !Prefs.quotes();
+                boolean locked = i == NOW_PLAYING_ROW ? !playingAllowed : i >= COIN_ROWS && !Prefs.quotes();
                 rowValue.setColor(blend(locked ? 0x59FFFFFF : 0xB3FFFFFF, locked ? 0x591C1C1E : 0xB31C1C1E, f));
                 if (locked) rowLabel.setColor(blend(0x73FFFFFF, 0x731C1C1E, f));
                 float base = rowRect.centerY() + Ui.halfCap(rowLabel);
@@ -1054,7 +1071,9 @@ public class SettingsActivity extends Activity {
             }
             Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
             float hy = (LIST_TOP + 20 + labels.length * pitch + 36) * k;
-            c.drawText(Strings.get(focus == POWER_ON_ROW ? R.string.power_on_hint : R.string.ok_or_the_arrows_change_the_value),
+            String hintText = focus == NOW_PLAYING_ROW ? playingHint()
+                    : Strings.get(focus == POWER_ON_ROW ? R.string.power_on_hint : R.string.ok_or_the_arrows_change_the_value);
+            c.drawText(TextUtils.ellipsize(hintText, new TextPaint(hint), (LIST_R - LIST_X - 30) * k, TextUtils.TruncateAt.END).toString(),
                     LIST_X * k + 30 * k, hy, hint);
         }
 

@@ -45,6 +45,10 @@ Free My TV. This project is for people who want both and a full Explore.
   drops, Back cancels; the order is kept) and add or remove an App Store button (Google Play, or Amazon Appstore on
   Fire TV; off until added).
 - Weather for your city, a theme that darkens at sunset, a photo screensaver.
+- Optional *Now Playing* (off until `NOW_PLAYING=1`): what an app plays, in the quotes' place on the home screen and
+  the screensaver. It needs Android's notification access, the only way apps' media sessions are shared. It reads
+  only the title, artist and app, never a notification, and nothing leaves the TV: see
+  [launcher-ui/README.md](launcher-ui/README.md#now-playing).
 - No ADB left on: debloat, the Home switch and the remote-button service are done once from the computer.
 
 **Explore** (the ▶ button on the home screen, or a remote button)

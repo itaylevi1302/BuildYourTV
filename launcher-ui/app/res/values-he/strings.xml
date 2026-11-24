@@ -161,6 +161,11 @@
     <string name="no_weather_data_right_now">"אין נתוני מזג אוויר כרגע."</string>
     <string name="not_connected_2">"לא מחובר"</string>
     <string name="not_installed">"לא מותקן"</string>
+    <string name="now_playing_announce">"מתנגן עכשיו: %1$s"</string>
+    <string name="now_playing_hint">"שם, אמן ואפליקציה של מה שמתנגן. שום דבר לא יוצא מהטלוויזיה."</string>
+    <string name="now_playing_hint_not_allowed">"אפשרו זאת ממחשב עם NOW_PLAYING=1."</string>
+    <string name="now_playing_not_allowed">"לא מאושר"</string>
+    <string name="now_playing_widget">"וידג\'ט מתנגן עכשיו"</string>
     <string name="not_on_any_streaming_service_in_the_region_right_now">"כרגע לא זמין באף שירות סטרימינג באזור."</string>
     <string name="not_on_the_shelf">"לא במדף"</string>
     <string name="inputs_edit_hint">"הצגה או הסתרה של כניסה ב־OK. שינוי הסדר ב־← →."</string>

@@ -199,6 +199,11 @@
     <string name="no_weather_data_right_now">"Наразі немає даних про погоду."</string>
     <string name="not_connected_2">"Не підключено"</string>
     <string name="not_installed">"Не встановлено"</string>
+    <string name="now_playing_announce">"Зараз грає: %1$s"</string>
+    <string name="now_playing_hint">"Назва, виконавець і застосунок. Ніщо не залишає телевізор."</string>
+    <string name="now_playing_hint_not_allowed">"Дозвольте з комп’ютера: NOW_PLAYING=1."</string>
+    <string name="now_playing_not_allowed">"Не дозволено"</string>
+    <string name="now_playing_widget">"Віджет «Зараз грає»"</string>
     <string name="not_on_any_streaming_service_in_the_region_right_now">"Наразі недоступно в жодному стримінговому сервісі регіону."</string>
     <string name="not_on_the_shelf">"не в обраному"</string>
     <string name="inputs_edit_hint">"OK — показати або приховати вхід. ← → — змінити порядок."</string>

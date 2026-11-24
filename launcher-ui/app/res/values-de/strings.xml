@@ -45,6 +45,11 @@
     <string name="no_city_with_that_name">"Keine Stadt mit diesem Namen."</string>
     <string name="no_weather_data_right_now">"Gerade keine Wetterdaten."</string>
     <string name="not_installed">"Nicht installiert"</string>
+    <string name="now_playing_announce">"Läuft gerade: %1$s"</string>
+    <string name="now_playing_hint">"Titel, Künstler und App der Wiedergabe. Nichts verlässt den TV."</string>
+    <string name="now_playing_hint_not_allowed">"Am Computer mit NOW_PLAYING=1 erlauben."</string>
+    <string name="now_playing_not_allowed">"Nicht erlaubt"</string>
+    <string name="now_playing_widget">"Wiedergabe-Widget"</string>
     <string name="not_on_the_shelf">"nicht in der Leiste"</string>
     <string name="inputs_edit_hint">"OK blendet einen Eingang ein oder aus. ← → ändern die Reihenfolge."</string>
     <string name="in_the_inputs_place_prefix">"in den Eingängen, Platz "</string>

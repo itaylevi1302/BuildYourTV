@@ -5,6 +5,7 @@
 #   TV_HOST=192.168.1.50 launcher-ui/build-and-install.sh                                  # build here, then install
 #   TV_HOST=192.168.1.50 APK=~/Downloads/CleanYourTV-UI.apk launcher-ui/build-and-install.sh  # a release APK, no build
 #   ... CONFIG=my-config.json ...                                       # and push this TV's config.json at the end
+#   ... NOW_PLAYING=1 ...                                               # allow Now Playing (0 takes it back; see README)
 #   ... WATCH_NEXT=1 ...                                                # let Continue Watching read Watch Next
 set -euo pipefail
 # APK and CONFIG are paths as the caller typed them: resolve them before moving into launcher-ui/.
@@ -166,6 +167,19 @@ if [ "${TV_SDK:-0}" = 30 ] && tv 'getprop ro.product.manufacturer; getprop ro.pr
 elif [ "${KEY_SERVICE:-0}" = 1 ] || tv "settings get secure enabled_accessibility_services" | grep -q "$svc"; then
   tv "s=\$(settings get secure enabled_accessibility_services); case \"\$s\" in *$svc*) settings put secure enabled_accessibility_services ''; settings put secure accessibility_enabled 0; sleep 1; settings put secure enabled_accessibility_services \"\$s\" ;; null|'') settings put secure enabled_accessibility_services $svc ;; *) settings put secure enabled_accessibility_services \"\$s:$svc\" ;; esac; settings put secure accessibility_enabled 1; echo remote buttons enabled"
 fi
+# Now Playing (#67): what apps play (title, artist, the app) on the home screen and the screensaver. Off until
+# NOW_PLAYING=1 allows our notification listener, the only way Android hands out media sessions; NOW_PLAYING=0 takes it
+# back, and without either a reinstall keeps what was there. The listener never reads a notification and unbinds
+# itself as soon as it connects. `cmd notification allow_listener` adds it next to the listeners already allowed (the
+# setting alone grants nothing since Android 8, as Free My TV PR 287 found); where that command answers anything (it is
+# missing on that firmware), the component is appended to enabled_notification_listeners, the others kept.
+np=$PKG/$PKG.NowPlaying
+case "${NOW_PLAYING:-}" in
+  1) tv "out=\$(cmd notification allow_listener $np 2>&1); if [ -n \"\$out\" ]; then s=\$(settings get secure enabled_notification_listeners); case \"\$s\" in *$np*) ;; null|'') settings put secure enabled_notification_listeners $np ;; *) settings put secure enabled_notification_listeners \"\$s:$np\" ;; esac; echo \"now playing allowed through enabled_notification_listeners (\$out)\"; else echo now playing allowed; fi" ;;
+  0) tv "cmd notification disallow_listener $np >/dev/null 2>&1; s=\$(settings get secure enabled_notification_listeners); case \"\$s\" in *$np*) settings put secure enabled_notification_listeners \"\$(echo \"\$s\" | sed 's#$np##; s#::#:#; s#^:##; s#:\$##')\" ;; esac; echo now playing taken back" ;;
+  '') ;;
+  *) echo "NOW_PLAYING=$NOW_PLAYING ignored: 1 allows Now Playing, 0 takes it back." >&2 ;;
+esac
 if [ -n "${CONFIG:-}" ]; then ./config.sh "$CONFIG"; fi
 echo "Installed. Press Home on the remote to see it. Back to CleanYourTV's own launcher:"
 echo "  TV_HOST=$TV_HOST launcher/build-and-install.sh   (or, if it is still installed: tools/tv.py 'cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity')"

@@ -67,7 +67,8 @@ class WeatherForecastTest(unittest.TestCase):
         settings = read("SettingsActivity.java")
         rows = dict(re.findall(r"(\w+_ROWS?) = (\d+)", settings[settings.index("CLOCK_ROW ="):]))
         self.assertEqual(int(rows["QUOTES_ROW"]), int(rows["FORECAST_ROW"]) + 1, "quotes follow the forecast row")
-        self.assertEqual(int(rows["COIN_ROWS"]), int(rows["QUOTES_ROW"]) + 1, "the coin rows follow the quotes row")
+        self.assertEqual(int(rows["NOW_PLAYING_ROW"]), int(rows["QUOTES_ROW"]) + 1, "Now Playing follows the quotes row")
+        self.assertEqual(int(rows["COIN_ROWS"]), int(rows["NOW_PLAYING_ROW"]) + 1, "the coin rows come last")
         case = settings[settings.index("case FORECAST_ROW:"):]
         case = case[:case.index("default:")]
         self.assertIn("Prefs.setForecast(", case)

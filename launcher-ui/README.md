@@ -42,6 +42,7 @@ on (Settings → Device Preferences → About → press OK on **Build** seven ti
    stick, so the app buttons work on the home screen only (`build-and-install.sh` refuses `KEY_SERVICE=1` there).
    For "Google Photos" under Settings → Screensaver (Google TV's own screensaver, which must stay enabled), let the app
    switch the screensaver: `adb shell pm grant io.cleanyourtv.ui android.permission.WRITE_SECURE_SETTINGS`.
+   Now Playing is off until you allow it: see [Now Playing](#now-playing).
 5. Switch Network debugging off again on the TV when you are done: port 5555 is plaintext.
 
 With a clone of this repository, `build-and-install.sh` does steps 2 to 4 with the same safeguards as CleanYourTV's
@@ -170,6 +171,32 @@ disabled the key did nothing. With the key service on (`KEY_SERVICE=1`) it now o
 the first input, and only while nothing answers the request (re-enable the stock home and the key is the TV's again).
 A row for key 178 decides instead: `configurable` with `"default": "inputs"` gives the same on any TV, and `""` leaves
 the key alone on Hisense too; a `native` row does not switch it off.
+
+## Now Playing
+
+Off by default. Once allowed, what an app is playing (its title, the artist or channel, and the app's name) takes the
+quotes' place on the home screen and the screensaver while it plays; when it stops, the quotes come back.
+
+Android shares what apps play (their media sessions) only with an app whose notification listener has been allowed,
+and such a listener *could* read every notification. So CleanYourTV UI never asks for it on its own: you allow it from
+the computer, once (a reinstall keeps it):
+
+```bash
+TV_HOST=192.168.1.50 NOW_PLAYING=1 launcher-ui/build-and-install.sh    # NOW_PLAYING=0 takes it back
+adb shell cmd notification allow_listener io.cleanyourtv.ui/io.cleanyourtv.ui.NowPlaying    # by hand; disallow_listener takes it back
+```
+
+What it reads, and what it doesn't:
+- From each app's media session: the title, the subtitle (artist, channel or show) and whether it is playing. The
+  app's name comes from the TV's app list.
+- It never reads a notification: the listener asks Android to unbind it the moment it connects, so none reaches it.
+- It watches only while the home screen or the screensaver is on screen. Nothing runs in the background for it.
+- Nothing is stored, logged or sent: what's playing is only drawn on the screen.
+
+Settings → Home Settings → *Now Playing widget* hides or shows it. Hiding it doesn't take the permission back
+(only `NOW_PLAYING=0` or `disallow_listener` do). The row says *Not allowed* until the permission is there, and stays
+so where the TV refuses it. On Android 11 to 12L the screensaver runs in its own process and picks up that switch
+the next time that process starts.
 
 ## Translations
 
