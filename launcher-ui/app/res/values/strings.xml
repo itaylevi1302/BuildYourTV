@@ -200,6 +200,11 @@
     <string name="no_weather_data_right_now">"No weather data right now."</string>
     <string name="not_connected_2">"Not connected"</string>
     <string name="not_installed">"Not installed"</string>
+    <string name="now_playing_announce">"Now playing: %1$s"</string>
+    <string name="now_playing_hint">"Title, artist and app of what plays. Nothing leaves the TV."</string>
+    <string name="now_playing_hint_not_allowed">"Allow it from a computer with NOW_PLAYING=1."</string>
+    <string name="now_playing_not_allowed">"Not allowed"</string>
+    <string name="now_playing_widget">"Now Playing widget"</string>
     <string name="not_on_any_streaming_service_in_the_region_right_now">"Not on any streaming service in the region right now."</string>
     <string name="not_on_the_shelf">"not on the shelf"</string>
     <string name="inputs_edit_hint">"OK shows or hides an input. ← → change the order."</string>

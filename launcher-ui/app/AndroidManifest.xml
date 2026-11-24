@@ -237,5 +237,20 @@
                 android:resource="@xml/remote_key_service" />
         </service>
 
+        <!-- Now Playing (#67): Android hands the apps' media sessions (what plays: title, artist, the app) only to an allowed
+             notification listener. Off until launcher-ui/build-and-install.sh NOW_PLAYING=1 allows it. It never reads a
+             notification and unbinds itself as soon as it connects. In :home, so binding it starts no other process.
+             The permission below lets only the system bind it; the app asks for no permission for it. -->
+        <service
+            android:name=".NowPlaying"
+            android:process=":home"
+            android:exported="true"
+            android:label="CleanYourTV UI"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
     </application>
 </manifest>

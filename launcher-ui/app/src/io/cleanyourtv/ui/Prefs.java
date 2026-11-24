@@ -240,6 +240,13 @@ final class Prefs {
     static boolean quotes() { return sp().getBoolean("quotes", Config.SHOW_CRYPTO); }
     static void setQuotes(boolean on) { put("quotes", on); }
 
+    /**
+     * Home Settings' Now Playing widget (#67). On by default because it shows nothing until the listener is allowed
+     * (build-and-install.sh NOW_PLAYING=1, the explicit step); Off hides it and stops watching.
+     */
+    static boolean nowPlaying() { return sp().getBoolean("nowPlaying", true); }
+    static void setNowPlaying(boolean on) { put("nowPlaying", on); }
+
     static boolean coin(int i) { return sp().getBoolean("coin" + i, true); }
     static void setCoin(int i, boolean on) { put("coin" + i, on); }
 

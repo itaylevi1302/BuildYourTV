@@ -180,6 +180,11 @@
     <string name="no_weather_data_right_now">"Şu anda hava durumu verisi yok."</string>
     <string name="not_connected_2">"Bağlı değil (İsteğe bağlı)"</string>
     <string name="not_installed">"Yüklü değil"</string>
+    <string name="now_playing_announce">"Şimdi çalıyor: %1$s"</string>
+    <string name="now_playing_hint">"Çalanın adı, sanatçısı ve uygulaması. Hiçbir şey TV\'den çıkmaz."</string>
+    <string name="now_playing_hint_not_allowed">"Bilgisayardan NOW_PLAYING=1 ile izin verin."</string>
+    <string name="now_playing_not_allowed">"İzin verilmedi"</string>
+    <string name="now_playing_widget">"Şimdi çalıyor widget\'ı"</string>
     <string name="not_on_any_streaming_service_in_the_region_right_now">"Şu anda bölgenizdeki hiçbir dijital platformda yer almıyor."</string>
     <string name="not_on_the_shelf">"rafta değil"</string>
     <string name="inputs_edit_hint">"OK bir girişi gösterir veya gizler. ← → sırayı değiştirir."</string>

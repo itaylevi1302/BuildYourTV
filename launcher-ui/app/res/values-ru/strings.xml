@@ -198,6 +198,11 @@
     <string name="no_weather_data_right_now">"Сейчас нет данных о погоде."</string>
     <string name="not_connected_2">"Не подключён"</string>
     <string name="not_installed">"Не установлено"</string>
+    <string name="now_playing_announce">"Сейчас играет: %1$s"</string>
+    <string name="now_playing_hint">"Название, исполнитель и приложение. Ничего не покидает ТВ."</string>
+    <string name="now_playing_hint_not_allowed">"Разрешите с компьютера: NOW_PLAYING=1."</string>
+    <string name="now_playing_not_allowed">"Не разрешено"</string>
+    <string name="now_playing_widget">"Виджет «Сейчас играет»"</string>
     <string name="not_on_any_streaming_service_in_the_region_right_now">"Сейчас недоступно ни в одном стриминговом сервисе региона."</string>
     <string name="not_on_the_shelf">"не в избранном"</string>
     <string name="inputs_edit_hint">"OK — показать или скрыть вход. ← → — изменить порядок."</string>

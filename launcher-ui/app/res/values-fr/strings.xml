@@ -156,6 +156,11 @@
     <string name="no_weather_data_right_now">"Pas de données météo pour le moment."</string>
     <string name="not_connected_2">"Non connecté"</string>
     <string name="not_installed">"Non installé"</string>
+    <string name="now_playing_announce">"En lecture : %1$s"</string>
+    <string name="now_playing_hint">"Titre, artiste et appli de la lecture. Rien ne quitte la TV."</string>
+    <string name="now_playing_hint_not_allowed">"Autorisez-le depuis un ordinateur avec NOW_PLAYING=1."</string>
+    <string name="now_playing_not_allowed">"Non autorisé"</string>
+    <string name="now_playing_widget">"Widget En lecture"</string>
     <string name="not_on_any_streaming_service_in_the_region_right_now">"Disponible sur aucune plateforme de streaming dans la région pour le moment."</string>
     <string name="not_on_the_shelf">"pas dans la barre d\'applis"</string>
     <string name="inputs_edit_hint">"OK affiche ou masque une source. ← → changent l\'ordre."</string>

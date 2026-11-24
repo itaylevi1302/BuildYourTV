@@ -102,6 +102,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private final Scene scene = new Scene();
     private final HomeData data;
     private final Recs recs;
+    private final NowPlaying.Watch playing;   // what an app plays, in the quotes' place (#67)
     private final Click click;
     private final Handler handler = new Handler(Looper.getMainLooper());
     /** The background follows the focused pick once it has been there this long (see bgFollow). */
@@ -363,6 +364,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         @Override public void run() {
             if (!running) return;
             wake();
+            playing.start();   // the listener allowed after the screen showed (a no-op once watching)
             data.refreshIfStale();
             recs.refreshIfStale();
             updatePalette();
@@ -377,6 +379,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         activity = a;
         data = HomeData.get(a);
         recs = Recs.get(a);
+        playing = new NowPlaying.Watch(a, this::onPlaying);
         click = new Click(a);
         ui = a.getSharedPreferences("home-ui", Context.MODE_PRIVATE);
         tvInputs = (TvInputManager) a.getSystemService(Context.TV_INPUT_SERVICE);
@@ -456,6 +459,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         recs.refreshIfStale();
         if (tvInputs != null) tvInputs.registerCallback(inputCallback, handler);
         handler.postDelayed(tick, 15_000);
+        playing.start();
         if (Prefs.shelfRecent()) reorderRecent();   // before the first frame: the app just left comes first (#63)
         if (!again) reload();
         updatePalette();
@@ -490,6 +494,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         Choreographer.getInstance().removeFrameCallback(this);
         handler.removeCallbacks(tick);
         handler.removeCallbacks(reloadSoon);
+        handler.removeCallbacks(bars);
+        playing.stop();
         data.removeListener(this);
         recs.removeListener(this);
         if (tvInputs != null) tvInputs.unregisterCallback(inputCallback);
@@ -711,6 +717,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         border.setStrokeWidth(2 * k);
         rim.setStyle(Paint.Style.STROKE);
         rim.setStrokeWidth(2.5f * k);
+        onPlaying();   // the line fits the new size; a title that came before the first layout bounces and is said now
     }
 
     // MARK: - Frames: 60 per second while something moves; nothing is redrawn when still
@@ -1351,6 +1358,61 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
 
     private Quotes quotes;
 
+    // What an app is playing (#67), cut to fit the tab row and the clock's row: once per title, never while drawing.
+    private String playingTab, playingClock;
+    private float playingTabWidth, playingTabCap, playingClockCap;
+    private final RectF barRect = new RectF();
+    // The bars bounce for a few seconds when the title changes, then stand still: bouncing all along redrew the top
+    // layer 10 times a second (~8% of a core on a Cortex-A55, Free My TV PR 287), the still screen nothing.
+    private static final long BAR_FRAME_MS = 100, BARS_BOUNCE_MS = 3000;
+    private long barsUntil;
+    private String shownTitle;   // kept while the screen is hidden: showing it again with the same title is no change
+    private final Runnable bars = new Runnable() {
+        @Override public void run() {
+            if (!running || playingTab == null) return;
+            heroDirty = true;
+            wake();
+            if (SystemClock.uptimeMillis() < barsUntil) handler.postDelayed(this, BAR_FRAME_MS);
+        }
+    };
+
+    private void bounceBars() {
+        handler.removeCallbacks(bars);
+        if (playingTab == null) return;
+        barsUntil = SystemClock.uptimeMillis() + BARS_BOUNCE_MS;
+        handler.post(bars);
+    }
+
+    /** What's playing changed (or stopped). */
+    private void onPlaying() {
+        fitPlaying();
+        heroDirty = true;
+        wake();
+        // Only a new title bounces the bars and is said to TalkBack: not a subtitle some players rewrite every second (the
+        // time), and not the same title again when the screen shows.
+        String title = playing.title, now = playing.text;
+        if (title != null && now != null && running && playingTab != null && !title.equals(shownTitle)) {
+            shownTitle = title;
+            bounceBars();
+            if (talkBack()) announceForAccessibility(Strings.get(R.string.now_playing_announce, now.replace(" · ", ", ")));
+        }
+    }
+
+    private void fitPlaying() {
+        String now = playing.text;
+        if (now == null || lQuote == null) {
+            playingTab = playingClock = null;
+            return;
+        }
+        fitPaint.set(lQuote);
+        playingTab = TextUtils.ellipsize(now, fitPaint, 640 * k, TextUtils.TruncateAt.END).toString();
+        playingTabWidth = lQuote.measureText(playingTab);
+        playingTabCap = Ui.cap(lQuote);
+        playingClockCap = Ui.cap(lClockQuote);
+        fitPaint.set(lClockQuote);
+        playingClock = TextUtils.ellipsize(now, fitPaint, (CONTENT_R - MARGIN - 60) * k, TextUtils.TruncateAt.END).toString();
+    }
+
     /** Coin logo + price in the configured currency, in a row at the right end of the tab bar. */
     private void drawQuotes(Canvas c) {
         boolean clock = !picksOn() && !watchMode;   // Continue Watching has no tabs: the prices take their row
@@ -1363,6 +1425,17 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         if (fade <= 0.01f) return;
         int textColor = text.getColor();
         text.setColor(Ui.alpha(textColor, fade));
+        // What an app is playing takes the quotes' place while it plays (#67).
+        String line = clock ? playingClock : playingTab;
+        if (line != null) {
+            float cap = clock ? playingClockCap : playingTabCap, gap = cap * 0.6f;
+            float base = clock ? L_QUOTES_BASE * k : (L_TABBAR_TOP + L_TABBAR_H / 2) * k + cap / 2;
+            float x = clock ? MARGIN * k : right - playingTabWidth - gap - NowPlaying.barsWidth(cap);
+            NowPlaying.drawBars(c, x, base, cap, text, SystemClock.uptimeMillis() < barsUntil, barRect);
+            c.drawText(line, x + NowPlaying.barsWidth(cap) + gap, base, text);
+            text.setColor(textColor);
+            return;
+        }
         int n = HomeData.coinCount();
         if (n == 0) { text.setColor(textColor); return; }
         // Measured once per set of prices: this row is redrawn on every frame of the cards' focus animation, and
@@ -3235,7 +3308,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
         if (!picksOn()) {
             drawClock(c);
-            if (HomeData.coinCount() > 0) drawQuotes(c);
+            if (HomeData.coinCount() > 0 || playingTab != null) drawQuotes(c);
             return;
         }
         String hello = Strings.get(R.string.for_you);
@@ -3269,7 +3342,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         for (int i = 0; i < 3; i++) if (cardFocus[i].value > 0.02f && (top < 0 || cardFocus[i].value > cardFocus[top].value)) top = i;
         for (int i = 0; i < 3; i++) if (i != top) drawLightCard(c, i);
         if (top >= 0) drawLightCard(c, top);
-        if (HomeData.coinCount() > 0) drawQuotes(c);
+        if (HomeData.coinCount() > 0 || playingTab != null) drawQuotes(c);
     }
 
     private boolean picksOn() {
@@ -3347,7 +3420,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             for (int i = watchFirst; i < end; i++) if (i != top) drawWatchCard(c, i);
             if (top >= 0) drawWatchCard(c, top);
         }
-        if (HomeData.coinCount() > 0) drawQuotes(c);
+        if (HomeData.coinCount() > 0 || playingTab != null) drawQuotes(c);
     }
 
     /** Like a pick's card (same focus, shadow, sheen and rim), with the progress bar on the picture. */
