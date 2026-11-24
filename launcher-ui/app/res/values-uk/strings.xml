@@ -287,6 +287,10 @@
     <string name="settings_2">"Налаштування"</string>
     <string name="shelf">"Обрані застосунки"</string>
     <string name="shelf_edit_hint">"OK — додати або прибрати (до %1$d). ← → — змінити порядок."</string>
+    <string name="shelf_edit_hint_recent">"OK — додати або прибрати (до %1$d). Останній відкритий застосунок — першим."</string>
+    <string name="shelf_order">"Порядок обраного"</string>
+    <string name="shelf_order_manual">"Мій порядок"</string>
+    <string name="shelf_order_recent">"Спочатку недавні"</string>
     <string name="shortcuts">"Ярлики"</string>
     <string name="show">"Серіал"</string>
     <string name="show_every_service">"Показувати всі сервіси"</string>

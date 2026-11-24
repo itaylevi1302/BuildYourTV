@@ -87,6 +87,10 @@
     <string name="settings_2">"Ajustes"</string>
     <string name="shelf">"Estante"</string>
     <string name="shelf_edit_hint">"OK pone o quita del estante (hasta %1$d). ← → cambian el orden."</string>
+    <string name="shelf_edit_hint_recent">"OK pone o quita del estante (hasta %1$d). La última app abierta va primero."</string>
+    <string name="shelf_order">"Orden del estante"</string>
+    <string name="shelf_order_manual">"Mi orden"</string>
+    <string name="shelf_order_recent">"Última abierta primero"</string>
     <string name="shortcuts">"Accesos directos"</string>
     <string name="sunrise_prefix">"Amanecer "</string>
     <string name="sunrise_suffix_prefix">" Amanecer "</string>

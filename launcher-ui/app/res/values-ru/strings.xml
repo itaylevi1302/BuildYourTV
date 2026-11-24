@@ -286,6 +286,10 @@
     <string name="settings_2">"Настройки"</string>
     <string name="shelf">"Избранные приложения"</string>
     <string name="shelf_edit_hint">"OK — добавить или убрать (до %1$d). ← → — изменить порядок."</string>
+    <string name="shelf_edit_hint_recent">"OK — добавить или убрать (до %1$d). Последнее открытое приложение — первым."</string>
+    <string name="shelf_order">"Порядок избранного"</string>
+    <string name="shelf_order_manual">"Мой порядок"</string>
+    <string name="shelf_order_recent">"Сначала недавние"</string>
     <string name="shortcuts">"Ярлыки"</string>
     <string name="show">"Сериал"</string>
     <string name="show_every_service">"Показывать все сервисы"</string>

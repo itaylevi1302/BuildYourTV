@@ -332,6 +332,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private final LauncherApps launcherApps;   // null: no app-change callback, so every reload reads the lists
     private boolean appsStale = true;
     private int appsVersion;
+    private int recentVersion;   // Recent.version when the shelf was last put in "Last opened first" order (#63)
     private String appsLanguage = "";
     private long appsAt;
 
@@ -436,6 +437,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         recs.refreshIfStale();
         if (tvInputs != null) tvInputs.registerCallback(inputCallback, handler);
         handler.postDelayed(tick, 15_000);
+        if (Prefs.shelfRecent()) reorderRecent();   // before the first frame: the app just left comes first (#63)
         if (!again) reload();
         updatePalette();
         updatePicks();
@@ -1217,6 +1219,23 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     }
 
     // MARK: - Quotes and shelf
+
+    /** "Last opened first": the shelf it has, in the new order, with no file or package reads (#63). */
+    private void reorderRecent() {
+        int v = Recent.version;
+        if (v == recentVersion || reordering) return;
+        recentVersion = v;
+        showRecent(Recent.orderKnown(shelf));
+    }
+
+    /** The shelf in this order, focused on its first app (nothing changes when it's already so). */
+    private void showRecent(List<HomeApps.Item> ordered) {
+        boolean same = ordered.size() == shelf.size();
+        for (int i = 0; same && i < ordered.size(); i++) same = ordered.get(i) == shelf.get(i);
+        if (same) return;
+        shelfIndex = 0;
+        setShelf(ordered);
+    }
 
     private void setShelf(List<HomeApps.Item> list) {
         wake();
@@ -2120,8 +2139,12 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             appsLanguage = Ui.language;
             appsAt = up;
         }
+        // Without the package read, "Last opened first" still reads its small file (#63): a launch noted after the
+        // resume, or written by another process.
+        final List<HomeApps.Item> from = !apps && Prefs.shelfRecent() ? shelf : null;
         LOADER.execute(() -> {
             final List<HomeApps.Item> s = apps ? HomeApps.shelf(c, true) : null;
+            final List<HomeApps.Item> recent = from != null ? Recent.order(c, from) : null;
             final List<HomeApps.Item> st = statusList(c);
             final List<HomeApps.Item> d = drawerList(c);
             final List<HomeApps.Item> o = apps ? HomeApps.others(c) : null;
@@ -2131,6 +2154,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 if (top != null && (reordering || orderAtLoad != orderRevision)) appsStale = true;
                 else if (top != null) setLightButtons(top);
                 if (s != null) setShelf(s);
+                else if (recent != null && shelf == from && !reordering) showRecent(recent);
                 setStatusItems(st);
                 setDrawerItems(d);
                 if (o != null && !sheetOpen) setOthers(o);
@@ -2412,7 +2436,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private boolean canReorder() {
         if (sheetOpen) return false;
         if (zone == Z_TOP) return topButtonHeld() && lightButtons.size() > 1;
-        if (zone != Z_SHELF || shelfIndex >= shelf.size() || shelf.size() < 2) return false;
+        // "Last opened first" places the shelf's apps itself (#63)
+        if (zone != Z_SHELF || shelfIndex >= shelf.size() || shelf.size() < 2 || Prefs.shelfRecent()) return false;
         HomeApps.Item it = shelf.get(shelfIndex);
         return it.kind == HomeApps.APP && it.pkg != null;
     }

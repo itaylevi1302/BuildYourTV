@@ -288,6 +288,10 @@
     <string name="settings_2">"Settings"</string>
     <string name="shelf">"Shelf"</string>
     <string name="shelf_edit_hint">"OK adds or removes (up to %1$d). ← → change the order."</string>
+    <string name="shelf_edit_hint_recent">"OK adds or removes (up to %1$d). The last one opened comes first."</string>
+    <string name="shelf_order">"Shelf order"</string>
+    <string name="shelf_order_manual">"My order"</string>
+    <string name="shelf_order_recent">"Last opened first"</string>
     <string name="shortcuts">"Shortcuts"</string>
     <string name="show">"Show"</string>
     <string name="show_every_service">"Show every service"</string>

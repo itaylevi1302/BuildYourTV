@@ -549,7 +549,10 @@ public class DetailActivity extends Activity {
         String name = title == null ? "" : title.name;
         new Thread(() -> {
             String url = DeepLinks.find(this, kind, id, name).get(pkg);
-            main.post(() -> { if (!DeepLinks.open(this, pkg, url)) RemoteKeys.run(this, pkg); });
+            main.post(() -> {
+                if (!DeepLinks.open(this, pkg, url)) RemoteKeys.run(this, pkg);
+                Recent.note(this, pkg);   // the shelf's "Last opened first" counts it too (#63)
+            });
         }).start();
     }
 

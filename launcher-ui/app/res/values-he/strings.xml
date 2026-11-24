@@ -241,6 +241,10 @@
     <string name="settings_2">"הגדרות"</string>
     <string name="shelf">"מדף האפליקציות"</string>
     <string name="shelf_edit_hint">"הוספה או הסרה ב־OK (עד %1$d). שינוי הסדר ב־← →."</string>
+    <string name="shelf_edit_hint_recent">"הוספה או הסרה ב־OK (עד %1$d). האפליקציה שנפתחה אחרונה מופיעה ראשונה."</string>
+    <string name="shelf_order">"סדר המדף"</string>
+    <string name="shelf_order_manual">"הסדר שלי"</string>
+    <string name="shelf_order_recent">"האחרונה שנפתחה ראשונה"</string>
     <string name="shortcuts">"קיצורי דרך"</string>
     <string name="show">"סדרה"</string>
     <string name="show_every_service">"הצגת כל השירותים"</string>

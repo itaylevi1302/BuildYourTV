@@ -85,6 +85,10 @@
     <string name="settings_2">"Einstellungen"</string>
     <string name="shelf">"Leiste"</string>
     <string name="shelf_edit_hint">"OK fügt hinzu oder entfernt (bis zu %1$d). ← → ändern die Reihenfolge."</string>
+    <string name="shelf_edit_hint_recent">"OK fügt hinzu oder entfernt (bis zu %1$d). Die zuletzt geöffnete App kommt zuerst."</string>
+    <string name="shelf_order">"Reihenfolge der Leiste"</string>
+    <string name="shelf_order_manual">"Meine Reihenfolge"</string>
+    <string name="shelf_order_recent">"Zuletzt geöffnet zuerst"</string>
     <string name="shortcuts">"Verknüpfungen"</string>
     <string name="sunrise_prefix">"Sonnenaufgang "</string>
     <string name="sunrise_suffix_prefix">" Sonnenaufgang "</string>

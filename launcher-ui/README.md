@@ -94,6 +94,7 @@ logged, never guessed. [`config.example.json`](config.example.json) has them all
 | `language` | `auto`, `pt`, `en`, `es`, `de`, `ru`, `uk`, `fr`, `tr`, `he` | `auto` (default) follows the TV. English is the fallback. Hebrew (`he`) also mirrors the home screen right to left. |
 | `shelf` | list of packages | The apps on the home screen, in order. |
 | `dock_apps` | list of packages | CleanYourTV's name for `shelf`, read when `shelf` is absent, so a theme's `config.json` works. |
+| `shelf_order` | `manual`, `recent` | `manual` (default) keeps the order of `shelf` and Settings → Shelf. `recent` puts the app last opened from the home screen (the shelf, All Apps, a pick's app) first; for that the TV keeps a list of the packages opened, newest first and without times, which never leaves the TV and is deleted by going back to `manual`. Also Settings → Shelf → Shelf order. |
 | `hidden_apps` | list of packages | Apps never shown. |
 | `city` | `{ "name", "latitude", "longitude" }` | The weather and the sunset that turns the theme dark. Without a city there is no weather. |
 | `theme` | `auto`, `light`, `dark` | `auto` is dark from sunset to sunrise. |

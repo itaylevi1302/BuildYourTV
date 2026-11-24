@@ -246,6 +246,15 @@ final class Prefs {
         put("shelf", sb.toString());
     }
 
+    /** The shelf puts the app last opened from here first (Recent, #63) instead of the order set in Settings > Shelf. */
+    static boolean shelfRecent() { return app != null && sp().getBoolean("shelfRecent", false); }
+
+    /** Off ("My order") also deletes the list of apps opened: nothing is kept while the shelf doesn't use it. */
+    static void setShelfRecent(boolean on) {
+        put("shelfRecent", on);
+        if (!on) Recent.clear(app);
+    }
+
     // MARK: - Drawer inputs (Settings > Inputs, #60)
 
     /**
