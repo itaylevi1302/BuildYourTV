@@ -31,7 +31,8 @@ final class Tmdb {
 
     static final String API = "https://api.themoviedb.org/3";
     static final String POSTER = "https://image.tmdb.org/t/p/w342", BACKDROP = "https://image.tmdb.org/t/p/w1280",
-            LOGO = "https://image.tmdb.org/t/p/w92", PROFILE = "https://image.tmdb.org/t/p/w185";
+            LOGO = "https://image.tmdb.org/t/p/w92", PROFILE = "https://image.tmdb.org/t/p/w185",
+            POSTER_SMALL = "https://image.tmdb.org/t/p/w154";
     /** In memory: the answers of the last half hour, a few dozen; on disk (DISK_MAX): for as long as ttl() says. */
     private static final long TTL = 30 * 60_000L, DISK_MAX = 24L * 1024 * 1024;
     /** Lists (trending, discover, the top 10…) stay the same this long, so Explore doesn't change under the person. */
@@ -110,7 +111,8 @@ final class Tmdb {
         if (path.startsWith("/search/")) return 3600_000L;
         if (isList(path)) return LIST_TTL;
         if (path.contains("/images") || path.startsWith("/person/") || path.startsWith("/collection/")
-                || path.contains("/season/") || path.startsWith("/watch/providers") || path.contains("/top_rated")) return 7 * 24 * 3600_000L;
+                || path.contains("/season/") || path.startsWith("/watch/providers") || path.contains("/top_rated")
+                || path.startsWith("/genre/")) return 7 * 24 * 3600_000L;
         return 12 * 3600_000L;
     }
 
@@ -571,4 +573,9 @@ final class Tmdb {
         }
         sp(c).edit().putString(list, a.toString()).apply();
     }
+
+    /** Titles opened from Explore, newest first (its "Recents"), kept on the TV. */
+    static List<Title> opened(Context c) { return local(c, "opened"); }
+
+    static void noteOpened(Context c, Title t) { localSet(c, "opened", t, true); }
 }

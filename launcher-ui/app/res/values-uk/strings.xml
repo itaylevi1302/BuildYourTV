@@ -457,4 +457,26 @@
     <string name="original_language">"Мова оригіналу"</string>
     <string name="budget">"Бюджет"</string>
     <string name="revenue">"Касові збори"</string>
+    <string name="by_category">"За категоріями"</string>
+    <string name="explore_by_category">"Огляд за категоріями"</string>
+    <string name="all_movies">"Усі фільми"</string>
+    <string name="all_shows">"Усі серіали"</string>
+    <string name="recently_opened">"Нещодавні"</string>
+    <string name="recents_empty">"Тут з’являться назви, які ви відкриваєте в Огляді."</string>
+    <string name="sort_popular">"Популярні"</string>
+    <string name="sort_newest">"Найновіші"</string>
+    <string name="sort_top_rated">"Найвища оцінка"</string>
+    <string name="sort_a_z">"А–Я"</string>
+    <plurals name="movies_count">
+        <item quantity="one">%1$d фільм</item>
+        <item quantity="few">%1$d фільми</item>
+        <item quantity="many">%1$d фільмів</item>
+        <item quantity="other">%1$d фільмів</item>
+    </plurals>
+    <plurals name="shows_count">
+        <item quantity="one">%1$d серіал</item>
+        <item quantity="few">%1$d серіали</item>
+        <item quantity="many">%1$d серіалів</item>
+        <item quantity="other">%1$d серіалів</item>
+    </plurals>
 </resources>

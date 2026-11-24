@@ -261,7 +261,10 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         root.addView(shade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.addView(buildMenu(), new FrameLayout.LayoutParams(Math.round(560 * k), ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
-        scroll.getViewTreeObserver().addOnGlobalFocusChangeListener((was, now) -> followFocus(now));
+        scroll.getViewTreeObserver().addOnGlobalFocusChangeListener((was, now) -> {
+            followFocus(now);
+            tilesNear(now);
+        });
         if (!Tmdb.hasKey()) {
             header(Strings.get(R.string.explore), Strings.get(R.string.tmdb_key_missing_build_hint));
             return;
@@ -571,7 +574,8 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         }
         if (code == KeyEvent.KEYCODE_DPAD_UP && Tmdb.hasKey() && !SETTINGS.equals(current)) {
             View f = getCurrentFocus();
-            if (f != null && inside(f, page) && f.focusSearch(View.FOCUS_UP) == null) {   // already at the top
+            View above = f == null || !inside(f, page) ? null : f.focusSearch(View.FOCUS_UP);
+            if (f != null && inside(f, page) && (above == null || !inside(above, page))) {   // already at the top
                 if (down && e.getRepeatCount() == 0) pulled();
                 return true;
             }
@@ -579,16 +583,44 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         if (code == KeyEvent.KEYCODE_DPAD_LEFT && down && Tmdb.hasKey()) {
             View f = getCurrentFocus();
             boolean heroBack = f != null && f == hero && heroAt > 0;   // the banner goes back first, then the menu
-            if (!heroBack && (f == null || f.focusSearch(View.FOCUS_LEFT) == null)) {
+            View next = f == null ? null : f.focusSearch(View.FOCUS_LEFT);
+            // Left off the first card of a line opens the menu; it never jumps to the end of the line above
+            if (!heroBack && (next == null || !inside(next, page) || !sameLine(f, next))) {
                 openMenu();
                 return true;
             }
+        }
+        if (code == KeyEvent.KEYCODE_DPAD_RIGHT && Tmdb.hasKey()) {   // Right off the last card of a line stays: no jump to the next line
+            View f = getCurrentFocus();
+            View next = f == null || !inside(f, page) ? null : f.focusSearch(View.FOCUS_RIGHT);
+            if (next != null && inside(next, page) && !sameLine(f, next)) return true;
+        }
+        if (code == KeyEvent.KEYCODE_BACK && Tmdb.hasKey() && catOpen != null && catKind != null) {   // a category page: back to the tiles
+            if (!down && !e.isCanceled()) backToTiles();
+            return true;
+        }
+        if (code == KeyEvent.KEYCODE_BACK && Tmdb.hasKey() && CATS.equals(current) && catReturn != null) {   // the filter a category sent us to
+            if (!down && !e.isCanceled()) {
+                Category c = catReturn;
+                String kind = catReturnKind, sort = catReturnSort;
+                showPage(kind);
+                openCategory(c, sort);
+            }
+            return true;
         }
         if (code == KeyEvent.KEYCODE_BACK && !fromBookmark && !HOME.equals(current) && Tmdb.hasKey()) {
             if (!down && !e.isCanceled()) showPage(HOME);
             return true;
         }
         return super.dispatchKeyEvent(e);
+    }
+
+    /** Whether b overlaps a vertically on screen (the same line of chips, posters or tiles). */
+    private static boolean sameLine(View a, View b) {
+        int[] p = new int[2], q = new int[2];
+        a.getLocationOnScreen(p);
+        b.getLocationOnScreen(q);
+        return q[1] < p[1] + a.getHeight() && p[1] < q[1] + b.getHeight();
     }
 
     private static boolean inside(View v, View parent) {
@@ -758,6 +790,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
     @Override public void titleChanged(boolean lists) {
         if (!Tmdb.hasKey()) return;
         if (lists || LIST.equals(current)) refreshPersonal();   // My list's tabs include "Seen"
+        if (lists && catOpen != null && catOpen.id == Category.FAVORITES) showCategoryGrid(catOpen, false);
         if (hero != null && !heroList.isEmpty()) showHeroMeta();
     }
 
@@ -771,6 +804,12 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         placedKeys.clear();
         hero = null;
         feed = null;
+        catCache.clear();
+        catOpen = null;
+        catKind = null;
+        catReturn = null;
+        catFocusId = Integer.MIN_VALUE;
+        catGen++;
         closeOverlay();
         main.removeCallbacks(heroTick);
         main.removeCallbacks(searchSoon);
@@ -951,6 +990,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
     }
 
     private void open(Tmdb.Title t) {
+        if (t.kind.equals("movie") || t.kind.equals("tv")) io.execute(() -> Tmdb.noteOpened(this, t));   // Explore's Recents
         if (current.equals(SEARCH) && filter != null && !filter.query.isEmpty()) remember(filter.query);
         DetailActivity.open(this, t.kind, t.id);
     }
@@ -965,6 +1005,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         h.setText(s.title);
         box.addView(h);
         TvUi.Grid grid = new TvUi.Grid(this, k, 5, this::open);
+        grid.stretch = false;   // the top 10 keeps its fixed-size posters
         for (int i = 0; i < titles.size(); i++) {
             View cell = TvUi.poster(this, k, titles.get(i), this::open);
             FrameLayout card = (FrameLayout) ((ViewGroup) cell).getChildAt(0);
@@ -1122,17 +1163,31 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
     private static final class Tab {
         final String label, path, kind;
         final Filter filter;
+        final String explore;   // "movie" or "tv" for the By category tab, else null
         Tab(String label, String path, String kind) {
             this.label = label;
             this.path = path;
             this.kind = kind;
             this.filter = null;
+            this.explore = null;
         }
         Tab(String label, Filter filter) {
             this.label = label;
             this.path = null;
             this.kind = null;
             this.filter = filter;
+            this.explore = null;
+        }
+        private Tab(String label, String explore, boolean unused) {
+            this.label = label;
+            this.path = null;
+            this.kind = null;
+            this.filter = null;
+            this.explore = explore;
+        }
+
+        static Tab explorer(String label, String kind) {
+            return new Tab(label, kind, true);
         }
     }
 
@@ -1142,6 +1197,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         List<Tab> list = new ArrayList<>();
         switch (id) {
             case MOVIES:
+                list.add(Tab.explorer(Strings.get(R.string.by_category), id));
                 list.add(new Tab(Strings.get(R.string.trending), "/trending/movie/week", "movie"));
                 list.add(new Tab(Strings.get(R.string.new_titles), sorted(Filter.of("movie"), "new")));
                 list.add(new Tab(Strings.get(R.string.top_rated), sorted(Filter.of("movie"), "votes")));
@@ -1150,6 +1206,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
                 }
                 break;
             case SHOWS:
+                list.add(Tab.explorer(Strings.get(R.string.by_category), id));
                 list.add(new Tab(Strings.get(R.string.trending), "/trending/tv/week", "tv"));
                 list.add(new Tab(Strings.get(R.string.on_the_air), "/tv/on_the_air", "tv"));
                 list.add(new Tab(Strings.get(R.string.top_rated_2), sorted(Filter.of("tv"), "votes")));
@@ -1186,6 +1243,14 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
     }
 
     private void showCatalogTab(Tab t) {
+        catOpen = null;
+        catKind = null;
+        catFocusId = Integer.MIN_VALUE;
+        catGen++;
+        if (t.explore != null) {
+            showExplorer(t.explore);
+            return;
+        }
         tabBody.removeAllViews();
         TvUi.Grid grid = new TvUi.Grid(this, k, 7, this::open);
         tabBody.addView(grid);
@@ -1258,6 +1323,463 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         feed.more();
     }
 
+    // MARK: - Explore by category
+
+    private String catKind;            // "movie"/"tv" while the explorer tab shows, else null
+    private Category catOpen;          // the category page showing; null on the tiles
+    private String catSort = "popularity";
+    private int catGen, catFocusId = Integer.MIN_VALUE;
+    private long catAt;                // like pageAt: the grid takes the focus only if no key was pressed since
+    private LinearLayout tileGrid, catGridBox;
+    private TvUi.Chip allChip, favChip, recChip;
+    private TextView catCount;
+    private final Map<String, List<Category>> catCache = new HashMap<>();   // per page visit
+    private Filter pendingFilter;      // seeds the filter page from a category's Filters button
+    private Category catReturn;        // Back on that filter page returns to this category page
+    private String catReturnKind, catReturnSort;
+
+    /** A genre tile (with its count and the posters of its collage), or one of the three chips. */
+    private static final class Category {
+        static final int ALL = 0, FAVORITES = -1, RECENTS = -2;
+        final String kind, name;
+        final int id;
+        int count = -1;
+        final List<Tmdb.Title> top = new ArrayList<>();   // the first four titles: the collage
+        ImageView[] pics;
+        boolean picsLoaded;
+
+        Category(String kind, int id, String name) {
+            this.kind = kind;
+            this.id = id;
+            this.name = name;
+        }
+    }
+
+    private static int plural(String kind) {
+        return kind.equals("movie") ? R.plurals.movies_count : R.plurals.shows_count;
+    }
+
+    private String number(int n) {
+        return java.text.NumberFormat.getIntegerInstance(Ui.locale()).format(n);
+    }
+
+    /** One page of a genre's titles (id 0: all), sorted; only on a background thread (it may ask for the services). */
+    private String catPath(String kind, int genreId, String sort, int page) {
+        boolean movie = kind.equals("movie");
+        String field = movie ? "primary_release_date" : "first_air_date";
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
+        StringBuilder p = new StringBuilder();
+        if (genreId > 0) p.append("&with_genres=").append(genreId);
+        switch (sort) {
+            case "new":
+                p.append("&sort_by=").append(field).append(".desc&").append(field).append(".lte=").append(today).append("&vote_count.gte=20");
+                break;
+            case "votes":
+                p.append("&sort_by=vote_average.desc&vote_count.gte=").append(movie ? 500 : 200);
+                break;
+            case "az":
+                p.append("&sort_by=").append(movie ? "original_title" : "original_name").append(".asc&vote_count.gte=20");
+                break;
+            default:
+                p.append("&sort_by=popularity.desc&vote_count.gte=20");
+        }
+        p.append(servicesParam());
+        return discoverPath(kind, p.toString() + "&page=" + page);
+    }
+
+    /** The tab's first view: three chips (All, Favorites, Recents), then a tile for each genre with titles. */
+    private void showExplorer(String kind) {
+        catKind = kind;
+        catOpen = null;
+        feed = null;
+        int my = ++catGen;
+        boolean movie = kind.equals("movie");
+        tabBody.removeAllViews();
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setClipChildren(false);
+        tabBody.addView(box);
+        TvUi.Flow chipRow = new TvUi.Flow(this, Math.round(14 * k), Math.round(14 * k));
+        chipRow.setPadding(Math.round(24 * k), Math.round(22 * k), Math.round(96 * k), 0);
+        Category all = new Category(kind, Category.ALL, Strings.get(movie ? R.string.all_movies : R.string.all_shows));
+        Category fav = new Category(kind, Category.FAVORITES, Strings.get(R.string.favorites));
+        Category rec = new Category(kind, Category.RECENTS, Strings.get(R.string.recently_opened));
+        allChip = new TvUi.Chip(this, k, all.name, v -> openCategory(all, "popularity"));
+        favChip = new TvUi.Chip(this, k, fav.name, v -> openCategory(fav, "popularity"));
+        recChip = new TvUi.Chip(this, k, rec.name, v -> openCategory(rec, "popularity"));
+        chipRow.addView(allChip);
+        chipRow.addView(favChip);
+        chipRow.addView(recChip);
+        box.addView(chipRow);
+        TextView heading = TvUi.text(this, k, 32, Ui.semibold, TvUi.INK);
+        heading.setText(Strings.get(R.string.explore_by_category));
+        heading.setPadding(Math.round(24 * k), Math.round(40 * k), 0, Math.round(6 * k));
+        box.addView(heading);
+        tileGrid = new LinearLayout(this);
+        tileGrid.setOrientation(LinearLayout.VERTICAL);
+        tileGrid.setClipChildren(false);
+        box.addView(tileGrid);
+        io.execute(() -> {   // Recents' count, and Favorites' when signed in
+            int opened = 0;
+            for (Tmdb.Title t : Tmdb.opened(this)) if (t.kind.equals(kind)) opened++;
+            int n = opened;
+            main.post(() -> { if (my == catGen && !isFinishing()) recChip.count(n > 0 ? number(n) : ""); });
+            if (!Tmdb.signedIn(this)) return;
+            try {
+                int favs = 0;
+                for (Tmdb.Title t : Tmdb.accountList(this, "favorite")) if (t.kind.equals(kind)) favs++;
+                int f = favs;
+                main.post(() -> { if (my == catGen && !isFinishing()) favChip.count(f > 0 ? number(f) : ""); });
+            } catch (Exception e) {
+                AppLog.w("explore favorites count: " + e.getMessage());
+            }
+        });
+        List<Category> cached = catCache.get(kind);
+        if (cached != null) {   // coming back from a category page: the tiles are as they were
+            renderTiles(kind, cached, my);
+            return;
+        }
+        tileGrid.addView(note(Strings.get(R.string.loading)));
+        io.execute(() -> {   // the genres, then one discover call each: its count and its first posters (cached with the list)
+            List<Category> cats = new ArrayList<>();
+            cats.add(all);
+            try {
+                JSONArray gs = Tmdb.get("/genre/" + kind + "/list").optJSONArray("genres");
+                for (int i = 0; gs != null && i < gs.length(); i++) {
+                    JSONObject g = gs.optJSONObject(i);
+                    if (g != null && g.optInt("id") > 0) cats.add(new Category(kind, g.optInt("id"), g.optString("name")));
+                }
+            } catch (Exception e) {
+                AppLog.w("explore genres: " + e.getMessage());
+            }
+            int[] left = {cats.size()};
+            for (Category c : cats) {
+                io.execute(() -> {
+                    try {
+                        JSONObject o = Tmdb.get(catPath(kind, c.id, "popularity", 1));
+                        c.count = o.optInt("total_results", 0);
+                        List<Tmdb.Title> titles = Tmdb.titles(o, kind);
+                        for (int i = 0; i < titles.size() && c.top.size() < 4; i++) c.top.add(titles.get(i));
+                    } catch (Exception e) {
+                        c.count = 0;
+                    }
+                    main.post(() -> {
+                        if (my != catGen || isFinishing()) return;
+                        if (--left[0] == 0) renderTiles(kind, cats, my);
+                    });
+                });
+            }
+        });
+    }
+
+    private void renderTiles(String kind, List<Category> list, int my) {
+        if (my != catGen || tileGrid == null) return;
+        catCache.put(kind, list);
+        tileGrid.removeAllViews();
+        List<Category> tiles = new ArrayList<>();
+        for (Category c : list) {
+            if (c.id == Category.ALL) allChip.count(c.count > 0 ? number(c.count) : "");
+            else if (c.count > 0) tiles.add(c);
+        }
+        tiles.sort((a, b) -> Integer.compare(b.count, a.count));
+        if (tiles.isEmpty()) {
+            tileGrid.addView(note(Strings.get(R.string.couldnt_fetch_titles_now_check_the_tvs_internet)));
+            return;
+        }
+        int gap = Math.round(26 * k);
+        for (int i = 0; i < tiles.size(); i += 5) {
+            TvUi.Columns line = new TvUi.Columns(this, 5, gap);
+            line.setPadding(Math.round(24 * k), Math.round(26 * k), Math.round(96 * k), 0);
+            for (int j = i; j < i + 5 && j < tiles.size(); j++) {
+                line.addView(tile(tiles.get(j)), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT));
+            }
+            tileGrid.addView(line);
+        }
+        loadTiles(2);
+        if (catFocusId != Integer.MIN_VALUE) {   // back from a category page: its tile (or chip) takes the focus again
+            int want = catFocusId;
+            catFocusId = Integer.MIN_VALUE;
+            focusCategory(want);
+        }
+    }
+
+    /** The tile of category `id` (or the chip of All, Favorites, Recents) takes the focus. */
+    private void focusCategory(int id) {
+        if (id == Category.ALL) allChip.requestFocus();
+        else if (id == Category.FAVORITES) favChip.requestFocus();
+        else if (id == Category.RECENTS) recChip.requestFocus();
+        else {
+            for (int i = 0; i < tileGrid.getChildCount(); i++) {
+                ViewGroup line = (ViewGroup) tileGrid.getChildAt(i);
+                for (int j = 0; j < line.getChildCount(); j++) {
+                    if (line.getChildAt(j).getTag() instanceof Category && ((Category) line.getChildAt(j).getTag()).id == id) {
+                        loadTiles(i + 2);
+                        line.getChildAt(j).requestFocus();
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    /** A genre: a collage of its first four posters under a shade, its name and how many titles it has. */
+    private View tile(Category c) {
+        TvUi.Ratio tile = new TvUi.Ratio(this, 10f / 16f);
+        tile.setBackground(TvUi.round(TvUi.CARD, 16 * k));
+        tile.setClipToOutline(true);
+        LinearLayout collage = new LinearLayout(this);
+        collage.setOrientation(LinearLayout.VERTICAL);
+        c.pics = new ImageView[4];
+        for (int r = 0; r < 2; r++) {
+            LinearLayout pair = new LinearLayout(this);
+            pair.setOrientation(LinearLayout.HORIZONTAL);
+            for (int q = 0; q < 2; q++) {
+                ImageView pic = new ImageView(this);
+                pic.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                c.pics[r * 2 + q] = pic;
+                pair.addView(pic, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1));
+            }
+            collage.addView(pair, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        }
+        tile.addView(collage, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        View shade = new View(this);
+        shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] {0xEB0A0A0C, 0x730A0A0C, 0x260A0A0C}));
+        tile.addView(shade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        LinearLayout text = new LinearLayout(this);
+        text.setOrientation(LinearLayout.VERTICAL);
+        TextView name = TvUi.text(this, k, 30, Ui.semibold, TvUi.INK);
+        name.setText(c.name);
+        name.setSingleLine(true);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        name.setShadowLayer(8 * k, 0, k, 0x99000000);
+        text.addView(name);
+        TextView count = TvUi.text(this, k, 22, Ui.regular, 0x9EFFFFFF);
+        String quantity = Strings.quantity(plural(c.kind), c.count);
+        count.setText(quantity);
+        text.addView(count);
+        FrameLayout.LayoutParams tp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.START);
+        tp.setMargins(Math.round(20 * k), 0, Math.round(20 * k), Math.round(20 * k));
+        tile.addView(text, tp);
+        tile.setTag(c);
+        tile.setContentDescription(c.name + ", " + quantity);
+        tile.setOnClickListener(v -> openCategory(c, "popularity"));
+        TvUi.focusable(tile, k, 16 * k);
+        return tile;
+    }
+
+    /** The collages of the tiles up to line `upToLine` (the first lines at once, the others as the focus nears them). */
+    private void loadTiles(int upToLine) {
+        if (tileGrid == null) return;
+        for (int i = 0; i <= upToLine && i < tileGrid.getChildCount(); i++) {
+            ViewGroup line = (ViewGroup) tileGrid.getChildAt(i);
+            for (int j = 0; j < line.getChildCount(); j++) {
+                if (!(line.getChildAt(j).getTag() instanceof Category)) continue;
+                Category c = (Category) line.getChildAt(j).getTag();
+                if (c.picsLoaded || c.pics == null) continue;
+                c.picsLoaded = true;
+                for (int p = 0; p < c.pics.length; p++) {
+                    Images.load(c.pics[p], p < c.top.size() && !c.top.get(p).poster.isEmpty() ? Tmdb.POSTER_SMALL + c.top.get(p).poster : null);
+                }
+            }
+        }
+    }
+
+    private void tilesNear(View now) {
+        if (now == null || tileGrid == null || !(now.getTag() instanceof Category)) return;
+        for (View v = now; v != null && v.getParent() instanceof View; v = (View) v.getParent()) {
+            if (v.getParent() == tileGrid) {
+                loadTiles(tileGrid.indexOfChild(v) + 2);
+                return;
+            }
+        }
+    }
+
+    /** A category's page: back, its name and count, the sorts and Filters, then the titles as a grid built as you scroll. */
+    private void openCategory(Category c, String sort) {
+        catOpen = c;
+        catSort = sort;
+        catFocusId = c.id;
+        catGen++;
+        catAt = android.os.SystemClock.uptimeMillis() + 1;
+        feed = null;
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setClipChildren(false);
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setPadding(Math.round(24 * k), Math.round(20 * k), Math.round(96 * k), 0);
+        TvUi.Chip back = new TvUi.Chip(this, k, "‹  " + Strings.get(R.string.categories), v -> backToTiles());
+        head.addView(back);
+        TextView title = TvUi.text(this, k, 44, Ui.displaySemibold, TvUi.INK);
+        title.setText(c.name);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleLp.leftMargin = Math.round(24 * k);
+        head.addView(title, titleLp);
+        catCount = TvUi.text(this, k, 26, Ui.regular, TvUi.DIM);
+        catCount.setPadding(Math.round(18 * k), 0, 0, 0);
+        catCount.setText(c.id >= 0 && c.count >= 0 ? Strings.quantity(plural(c.kind), c.count) : "");
+        head.addView(catCount);
+        content.addView(head);
+        LinearLayout sorts = new LinearLayout(this);
+        sorts.setOrientation(LinearLayout.HORIZONTAL);
+        sorts.setGravity(Gravity.CENTER_VERTICAL);
+        sorts.setClipChildren(false);
+        sorts.setPadding(Math.round(24 * k), Math.round(18 * k), Math.round(96 * k), 0);
+        String[] keys = {"popularity", "new", "votes", "az"};
+        int[] names = {R.string.sort_popular, R.string.sort_newest, R.string.sort_top_rated, R.string.sort_a_z};
+        TvUi.Chip[] pills = new TvUi.Chip[keys.length];
+        for (int i = 0; i < keys.length; i++) {
+            final String key = keys[i];
+            pills[i] = new TvUi.Chip(this, k, Strings.get(names[i]), null);
+            pills[i].setActivated(key.equals(sort));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.rightMargin = Math.round(14 * k);
+            sorts.addView(pills[i], lp);
+        }
+        for (int i = 0; i < pills.length; i++) {   // set after all exist: a click turns its pill on and the others off
+            final int at = i;
+            pills[i].setOnClickListener(v -> {
+                catSort = keys[at];
+                for (int j = 0; j < pills.length; j++) pills[j].setActivated(j == at);
+                showCategoryGrid(c, false);
+            });
+        }
+        sorts.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
+        if (c.id >= 0) {   // Favorites and Recents are lists of titles, not a discover query
+            sorts.addView(TvUi.iconButton(this, k, "tune", Strings.get(R.string.filters), v -> openCategoryFilter()));
+        }
+        content.addView(sorts);
+        catGridBox = new LinearLayout(this);
+        catGridBox.setOrientation(LinearLayout.VERTICAL);
+        catGridBox.setClipChildren(false);
+        content.addView(catGridBox);
+        int old = tabBody.getChildCount();
+        tabBody.addView(content);
+        for (int i = 0; i < keys.length; i++) {   // the focus moves first, so it is never dropped with the old view
+            if (keys[i].equals(sort)) pills[i].requestFocus();
+        }
+        for (int i = old - 1; i >= 0; i--) tabBody.removeViewAt(i);
+        tileGrid = null;
+        showCategoryGrid(c, true);
+    }
+
+    /** The grid under the sorts; `focusGrid`: the first title takes the focus when it arrives, if no key was pressed meanwhile. */
+    private void showCategoryGrid(Category c, boolean focusGrid) {
+        if (catGridBox == null) return;
+        int my = ++catGen;
+        String sortNow = catSort;
+        boolean focusIn = focusGrid;
+        View was = catGridBox.hasFocus() ? getCurrentFocus() : null;
+        int wasAt = was == null ? -1 : cards(catGridBox).indexOf(was);
+        catGridBox.removeAllViews();
+        TextView empty = note("");
+        if (c.id < 0) {   // Favorites or Recents: kept titles, sorted here
+            feed = null;
+            if (c.id == Category.FAVORITES && !Tmdb.signedIn(this)) {
+                catGridBox.addView(note(Strings.get(R.string.tmdb_connect_for_favorites_and_ratings)));
+                return;
+            }
+            catGridBox.addView(note(Strings.get(R.string.loading)));
+            io.execute(() -> {
+                List<Tmdb.Title> got = new ArrayList<>();
+                try {
+                    for (Tmdb.Title t : c.id == Category.FAVORITES ? Tmdb.accountList(this, "favorite") : Tmdb.opened(this)) {
+                        if (t.kind.equals(c.kind)) got.add(t);
+                    }
+                } catch (Exception e) {
+                    AppLog.w("explore " + c.name + ": " + e.getMessage());
+                }
+                sortLocal(got, sortNow);
+                main.post(() -> {
+                    if (my != catGen || isFinishing()) return;
+                    catGridBox.removeAllViews();
+                    catCount.setText(got.isEmpty() ? "" : Strings.quantity(plural(c.kind), got.size()));
+                    if (got.isEmpty()) {
+                        catGridBox.addView(note(Strings.get(c.id == Category.FAVORITES ? R.string.nothing_here_yet_open_a_title_to_add_it : R.string.recents_empty)));
+                        return;
+                    }
+                    TvUi.Grid grid = new TvUi.Grid(this, k, 7, this::open);
+                    grid.add(got);
+                    catGridBox.addView(grid);
+                    if (wasAt >= 0) grid.focusAt(wasAt);
+                    else if (focusIn && keyAt < catAt) grid.focusAt(0);
+                });
+            });
+            return;
+        }
+        TvUi.Grid grid = new TvUi.Grid(this, k, 7, this::open);
+        catGridBox.addView(grid);
+        empty.setVisibility(View.GONE);
+        catGridBox.addView(empty);
+        startFeed(grid, p -> {
+            JSONObject o = Tmdb.get(catPath(c.kind, c.id, sortNow, p));
+            if (p == 1) {
+                int n = o.optInt("total_results", 0);
+                main.post(() -> {
+                    if (my != catGen || isFinishing()) return;
+                    if (catCount != null) catCount.setText(Strings.quantity(plural(c.kind), n));
+                    // queued again: it runs after the feed's own post, which fills the grid
+                    main.post(() -> { if (my == catGen && focusIn && keyAt < catAt && grid.count > 0) grid.focusAt(0); });
+                });
+            }
+            return Tmdb.titles(o, c.kind);
+        }, empty);
+    }
+
+    /** Popular is the list's own order; newest by date (year when the date is missing), top rated by vote, A-Z by name. */
+    private static void sortLocal(List<Tmdb.Title> list, String sort) {
+        switch (sort) {
+            case "new":
+                list.sort((a, b) -> (b.date.isEmpty() ? b.year : b.date).compareTo(a.date.isEmpty() ? a.year : a.date));
+                break;
+            case "votes":
+                list.sort((a, b) -> Double.compare(b.vote, a.vote));
+                break;
+            case "az":
+                java.text.Collator collator = java.text.Collator.getInstance(Ui.locale());
+                list.sort((a, b) -> collator.compare(a.name, b.name));
+                break;
+            default:
+        }
+    }
+
+    /** Back from a category page to the tiles, on the tile it came from. */
+    private void backToTiles() {
+        if (tabBar != null && tab < tabBar.getChildCount()) tabBar.getChildAt(tab).requestFocus();
+        showExplorer(catKind);
+    }
+
+    /** The filter page, set to this category and sort; Back there returns here. */
+    private void openCategoryFilter() {
+        if (catOpen == null || catKind == null) return;
+        Filter f = new Filter();
+        f.kind = catKind;
+        f.services = true;
+        String key = genreKey(catKind, catOpen.id);
+        if (key != null) f.genres.add(key);
+        f.sort = catSort.equals("az") ? "popularity" : catSort;
+        Category back = catOpen;
+        String backKind = current, backSort = catSort;
+        pendingFilter = f;
+        showPage(CATS);
+        catReturn = back;
+        catReturnKind = backKind;
+        catReturnSort = backSort;
+    }
+
+    /** The filter's key for a TMDB genre id: the plain genres only ("animacao", not "anime", for 16). */
+    private static String genreKey(String kind, int id) {
+        for (Genre g : GENRES) {
+            if (g.keyword != null || g.country != null) continue;
+            if (String.valueOf(id).equals(kind.equals("movie") ? g.movie : g.show)) return g.key;
+        }
+        return null;
+    }
+
     // MARK: - Search and categories: the same filter
 
     private Filter filter;
@@ -1272,7 +1794,8 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         status.setVisibility(View.GONE);
         savedId = saved;
         filter = saved != null ? Filter.fromJson(saved().optJSONObject(saved) == null ? "{}" : saved().optJSONObject(saved).optString("filter"))
-                : new Filter();
+                : pendingFilter != null ? pendingFilter : new Filter();
+        pendingFilter = null;
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);

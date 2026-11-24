@@ -444,4 +444,22 @@
     <string name="original_language">"Idioma original"</string>
     <string name="budget">"Orçamento"</string>
     <string name="revenue">"Bilheteria"</string>
+    <string name="by_category">"Por categoria"</string>
+    <string name="explore_by_category">"Explorar por categoria"</string>
+    <string name="all_movies">"Todos os filmes"</string>
+    <string name="all_shows">"Todas as séries"</string>
+    <string name="recently_opened">"Recentes"</string>
+    <string name="recents_empty">"Os títulos que você abrir no Explorar aparecem aqui."</string>
+    <string name="sort_popular">"Populares"</string>
+    <string name="sort_newest">"Mais novos"</string>
+    <string name="sort_top_rated">"Melhor nota"</string>
+    <string name="sort_a_z">"A–Z"</string>
+    <plurals name="movies_count">
+        <item quantity="one">%1$d filme</item>
+        <item quantity="other">%1$d filmes</item>
+    </plurals>
+    <plurals name="shows_count">
+        <item quantity="one">%1$d série</item>
+        <item quantity="other">%1$d séries</item>
+    </plurals>
 </resources>

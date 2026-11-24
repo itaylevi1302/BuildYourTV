@@ -453,4 +453,22 @@
     <string name="original_language">"Original language"</string>
     <string name="budget">"Budget"</string>
     <string name="revenue">"Box office"</string>
+    <string name="by_category">"By category"</string>
+    <string name="explore_by_category">"Explore by category"</string>
+    <string name="all_movies">"All movies"</string>
+    <string name="all_shows">"All shows"</string>
+    <string name="recently_opened">"Recents"</string>
+    <string name="recents_empty">"Titles you open in Explore show up here."</string>
+    <string name="sort_popular">"Popular"</string>
+    <string name="sort_newest">"Newest"</string>
+    <string name="sort_top_rated">"Top rated"</string>
+    <string name="sort_a_z">"A–Z"</string>
+    <plurals name="movies_count">
+        <item quantity="one">%1$d movie</item>
+        <item quantity="other">%1$d movies</item>
+    </plurals>
+    <plurals name="shows_count">
+        <item quantity="one">%1$d show</item>
+        <item quantity="other">%1$d shows</item>
+    </plurals>
 </resources>
