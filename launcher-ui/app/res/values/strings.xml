@@ -270,6 +270,8 @@
     <string name="saved_to_the_menu">"Saved to the menu"</string>
     <string name="screensaver">"Screensaver"</string>
     <string name="screensaver_preview">"Screensaver, preview"</string>
+    <string name="screensaver_ok_hint">"Press OK to watch on %1$s · any other button to close"</string>
+    <string name="screensaver_ok_opens_title">"OK on the screensaver opens the title"</string>
     <string name="search">"Search"</string>
     <string name="side_menu_edit_hint">"Search, Home and My list always stay on top. OK on an item: move, hide or remove."</string>
     <string name="search_movie_via_iptv">"Search movie via IPTV"</string>

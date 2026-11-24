@@ -306,6 +306,15 @@ final class Prefs {
 
     static void setHidden(List<String> packages) { put("hidden", String.join(",", packages)); }
 
+    // MARK: - Screensaver OK
+
+    /**
+     * OK on the screensaver opens the title on screen in its app (Free My TV PR 276). Off (the default): the screensaver
+     * is as it always was, any key wakes it, with no hint and no link lookups.
+     */
+    static boolean screensaverOk() { return sp().getBoolean("screensaverOk", false); }
+    static void setScreensaverOk(boolean on) { put("screensaverOk", on); }
+
     // MARK: - System apps
 
     /**

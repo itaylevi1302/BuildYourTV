@@ -82,7 +82,8 @@ public class SettingsActivity extends Activity {
 
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         if (preview != null) {
-            // Like the real screensaver: arrows, OK or Back close it (other keys go on to the system).
+            // Like the real screensaver: arrows, OK or Back close it (other keys go on to the system); with "OK on the
+            // screensaver opens the title" on, OK first opens the title on screen in its app.
             switch (event.getKeyCode()) {
                 case KeyEvent.KEYCODE_DPAD_UP:
                 case KeyEvent.KEYCODE_DPAD_DOWN:
@@ -90,8 +91,12 @@ public class SettingsActivity extends Activity {
                 case KeyEvent.KEYCODE_DPAD_RIGHT:
                 case KeyEvent.KEYCODE_DPAD_CENTER:
                 case KeyEvent.KEYCODE_ENTER:
+                case KeyEvent.KEYCODE_NUMPAD_ENTER:
                 case KeyEvent.KEYCODE_BACK:
-                    if (event.getAction() == KeyEvent.ACTION_UP) closePreview();
+                    if (event.getAction() == KeyEvent.ACTION_UP) {
+                        if (Screensaver.isOk(event.getKeyCode()) && !event.isCanceled()) ((Screensaver.Show) preview).watch();
+                        closePreview();
+                    }
                     return true;
                 default:
                     return super.dispatchKeyEvent(event);
@@ -125,7 +130,7 @@ public class SettingsActivity extends Activity {
         private final SettingsActivity activity;
         private final Scene scene = new Scene();
         private final Handler handler = new Handler(Looper.getMainLooper());
-        private final Spring[] pop = new Spring[16];
+        private final Spring[] pop = new Spring[20];
         private final List<String> appPkgs = new ArrayList<>(), appLabels = new ArrayList<>();
         // The list picker (the app of a remote button): what it shows, which one is in use, where we are.
         private final List<String> pickLabels = new ArrayList<>();
@@ -555,8 +560,8 @@ public class SettingsActivity extends Activity {
 
         private static final String[] LANGUAGES = {"auto", "pt", "en", "es", "de", "ru", "uk", "fr", "tr", "he"}, UNITS = {"auto", "C", "F"}, THEMES = {"auto", "light", "dark"};
         private static final String[] CLOCKS = {"auto", "24h", "12h"}, STYLES = {"photos", "aurora", "google"};
-        /** Home Settings: language, temperature, theme, clock, at power-on, system apps, weather, city, forecast, quotes, then one row per coin. */
-        private static final int CLOCK_ROW = 3, POWER_ON_ROW = 4, SYSTEM_APPS_ROW = 5, WEATHER_ROW = 6, CITY_ROW = 7, FORECAST_ROW = 8, QUOTES_ROW = 9, COIN_ROWS = 10;
+        /** Home Settings: language, temperature, theme, clock, at power-on, system apps, OK on the screensaver, weather, city, forecast, quotes, then one row per coin. */
+        private static final int CLOCK_ROW = 3, POWER_ON_ROW = 4, SYSTEM_APPS_ROW = 5, SAVER_OK_ROW = 6, WEATHER_ROW = 7, CITY_ROW = 8, FORECAST_ROW = 9, QUOTES_ROW = 10, COIN_ROWS = 11;
 
         private static String styleName(String style) {
             return style.equals("aurora") ? Strings.get(R.string.clock_and_aurora)
@@ -575,6 +580,7 @@ public class SettingsActivity extends Activity {
             l.add(Strings.get(R.string.clock_format));
             l.add(Strings.get(R.string.at_power_on));
             l.add(Strings.get(R.string.system_apps_in_all_apps));
+            l.add(Strings.get(R.string.screensaver_ok_opens_title));
             l.add(Strings.get(R.string.weather_widget));
             l.add(Strings.get(R.string.city));
             l.add(Strings.get(R.string.forecast));
@@ -604,6 +610,7 @@ public class SettingsActivity extends Activity {
             v[POWER_ON_ROW] = power.equals("home") ? Strings.get(R.string.home_screen)
                     : power.equals("live") ? Strings.get(R.string.live_tv) : Strings.get(R.string.power_on_tv);
             v[SYSTEM_APPS_ROW] = onOff(Prefs.systemApps());
+            v[SAVER_OK_ROW] = onOff(Prefs.screensaverOk());
             v[WEATHER_ROW] = onOff(Prefs.weather());
             v[CITY_ROW] = !cityStatus.isEmpty() ? cityStatus : Prefs.city().isEmpty() ? "—" : Prefs.city();
             v[FORECAST_ROW] = Prefs.forecast().equals("days") ? Strings.get(R.string.forecast_next_5_days) : Strings.get(R.string.forecast_next_hours);
@@ -696,6 +703,7 @@ public class SettingsActivity extends Activity {
                     return;
                 }
                 case SYSTEM_APPS_ROW: Prefs.setSystemApps(!Prefs.systemApps()); break;   // All Apps re-reads on Prefs.version
+                case SAVER_OK_ROW: Prefs.setScreensaverOk(!Prefs.screensaverOk()); break;   // read when the screensaver starts
                 case WEATHER_ROW: Prefs.setWeather(!Prefs.weather()); break;
                 case CITY_ROW: return;
                 case FORECAST_ROW:   // both are in memory: nothing to fetch

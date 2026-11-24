@@ -244,6 +244,8 @@
     <string name="saved_to_the_menu">"Menüye kaydedildi"</string>
     <string name="screensaver">"Ekran Koruyucu"</string>
     <string name="screensaver_preview">"Ekran koruyucu, önizleme"</string>
+    <string name="screensaver_ok_hint">"%1$s üzerinde izlemek için OK\'e basın · diğer tuşlar kapatır"</string>
+    <string name="screensaver_ok_opens_title">"Ekran koruyucuda OK başlığı açar"</string>
     <string name="search">"Ara"</string>
     <string name="side_menu_edit_hint">"Ara, Ana Sayfa ve Listem her zaman en üstte kalır. Öğe üzerinde OK: taşı, gizle veya kaldır."</string>
     <string name="search_movie_via_iptv">"Filmi IPTV\'de ara"</string>

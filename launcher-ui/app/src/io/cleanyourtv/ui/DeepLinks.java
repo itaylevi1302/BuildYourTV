@@ -31,24 +31,8 @@ final class DeepLinks {
         synchronized (CACHE) {
             if (CACHE.containsKey(key)) return CACHE.get(key);
         }
-        android.content.SharedPreferences sp = c.getSharedPreferences("deeplinks", Context.MODE_PRIVATE);
-        String kept = sp.getString(key, null);
-        if (kept != null) {   // "time|json": a month, then asked again (Wikidata gains ids over time)
-            int bar = kept.indexOf('|');
-            try {
-                if (System.currentTimeMillis() - Long.parseLong(kept.substring(0, bar)) < 30L * 24 * 3600_000) {
-                    Map<String, String> out = new HashMap<>();
-                    JSONObject o = new JSONObject(kept.substring(bar + 1));
-                    for (java.util.Iterator<String> it = o.keys(); it.hasNext(); ) {
-                        String app = it.next();
-                        out.put(app, o.getString(app));
-                    }
-                    synchronized (CACHE) { CACHE.put(key, out); }
-                    return out;
-                }
-            } catch (Exception ignored) {
-            }
-        }
+        Map<String, String> known = kept(c, key);
+        if (known != null) return known;
         Map<String, String> out = new HashMap<>();
         try {
             String prop = kind.equals("movie") ? "P4947" : "P4983";
@@ -79,8 +63,56 @@ final class DeepLinks {
             return out;    // not cached: the next try may reach Wikidata
         }
         synchronized (CACHE) { CACHE.put(key, out); }
-        sp.edit().putString(key, System.currentTimeMillis() + "|" + new JSONObject(out)).apply();
+        c.getSharedPreferences("deeplinks", Context.MODE_PRIVATE).edit()
+                .putString(key, System.currentTimeMillis() + "|" + new JSONObject(out)).apply();
         return out;
+    }
+
+    /** What find() already knows for the title (this session, or the month kept on disk), without asking Wikidata;
+     *  null when it knows nothing yet. The screensaver's OK uses it: it can't wait for the network. */
+    static Map<String, String> cached(Context c, String kind, int id) {
+        String key = kind + ":" + id;
+        synchronized (CACHE) {
+            if (CACHE.containsKey(key)) return CACHE.get(key);
+        }
+        return kept(c, key);
+    }
+
+    /** The apps find() builds links for; for any other app there is nothing to ask Wikidata. */
+    static boolean covers(String pkg) {
+        if (pkg == null) return false;
+        switch (pkg) {
+            case "com.netflix.ninja":
+            case "com.disney.disneyplus":
+            case "com.apple.atve.androidtv.appletv":
+            case "com.wbd.stream":
+            case "com.hbo.hbonow":
+            case "com.amazon.amazonvideo.livingroom":
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /** The links kept on disk for the title ("time|json"), while under a month old (Wikidata gains ids over time);
+     *  null otherwise. */
+    private static Map<String, String> kept(Context c, String key) {
+        String kept = c.getSharedPreferences("deeplinks", Context.MODE_PRIVATE).getString(key, null);
+        if (kept == null) return null;
+        int bar = kept.indexOf('|');
+        try {
+            if (System.currentTimeMillis() - Long.parseLong(kept.substring(0, bar)) >= 30L * 24 * 3600_000) return null;
+            Map<String, String> out = new HashMap<>();
+            JSONObject o = new JSONObject(kept.substring(bar + 1));
+            for (java.util.Iterator<String> it = o.keys(); it.hasNext(); ) {
+                String app = it.next();
+                out.put(app, o.getString(app));
+            }
+            synchronized (CACHE) { CACHE.put(key, out); }
+            return out;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     /** Opens the title in the app when there's a link it takes; otherwise false (the caller opens the app). */

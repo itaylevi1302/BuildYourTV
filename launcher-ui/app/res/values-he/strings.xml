@@ -223,6 +223,8 @@
     <string name="saved_to_the_menu">"נשמר בתפריט"</string>
     <string name="screensaver">"שומר מסך"</string>
     <string name="screensaver_preview">"שומר מסך, תצוגה מקדימה"</string>
+    <string name="screensaver_ok_hint">"לחצו OK לצפייה ב־%1$s · כל כפתור אחר סוגר"</string>
+    <string name="screensaver_ok_opens_title">"OK בשומר המסך פותח את הכותרת"</string>
     <string name="search">"חיפוש"</string>
     <string name="side_menu_edit_hint">"חיפוש, בית והרשימה שלי תמיד למעלה. OK על פריט: הזזה, הסתרה או הסרה."</string>
     <string name="search_movie_via_iptv">"חיפוש סרט ב-IPTV"</string>
