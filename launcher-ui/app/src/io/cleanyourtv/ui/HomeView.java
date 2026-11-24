@@ -632,6 +632,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         lastNanos = frameTimeNanos;
         long up = SystemClock.uptimeMillis();
 
+        settleWhileSliding();
         boolean tilesMoving = step(tileFocus, dt);
         if (reorderAnim) tilesMoving |= stepReorder(dt, up);
         boolean statusMoving = step(statusFocus, dt);
@@ -714,6 +715,32 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         float scale = 1.04f - 0.04f * s;
         sheetLayer.setScaleX(scale);
         sheetLayer.setScaleY(scale);
+    }
+
+    /**
+     * While the drawer slides, the focus in the drawer, the hero and the capsule jumps instead of animating: the shelf's
+     * focus alone is cheap over the sliding sky (10 ms a frame on a Realtek TCL), but a redraw of the drawer's cards or
+     * of the hero on top of it took 35 to 45 ms of GPU there (most frames dropped when a key came during the slide).
+     */
+    private void settleWhileSliding() {
+        if (drawer.settled()) return;
+        if (settle(drawerFocus)) drawerDirty = true;
+        if (settle(cardFocus) | settle(topFocus)) heroDirty = statusDirty = true;
+        if (settle(statusFocus)) statusDirty = true;
+        if (!heroFocus.settled()) {
+            heroFocus.snap(heroFocus.target);
+            heroDirty = true;
+        }
+    }
+
+    private static boolean settle(Spring[] springs) {
+        boolean moved = false;
+        for (Spring s : springs) {
+            if (s.settled()) continue;
+            s.snap(s.target);
+            moved = true;
+        }
+        return moved;
     }
 
     private static void show(View v, float alpha, float translationY) {
