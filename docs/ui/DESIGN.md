@@ -64,6 +64,12 @@ Ações possíveis de um botão configurável: um app (inclusive de celular, com
 HDMI), `live` (TV ao vivo), `settings`, `tmdb:watchlist`, ou vazio (o botão faz o que fazia). A tela **Botões do
 Controle** só lista os `configurable`; os `native` nunca aparecem nem são interceptados.
 
+Campos opcionais no topo do arquivo (#50, vindos do Free My TV): `vendor` e `product` (número como o Android informa,
+`2391`, ou hex como no nome do `.kl`, `"0957"`) fazem só as teclas daquele controle contarem, e o `BUTTON_3` de um
+gamepad, teclado ou outro controle segue normal; `debounce_ms` (0 a 5000) faz uma rajada do mesmo botão dentro desse
+tempo valer um toque só (controle Xiaomi: `1000`). Sem eles, nada muda. Um `vendor`/`product` inválido faz o arquivo
+inteiro ser ignorado (no log: `remote.json not read`).
+
 O serviço de acessibilidade que lê os botões é ligado pelo `build-and-install.sh` (`HOME_KEY_SERVICE=1`), como no
 CleanYourTV, e funciona com o ADB desligado depois.
 
