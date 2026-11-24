@@ -378,6 +378,13 @@
     <string name="weather_range_wide">"Макс. %1$s   Мін. %2$s"</string>
     <string name="weather_minutes_ago">"%1$d хв тому"</string>
     <string name="weather_hours_ago">"%1$d год тому"</string>
+    <string name="weather_rain_now">"Зараз дощ"</string>
+    <string name="weather_rain_in_hours">"Дощ через %1$d год"</string>
+    <string name="weather_day_range">"%1$s: максимум %2$s, мінімум %3$s"</string>
+    <string name="next_days_suffix_prefix">" Найближчі дні: "</string>
+    <string name="forecast">"Прогноз"</string>
+    <string name="forecast_next_hours">"Найближчі години"</string>
+    <string name="forecast_next_5_days">"Найближчі 5 днів"</string>
     <string name="duration_minutes">"%1$d хв"</string>
     <string name="duration_hours_minutes">"%1$d год %2$d хв"</string>
     <string name="stale_quote_prefix">""</string>

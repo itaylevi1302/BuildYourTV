@@ -84,6 +84,7 @@ final class TvConfig {
             if (o.has("weather")) Prefs.setWeather(o.getBoolean("weather"));
             if (o.has("language")) Prefs.setLanguage(o.getString("language"));
             if (o.has("clock")) Prefs.setClockFormat(o.getString("clock"));
+            if (o.has("forecast")) Prefs.setForecast(o.getString("forecast"));
             if (o.has("screensaver")) Prefs.setScreensaverStyle(o.getString("screensaver"));
             if (o.has("show_crypto")) Prefs.setQuotes(o.getBoolean("show_crypto"));
             String currency = o.optString("currency").trim();
