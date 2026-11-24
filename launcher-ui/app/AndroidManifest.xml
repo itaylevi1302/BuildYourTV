@@ -40,6 +40,9 @@
         <package android:name="com.softwinner.awlivetv" />
         <!-- Google TV's screensaver: the "Google Photos" choice is offered only when it is there and on. -->
         <package android:name="com.google.android.apps.tv.dreamx" />
+        <!-- The optional App Store round button: Google Play, or Amazon Appstore on Fire TV (HomeApps.storePackage). -->
+        <package android:name="com.android.vending" />
+        <package android:name="com.amazon.venezia" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />

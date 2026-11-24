@@ -120,6 +120,9 @@
     <string name="go_to_settings">"До налаштувань"</string>
     <string name="google_photos">"Google Фото"</string>
     <string name="hdmi_inputs">"Входи HDMI"</string>
+    <string name="app_store">"Магазин застосунків"</string>
+    <string name="add_app_store_button">"Додати кнопку магазину"</string>
+    <string name="remove_app_store_button">"Прибрати кнопку магазину"</string>
     <string name="hidden">"Приховано"</string>
     <string name="hide">"Приховати «"</string>
     <string name="hide_2">"Приховати"</string>

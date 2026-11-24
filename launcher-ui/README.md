@@ -110,6 +110,7 @@ logged, never guessed. [`config.example.json`](config.example.json) has them all
 | `remote` | the contents of a `remote.json` | The remote's buttons: which are the TV's own and which can be changed. See `examples/tcl-55c725/remote.json`. |
 | `providers` | `{ "283": "com.app" }` | A TMDB streaming provider id to the app that opens its titles, or `"off"`. |
 | `show_all_providers` | `true` / `false` | Explore shows every provider of the region, not only the installed apps'. |
+| `app_store_button` | `true` / `false` | A round App Store button at the top right (Google Play, or Amazon Appstore on Fire TV), where the TV has one. Off by default; also added or removed by holding OK on a top button. |
 | `app_tiles` | `{ "com.app": { "logo", "color" } }` | A tile for an app without a banner: an `https://` logo or a PNG pushed with `config.sh --file`, and a `#RRGGBB` colour. |
 
 A button's action is a package, `input:<TV input id>`, `input:next`, `live`, `settings`, `home`, `tmdb:explore`,

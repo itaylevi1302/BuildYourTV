@@ -270,6 +270,24 @@ final class Prefs {
         return out;
     }
 
+    // MARK: - Top buttons
+
+    /** The round buttons at the top right, in order (HomeApps.TOP_ALL keys); null until one is moved. */
+    static List<String> topButtons() {
+        String v = sp().getString("topButtons", null);
+        if (v == null) return null;
+        List<String> out = new ArrayList<>();
+        for (String key : v.split(",")) if (!key.isEmpty()) out.add(key);
+        return out;
+    }
+
+    static void setTopButtons(List<String> keys) { put("topButtons", String.join(",", keys)); }
+
+    /** The App Store round button (Google Play, or Amazon Appstore on Fire TV): off until added. */
+    static boolean storeButton() { return sp().getBoolean("storeButton", false); }
+
+    static void setStoreButton(boolean on) { put("storeButton", on); }
+
     // MARK: - Hidden apps
 
     /** Packages kept out of All Apps (config.json "hidden_apps"), on top of HomeApps' own list. */

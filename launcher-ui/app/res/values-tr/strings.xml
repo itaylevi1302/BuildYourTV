@@ -109,6 +109,9 @@
     <string name="getting_ready">"Hazırlanıyor…"</string>
     <string name="go_to_settings">"Ayarlar\'a git"</string>
     <string name="hdmi_inputs">"HDMI Girişleri"</string>
+    <string name="app_store">"Uygulama mağazası"</string>
+    <string name="add_app_store_button">"Mağaza düğmesini ekle"</string>
+    <string name="remove_app_store_button">"Mağaza düğmesini kaldır"</string>
     <string name="hidden">"Gizli"</string>
     <string name="hide">"“"</string>
     <string name="hide_2">"Gizle"</string>

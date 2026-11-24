@@ -36,6 +36,7 @@
     "283": "com.crunchyroll.crunchyroid"
   },
   "show_all_providers": false,
+  "app_store_button": false,
   "app_tiles": {
     "com.tomatos.clientapp": {
       "logo": "https://example.com/tomato-logo.png",

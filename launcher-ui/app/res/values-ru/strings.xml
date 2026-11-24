@@ -119,6 +119,9 @@
     <string name="go_to_settings">"В настройки"</string>
     <string name="google_photos">"Google Фото"</string>
     <string name="hdmi_inputs">"Входы HDMI"</string>
+    <string name="app_store">"Магазин приложений"</string>
+    <string name="add_app_store_button">"Добавить кнопку магазина"</string>
+    <string name="remove_app_store_button">"Убрать кнопку магазина"</string>
     <string name="hidden">"Скрыто"</string>
     <string name="hide">"Скрыть «"</string>
     <string name="hide_2">"Скрыть"</string>

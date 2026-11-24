@@ -114,6 +114,9 @@
     <string name="go_to_settings">"Ir pra Ajustes"</string>
     <string name="google_photos">"Fotos do Google"</string>
     <string name="hdmi_inputs">"Entradas HDMI"</string>
+    <string name="app_store">"Loja de aplicativos"</string>
+    <string name="add_app_store_button">"Adicionar o botão da loja"</string>
+    <string name="remove_app_store_button">"Remover o botão da loja"</string>
     <string name="hidden">"Oculto"</string>
     <string name="hide">"Ocultar “"</string>
     <string name="hide_2">"Ocultar"</string>

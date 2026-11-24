@@ -38,6 +38,9 @@ Free My TV. This project is for people who want both and a full Explore.
 - "For You" with TMDB picks on your services, and Explore, Movies and Shows tabs.
 - An app shelf with official logos; holding OK on an app drops a menu from its card: move, logo and color (a PNG's URL
   and a background color, or through `config.json`), the app's Android settings (force stop, clear cache) and close.
+- Round buttons at the top right (Explore, HDMI Inputs, Settings); holding OK on one drops a menu: move it (← →, OK
+  drops, Back cancels; the order is kept) and add or remove an App Store button (Google Play, or Amazon Appstore on
+  Fire TV; off until added).
 - Weather for your city, a theme that darkens at sunset, a photo screensaver.
 - No ADB left on: debloat, the Home switch and the remote-button service are done once from the computer.
 
