@@ -200,6 +200,14 @@ final class HomeApps {
             if (app[0].equals(c.getPackageName()) || HIDDEN.contains(app[0]) || !seen.add(app[0])) continue;
             more.add(app);
         }
+        // A system app put on the shelf while "System apps" was on keeps its row after it's turned off, so it can come
+        // off again (and doesn't hold a place toward the limit with no row).
+        for (String pkg : shelfPackages(c)) {
+            Intent launch = launchIntent(pm, pkg);
+            if (launch == null || pkg.equals(c.getPackageName()) || !seen.add(pkg)) continue;
+            ResolveInfo ri = pm.resolveActivity(launch, 0);
+            more.add(new String[] {pkg, ri != null ? String.valueOf(ri.loadLabel(pm)) : pkg});
+        }
         Collections.sort(more, (a, b) -> a[1].toLowerCase(Locale.ROOT).compareTo(b[1].toLowerCase(Locale.ROOT)));
         out.addAll(more);
         return out;
@@ -765,6 +773,19 @@ final class HomeApps {
         return kind * 1000 + hw;
     }
 
+    /** Factory and service menus, on any brand ("com.tcl.factory.view", "com.cvte.tv.fac.aging", "mediatek.factorymenu.ui"). */
+    private static final Pattern FACTORY = Pattern.compile("(.*\\.)?(factory|factorymenu|facmenu|fac|hkcfac|testpq)(\\..*)?");
+
+    /** A factory or service menu: never listed, even with Home Settings, System apps on (one OK there can reset the TV). */
+    static boolean factoryMenu(String pkg) {
+        return FACTORY.matcher(pkg).matches();
+    }
+
+    /**
+     * The apps a TV can start, as {package, name}: its TV apps (Leanback) first, then the phone ones (projectors and AOSP
+     * boxes). System apps among the phone ones only come with Home Settings, System apps on (Free My TV PR 368); off
+     * keeps the list as it always was.
+     */
     static List<String[]> launchable(Context c) {
         PackageManager pm = c.getPackageManager();
         List<String[]> out = new ArrayList<>();
@@ -774,10 +795,13 @@ final class HomeApps {
             String pkg = ri.activityInfo.packageName;
             if (seen.add(pkg)) out.add(new String[] {pkg, String.valueOf(ri.loadLabel(pm))});
         }
+        boolean systemApps = Prefs.systemApps();
         Intent phone = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
         for (ResolveInfo ri : pm.queryIntentActivities(phone, 0)) {
             String pkg = ri.activityInfo.packageName;
-            if ((ri.activityInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0 || !seen.add(pkg)) continue;
+            boolean system = (ri.activityInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
+            if (system && (!systemApps || factoryMenu(pkg))) continue;
+            if (!seen.add(pkg)) continue;
             out.add(new String[] {pkg, String.valueOf(ri.loadLabel(pm))});
         }
         return out;

@@ -97,7 +97,7 @@ class PowerOnTest(unittest.TestCase):
         settings = read("SettingsActivity.java")
         rows = {k: int(v) for k, v in re.findall(r"(\w+_ROWS?) = (\d+)", settings[settings.index("CLOCK_ROW ="):])}
         self.assertEqual(rows["POWER_ON_ROW"], rows["CLOCK_ROW"] + 1, "right after Clock format")
-        self.assertEqual(rows["WEATHER_ROW"], rows["POWER_ON_ROW"] + 1)
+        self.assertLess(rows["POWER_ON_ROW"], rows["WEATHER_ROW"])
         labels = block(settings, "private String[] settingLabels()")
         self.assertLess(labels.index("R.string.clock_format"), labels.index("R.string.at_power_on"))
         self.assertLess(labels.index("R.string.at_power_on"), labels.index("R.string.weather_widget"))

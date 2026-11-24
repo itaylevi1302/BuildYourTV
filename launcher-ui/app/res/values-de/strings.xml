@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="all_apps">"Alle Apps"</string>
+    <string name="system_apps_in_all_apps">"System-Apps in Alle Apps"</string>
     <string name="apps_settings">"App-Einstellungen"</string>
     <string name="automatic">"Automatisch"</string>
     <string name="automatic_2">"Automatisch"</string>
