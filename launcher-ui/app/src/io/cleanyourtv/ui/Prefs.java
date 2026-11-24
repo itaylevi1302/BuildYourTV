@@ -233,6 +233,10 @@ final class Prefs {
 
     static boolean weather() { return sp().getBoolean("weather", true); }
     static void setWeather(boolean on) { put("weather", on); }
+
+    /** Wi-Fi or Ethernet and a USB drive, as small icons by the home screen's round buttons. Off unless config.json sets it. */
+    static boolean statusIcons() { return sp().getBoolean("statusIcons", false); }
+    static void setStatusIcons(boolean on) { put("statusIcons", on); }
     /** The weather card's forecast: "hours" (the next 6 hours, as before) or "days" (the next 5 days). */
     static String forecast() { return "days".equals(sp().getString("forecast", "hours")) ? "days" : "hours"; }
     static void setForecast(String v) { put("forecast", v); }

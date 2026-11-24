@@ -27,6 +27,7 @@
   "screensaver": "photos",
   "weather": true,
   "show_crypto": false,
+  "status_icons": false,
   "currency": "BRL",
   "buttons": {
     "s395": "tmdb:watchlist",

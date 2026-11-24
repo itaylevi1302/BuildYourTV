@@ -2,7 +2,10 @@ package io.cleanyourtv.ui;
 
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.app.Activity;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.LauncherApps;
 import android.graphics.Bitmap;
@@ -15,10 +18,17 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.media.tv.TvInputManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.os.Build;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.os.UserHandle;
+import android.os.storage.StorageManager;
+import android.os.storage.StorageVolume;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
@@ -93,6 +103,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     // The tab bar is a 68 px capsule; the cards sit on the 5-column grid (the wide one spans 3).
     private static final float L_TITLE_BASE = 130, L_TABBAR_TOP = 158, L_TABBAR_H = 68, L_CARDS_TOP = 262, L_CARD_H = 442;
     private static final float L_TALL_W = 320, L_CARD_GAP = 40, L_BUTTON = 68, L_BUTTON_GAP = 20, L_BUTTON_CY = 103;
+    private static final float L_STATUS = 25, L_STATUS_GAP = 22;
+    private static final String[] STATUS_SYMBOLS = {"wifi", "ethernet", "usb"};
     private static final float L_PLATTER_TOP = 814, L_TILE_H = 126;
     private static final float L_DATE_BASE = 330, L_CLOCK_BASE = 540, L_WEATHER_BASE = 626, L_QUOTES_BASE = 694;
     private static final int L_INK = 0xFF1D1D1F, L_DIM = 0xFF6E6E73, L_FAINT = 0xFF8E8E93;
@@ -111,6 +123,11 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private static final long BG_FOLLOW_MS = 500;
     private final SharedPreferences ui;
     private final TvInputManager tvInputs;
+    private final ConnectivityManager connectivity;
+    // The status icons (Prefs.statusIcons, off by default): read and listened to only while they are on.
+    private boolean networkRegistered, drivesRegistered;
+    private int network;          // 0 = no network, 1 = Wi-Fi, 2 = Ethernet
+    private boolean usbDrive;     // a mounted removable volume: a USB stick or an SD card
     private final Spoken spoken = new Spoken(this, new Spoken.Source() {
         @Override public void items(List<Integer> out) { a11yItems(out); }
         @Override public String text(int id) { return a11yText(id); }
@@ -362,6 +379,116 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         handler.postDelayed(reloadSoon, 500);
     }
 
+    // MARK: - Status icons: Wi-Fi or Ethernet and a USB drive (Free My TV PR 371, queries off the main thread as eb649bb)
+
+    /** On the main thread (registered with `handler`); registering hands the current network over at once. */
+    private final ConnectivityManager.NetworkCallback statusNetwork = new ConnectivityManager.NetworkCallback() {
+        @Override public void onCapabilitiesChanged(Network n, NetworkCapabilities caps) {
+            setNetwork(caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ? 2
+                    : caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ? 1 : 0);
+        }
+
+        @Override public void onLost(Network n) {
+            setNetwork(0);
+        }
+    };
+
+    private void setNetwork(int type) {
+        if (type == network) return;
+        network = type;
+        status.invalidate();
+    }
+
+    /** A drive mounted, unmounted, ejected or removed. */
+    private final BroadcastReceiver drivesChanged = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            updateDrives();
+        }
+    };
+
+    /**
+     * Whether a USB stick or an SD card is mounted. On LOADER, the result posted back: the storage volumes are binder
+     * calls, kept off the main thread (Free My TV eb649bb). An unmounted drive shows nothing.
+     */
+    private void updateDrives() {
+        Context c = getContext();
+        LOADER.execute(() -> {
+            boolean drive = false;
+            try {
+                StorageManager sm = (StorageManager) c.getSystemService(Context.STORAGE_SERVICE);
+                if (sm != null) {
+                    for (StorageVolume v : sm.getStorageVolumes()) {
+                        if (v.isRemovable() && Environment.MEDIA_MOUNTED.equals(v.getState())) {
+                            drive = true;
+                            break;
+                        }
+                    }
+                }
+            } catch (RuntimeException ignored) {
+            }
+            boolean on = drive;
+            handler.post(() -> setUsbDrive(on));
+        });
+    }
+
+    private void setUsbDrive(boolean on) {
+        if (on == usbDrive) return;
+        usbDrive = on;
+        status.invalidate();
+    }
+
+    /**
+     * Reads the icons' state and listens for changes, only while Status icons is on: off, nothing is registered. No
+     * Bluetooth icon: its connection state needs BLUETOOTH_CONNECT from Android 12, and the app asks for no new
+     * permission.
+     */
+    private void startStatus() {
+        if (!Prefs.statusIcons()) return;
+        updateDrives();
+        if (connectivity != null && !networkRegistered) {
+            try {
+                connectivity.registerDefaultNetworkCallback(statusNetwork, handler);
+                networkRegistered = true;
+            } catch (RuntimeException e) {
+                AppLog.w("status icons: no network callback: " + e.getMessage());
+            }
+        }
+        if (!drivesRegistered) {
+            // A drive's broadcast carries a file:// URI: without the scheme the filter never matches.
+            IntentFilter f = new IntentFilter();
+            f.addAction(Intent.ACTION_MEDIA_MOUNTED);
+            f.addAction(Intent.ACTION_MEDIA_UNMOUNTED);
+            f.addAction(Intent.ACTION_MEDIA_EJECT);
+            f.addAction(Intent.ACTION_MEDIA_REMOVED);
+            f.addDataScheme("file");
+            try {
+                if (Build.VERSION.SDK_INT >= 33) getContext().registerReceiver(drivesChanged, f, Context.RECEIVER_NOT_EXPORTED);
+                else getContext().registerReceiver(drivesChanged, f);
+                drivesRegistered = true;
+            } catch (RuntimeException e) {
+                AppLog.w("status icons: no drive receiver: " + e.getMessage());
+            }
+        }
+    }
+
+    private void stopStatus() {
+        if (networkRegistered) {
+            try {
+                connectivity.unregisterNetworkCallback(statusNetwork);
+            } catch (RuntimeException ignored) {
+            }
+            networkRegistered = false;
+            network = 0;   // read again on the way back: the network may change while another app shows
+        }
+        if (drivesRegistered) {
+            try {
+                getContext().unregisterReceiver(drivesChanged);
+            } catch (RuntimeException ignored) {
+            }
+            drivesRegistered = false;
+        }
+    }
+
     private final Runnable tick = new Runnable() {
         @Override public void run() {
             if (!running) return;
@@ -385,6 +512,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         click = new Click(a);
         ui = a.getSharedPreferences("home-ui", Context.MODE_PRIVATE);
         tvInputs = (TvInputManager) a.getSystemService(Context.TV_INPUT_SERVICE);
+        connectivity = (ConnectivityManager) a.getSystemService(Context.CONNECTIVITY_SERVICE);
         LauncherApps apps = null;
         try {
             apps = (LauncherApps) a.getSystemService(Context.LAUNCHER_APPS_SERVICE);
@@ -460,6 +588,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         data.refreshIfStale();
         recs.refreshIfStale();
         if (tvInputs != null) tvInputs.registerCallback(inputCallback, handler);
+        startStatus();
         handler.postDelayed(tick, 15_000);
         playing.start();
         if (Prefs.shelfRecent()) reorderRecent();   // before the first frame: the app just left comes first (#63)
@@ -501,6 +630,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         data.removeListener(this);
         recs.removeListener(this);
         if (tvInputs != null) tvInputs.unregisterCallback(inputCallback);
+        stopStatus();
     }
 
     void destroy() {
@@ -3372,6 +3502,9 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             Symbols.warm(getContext(), it.symbol, 27 * k * 1.1f);
         }
         Symbols.warmWeather(getContext(), 40 * k);
+        for (String name : STATUS_SYMBOLS) {   // at the size drawStatusIcon draws them: never a 150 px PNG scaled to 25
+            Symbols.warm(getContext(), name, Symbols.pointSizeForHeight(getContext(), name, L_STATUS * k * statusScale(name)));
+        }
         heroDirty = statusDirty = true;
     }
 
@@ -3770,6 +3903,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
      */
     private void drawLightButtons(Canvas c) {
         applyTone();
+        drawStatusIcons(c);
         int n = lightButtons.size();
         for (int slot = 0; slot < n; slot++) {
             int i = slot;
@@ -3811,6 +3945,41 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             if (moved) c.restore();
         }
     }
+    /**
+     * The status icons (Prefs.statusIcons): Wi-Fi or Ethernet, then a USB drive, on the round buttons' centre line just
+     * before them (just after them in Hebrew, mirrored), so the title, the tabs and the clock keep their places.
+     */
+    private void drawStatusIcons(Canvas c) {
+        if (!Prefs.statusIcons() || (network == 0 && !usbDrive)) return;
+        // The round buttons' edge on the title's side, however many of them show.
+        float edge = Float.NaN;
+        for (int i = TABS.length; i < TABS.length + lightButtons.size(); i++) {   // the buttons shown, not stale rects
+            RectF r = topRects[i];
+            if (r.isEmpty()) continue;
+            float e = Ui.he ? r.right : r.left;
+            edge = Float.isNaN(edge) ? e : Ui.he ? Math.max(edge, e) : Math.min(edge, e);
+        }
+        if (Float.isNaN(edge)) return;   // not laid out yet
+        int color = Ui.alpha(tone(L_INK, 0xEBFFFFFF), 0.85f);
+        float x = Ui.he ? edge + 2 * L_STATUS_GAP * k : edge - 2 * L_STATUS_GAP * k;
+        // From the buttons outward: the drive next to them, the network beyond it (it reads "Wi-Fi, USB, buttons").
+        if (usbDrive) x = drawStatusIcon(c, "usb", x, color);
+        if (network != 0) drawStatusIcon(c, network == 2 ? "ethernet" : "wifi", x, color);
+    }
+
+    /** Narrow symbols need a little more height to look as big as wide ones. */
+    private static float statusScale(String name) {
+        return "usb".equals(name) ? 1.3f : 1;
+    }
+
+    /** Draws a status icon with its outer edge at `from` (its right edge; its left one in Hebrew); returns the next edge. */
+    private float drawStatusIcon(Canvas c, String name, float from, int color) {
+        float size = Symbols.pointSizeForHeight(getContext(), name, L_STATUS * k * statusScale(name));
+        float width = Symbols.width(getContext(), name, size);
+        Symbols.draw(getContext(), c, name, Ui.he ? from + width / 2 : from - width / 2, L_BUTTON_CY * k, size, color);
+        return Ui.he ? from + width + L_STATUS_GAP * k : from - width - L_STATUS_GAP * k;
+    }
+
     private boolean moveLight(int dx, int dy) {
         switch (zone) {
             case Z_SHELF:
