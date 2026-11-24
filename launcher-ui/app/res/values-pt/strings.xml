@@ -413,4 +413,13 @@
     <string name="sleep_more">"Mais 15 minutos"</string>
     <string name="sleep_keep_on">"Manter a TV ligada"</string>
     <string name="sleep_now">"Desligar agora"</string>
+    <string name="watch_provider_consent">"%1$s quer aparecer em Onde assistir. Ele vai saber quais títulos você abre."</string>
+    <string name="allow">"Permitir"</string>
+    <string name="not_now">"Agora não"</string>
+    <string name="watch_provider_couldnt_open">"Este app não conseguiu abrir o título"</string>
+    <string name="resume_from">"Continuar de %1$s"</string>
+    <string name="watch_providers_section">"Apps em Onde assistir"</string>
+    <string name="watch_providers_hint">"Apps que dizem quais títulos têm. OK liga ou desliga, ← → muda a ordem: Assistir abre o primeiro ligado que tiver o título."</string>
+    <string name="watch_episode_button">"Assistir"</string>
+    <string name="no_app_has_this_episode">"Nenhum dos seus apps tem este episódio"</string>
 </resources>

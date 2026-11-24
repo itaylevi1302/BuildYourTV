@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -26,6 +27,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -55,6 +57,16 @@ public class DetailActivity extends Activity {
     private TextView listButton, seenButton, favButton, rateButton;
     private boolean inList, favorite;
     private int myRating;
+    // Watch providers (#106): the request for this title, what came back, and what must be redone when it changes.
+    private JSONObject baseRequest;
+    private TvUi.Flow actions;
+    private final List<View> providerChips = new ArrayList<>();
+    private View providerWatchButton;
+    private TextView noneText;
+    private boolean streamingWatch, keyPressed;
+    private int providerStamp;
+    private int askGeneration;
+    private static final Set<String> askedThisRun = new HashSet<>();   // answered with Back: asked again next launch, not on every page
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -87,7 +99,7 @@ public class DetailActivity extends Activity {
             try {
                 boolean movie = "movie".equals(kind);
                 String extra = movie ? "release_dates,credits" : "content_ratings,aggregate_credits";
-                JSONObject o = Tmdb.get("/" + kind + "/" + id + "?append_to_response=watch/providers,recommendations,videos,reviews,keywords," + extra);
+                JSONObject o = Tmdb.get("/" + kind + "/" + id + "?append_to_response=watch/providers,recommendations,videos,reviews,keywords,external_ids," + extra);
                 JSONObject collection = null;
                 JSONObject belongs = o.optJSONObject("belongs_to_collection");
                 if (belongs != null) {
@@ -123,6 +135,10 @@ public class DetailActivity extends Activity {
         String date = o.optString(movie ? "release_date" : "first_air_date");
         String year = date.length() >= 4 ? date.substring(0, 4) : "";
         title = new Tmdb.Title(kind, id, name, o.optString("poster_path"), o.optString("backdrop_path"), year, o.optDouble("vote_average"));
+        int yearNumber = 0;
+        try { yearNumber = Integer.parseInt(year); } catch (NumberFormatException ignored) {}
+        baseRequest = WatchProviders.request(kind, id, name, o.optString(movie ? "original_title" : "original_name"), yearNumber,
+                o.optJSONObject("external_ids"), 0, 0);
 
         TextView h = TvUi.text(this, k, 72, Ui.displaySemibold, TvUi.INK);
         h.setText(name);
@@ -184,7 +200,9 @@ public class DetailActivity extends Activity {
                 : o.optJSONObject("watch/providers").optJSONObject("results") == null ? null
                 : o.optJSONObject("watch/providers").optJSONObject("results").optJSONObject(Tmdb.region());
         String[] watchApp = firstApp(region);
-        TvUi.Flow actions = new TvUi.Flow(this, Math.round(20 * k), Math.round(20 * k));
+        actions = new TvUi.Flow(this, Math.round(20 * k), Math.round(20 * k));
+        providerWatchButton = null;
+        streamingWatch = watchApp != null;
         actions.setPadding(Math.round(14 * k), Math.round(36 * k), Math.round(96 * k), Math.round(16 * k));
         if (watchApp != null) {
             actions.addView((TvUi.button(this, k, "▶  " + Strings.get(R.string.watch_on_prefix) + watchApp[1], v -> watch(watchApp[0]))));
@@ -213,7 +231,7 @@ public class DetailActivity extends Activity {
         if (!movie) {
             List<Tmdb.Title> seasonCards = seasons(o);
             if (!seasonCards.isEmpty()) {
-                TvUi.OnTitle season = t -> SeasonActivity.open(this, id, t.id, name);
+                TvUi.OnTitle season = t -> SeasonActivity.open(this, id, t.id, name, baseRequest == null ? null : baseRequest.toString());
                 content.addView(TvUi.row(this, k, Strings.get(R.string.seasons), seasonCards, season,
                         () -> GridActivity.show(this, name + " · " + Strings.get(R.string.seasons), seasonCards, season), Math.round(96 * k)));
             }
@@ -245,6 +263,7 @@ public class DetailActivity extends Activity {
             java.util.Map<String, String> links = DeepLinks.find(this, kind, id, name);
             main.post(() -> { if (!isFinishing()) linksKnown(links); });
         }).start();
+        askProviders(true);
     }
 
     private String certification(JSONObject o) {
@@ -435,6 +454,7 @@ public class DetailActivity extends Activity {
         if (whereLine.getChildCount() == 0) {
             TextView none = TvUi.text(this, k, 26, Ui.regular, TvUi.DIM);
             none.setText(Strings.get(R.string.not_on_any_streaming_service_in_the_region_right_now));
+            noneText = none;
             box.addView(none);
         }
         box.addView(whereLine, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -664,6 +684,114 @@ public class DetailActivity extends Activity {
         return players.isEmpty() ? null : players.get(0);
     }
 
+    // MARK: - Watch providers (#106)
+
+    @Override public boolean dispatchKeyEvent(KeyEvent e) {
+        if (e.getAction() == KeyEvent.ACTION_DOWN) keyPressed = true;   // from the first key on, focus stays where the person put it
+        return super.dispatchKeyEvent(e);
+    }
+
+    /** Finds the apps on the TV that offer results, asks the person about new ones (only when mayPrompt), then asks the
+     *  allowed ones about this title. Nothing is sent before an app is allowed. */
+    private void askProviders(boolean mayPrompt) {
+        providerStamp = WatchProviders.stamp();
+        JSONObject req = baseRequest;
+        int generation = ++askGeneration;
+        new Thread(() -> {
+            List<WatchProviders.Provider> all = WatchProviders.found(this);
+            main.post(() -> {
+                if (isFinishing() || isDestroyed() || generation != askGeneration) return;
+                List<WatchProviders.Provider> pending = new ArrayList<>();
+                if (mayPrompt) {
+                    for (WatchProviders.Provider p : all) if (p.state == WatchProviders.State.NEW && !askedThisRun.contains(p.pkg)) pending.add(p);
+                }
+                consentChain(pending, 0, () -> new Thread(() -> {
+                    List<WatchProviders.Provider> on = WatchProviders.allowed(WatchProviders.found(this));
+                    Map<WatchProviders.Provider, List<WatchProviders.Item>> res = on.isEmpty() ? new java.util.LinkedHashMap<>()
+                            : WatchProviders.ask(this, on, req.toString());
+                    main.post(() -> {
+                        if (!isFinishing() && !isDestroyed() && generation == askGeneration) showProviders(res);
+                    });
+                }).start());
+            });
+        }).start();
+    }
+
+    /** One question per new app, one after the other; then done. */
+    private void consentChain(List<WatchProviders.Provider> pending, int at, Runnable done) {
+        if (at >= pending.size()) {
+            done.run();
+            return;
+        }
+        WatchProviders.Provider p = pending.get(at);
+        boolean[] moved = {false};
+        Runnable next = () -> {
+            if (moved[0]) return;
+            moved[0] = true;
+            consentChain(pending, at + 1, done);
+        };
+        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle(p.label)
+                .setMessage(Strings.get(R.string.watch_provider_consent, p.appLabel))
+                .setPositiveButton(Strings.get(R.string.allow), (d, w) -> {
+                    WatchProviders.decide(p, true);
+                    next.run();
+                })
+                .setNegativeButton(Strings.get(R.string.not_now), (d, w) -> {
+                    WatchProviders.decide(p, false);
+                    next.run();
+                })
+                .setOnCancelListener(d -> {
+                    askedThisRun.add(p.pkg);   // Back records nothing
+                    next.run();
+                })
+                .show();
+    }
+
+    /** The providers' answers as chips after the IPTV one, and, when no streaming app has a link, as the Watch button. */
+    private void showProviders(Map<WatchProviders.Provider, List<WatchProviders.Item>> res) {
+        for (View v : providerChips) whereLine.removeView(v);
+        providerChips.clear();
+        if (providerWatchButton != null) actions.removeView(providerWatchButton);
+        providerWatchButton = null;
+        int at = iptvChip != null ? 1 : 0;
+        WatchProviders.Item first = null;
+        for (Map.Entry<WatchProviders.Provider, List<WatchProviders.Item>> e : res.entrySet()) {
+            WatchProviders.Provider p = e.getKey();
+            for (WatchProviders.Item item : e.getValue()) {
+                if (first == null) first = item;
+                ImageView img = new ImageView(this);
+                try {
+                    img.setImageDrawable(getPackageManager().getApplicationIcon(p.pkg));
+                } catch (PackageManager.NameNotFoundException ignored) {
+                }
+                List<String> parts = new ArrayList<>();
+                if (!item.label.isEmpty()) parts.add(item.label);
+                if (!item.detail.isEmpty()) parts.add(item.detail);
+                String resume = WatchProviders.resumeText(item);
+                if (resume != null) parts.add(resume);
+                String sub = TextUtils.join("  ·  ", parts);
+                View chip = chipBox(img, p.label, chipSub(sub.isEmpty() ? Strings.get(R.string.opens_prefix) + p.appLabel : sub));
+                chip.setOnClickListener(v -> openProviderItem(item));
+                whereLine.addView(chip, at++);
+                providerChips.add(chip);
+            }
+        }
+        if (noneText != null) noneText.setVisibility(providerChips.isEmpty() ? View.VISIBLE : View.GONE);
+        whereLine.setVisibility(whereLine.getChildCount() == 0 ? View.GONE : View.VISIBLE);
+        if (first != null && !streamingWatch && actions != null) {
+            WatchProviders.Item item = first;
+            providerWatchButton = TvUi.button(this, k, "▶  " + Strings.get(R.string.watch_on_prefix) + item.provider.label, v -> openProviderItem(item));
+            actions.addView(providerWatchButton, 0);
+            if (!keyPressed && getCurrentFocus() == listButton) providerWatchButton.requestFocus();
+        }
+    }
+
+    private void openProviderItem(WatchProviders.Item item) {
+        if (title != null) Tmdb.setSeen(this, title, true);
+        WatchProviders.open(this, item);
+    }
+
     private boolean stopped;
 
     @Override protected void onStop() {
@@ -676,6 +804,7 @@ public class DetailActivity extends Activity {
         super.onStart();
         if (stopped) TvUi.restoreImages(getWindow().getDecorView());
         if (stopped && whereLine != null && !Prefs.iptvPlayer().equals(iptvShown)) showIptvChip();   // back from Settings › Services
+        if (stopped && baseRequest != null && WatchProviders.stamp() != providerStamp) askProviders(false);   // an app was switched on, off or moved
         stopped = false;
     }
 }

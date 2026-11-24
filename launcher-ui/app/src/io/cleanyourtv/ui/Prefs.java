@@ -399,6 +399,29 @@ final class Prefs {
     static int iptvFallbackWarnCount() { return sp().getInt("iptvFallbackWarnCount", 0); }
     static void setIptvFallbackWarnCount(int count) { sp().edit().putInt("iptvFallbackWarnCount", count).apply(); }
 
+    // MARK: - Watch providers (#106) - not home-screen settings: never bump version
+
+    /** The answer for an app that offers "Where to watch" results: "on|<signing digest>" or "off|<digest>"; "" before it was asked. */
+    static String watchProvider(String pkg) { return sp().getString("watchProvider." + pkg, ""); }
+    static void setWatchProvider(String pkg, String value) { sp().edit().putString("watchProvider." + pkg, value).apply(); }
+
+    /** The providers' packages in the person's order; null until one is moved or answered. */
+    static List<String> watchProvidersOrder() {
+        String v = sp().getString("watchProvidersOrder", null);
+        return v == null ? null : keyList(v);
+    }
+
+    static void setWatchProvidersOrder(List<String> pkgs) { sp().edit().putString("watchProvidersOrder", String.join(",", pkgs)).apply(); }
+
+    /** Changes whenever an answer or the order does, so a page open behind Settings asks again on return. */
+    static int watchProvidersStamp() {
+        int h = 0;
+        for (java.util.Map.Entry<String, ?> e : sp().getAll().entrySet()) {
+            if (e.getKey().startsWith("watchProvider")) h = h * 31 + (e.getKey() + "=" + e.getValue()).hashCode();
+        }
+        return h;
+    }
+
     // MARK: - Remote buttons
 
     // The key service runs in its own small process (:keys), so that a busy home screen can never delay the TV's keys.

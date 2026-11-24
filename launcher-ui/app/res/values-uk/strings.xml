@@ -426,4 +426,13 @@
     <string name="sleep_keep_on">"Не вимикати ТВ"</string>
     <string name="sleep_now">"Вимкнути зараз"</string>
     <string name="stale_quote_prefix">""</string>
+    <string name="watch_provider_consent">"%1$s хоче з’являтися в «Де дивитися». Застосунок знатиме, які назви ви відкриваєте."</string>
+    <string name="allow">"Дозволити"</string>
+    <string name="not_now">"Не зараз"</string>
+    <string name="watch_provider_couldnt_open">"Цей застосунок не зміг відкрити назву"</string>
+    <string name="resume_from">"Продовжити з %1$s"</string>
+    <string name="watch_providers_section">"Застосунки в «Де дивитися»"</string>
+    <string name="watch_providers_hint">"Застосунки, що кажуть, які назви в них є. OK вмикає чи вимикає, ← → змінює порядок: «Дивитися» відкриває перший увімкнений, у якому є назва."</string>
+    <string name="watch_episode_button">"Дивитися"</string>
+    <string name="no_app_has_this_episode">"У жодному з ваших застосунків немає цієї серії"</string>
 </resources>

@@ -219,6 +219,16 @@ does. Without the service the row says so. It adds no permission (no overlay, no
 To try it, pick 15 min and watch `adb logcat -s CleanYourTV-UI` for "sleep timer: 900 s", then, after the warning box a
 minute before the end, "sleep timer: TV off".
 
+## Watch providers
+
+An Android TV app can tell a title's page whether it has that title, and open it: its answer shows under **Where to watch**
+next to the streaming services, and the page's Watch button uses it when no streaming app has a link. A provider stays
+silent until you allow it: the first time one is found the page asks once, naming the app. Settings → Services lists every
+provider found, with OK to switch one on or off and ← → to change the order. The request goes from app to app on the TV
+(no network, no new permission), only when a title page opens, and only to the apps you allowed; on a season's page the
+Watch pill asks about one episode. The contract is [`docs/specs/provider.md`](../docs/specs/provider.md) and the short
+version for app authors is [`docs/providers.md`](../docs/providers.md).
+
 ## Translations
 
 Edit the English defaults in [`app/res/values/strings.xml`](app/res/values/strings.xml)

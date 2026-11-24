@@ -26,16 +26,20 @@ import java.util.List;
 
 /** A season's episodes: OK marks one as seen (kept on the TV), Menu rates it on the TMDB account. */
 public class SeasonActivity extends Activity {
-    private static final String SERIES = "series", SEASON = "season", NAME = "name";
+    private static final String SERIES = "series", SEASON = "season", NAME = "name", REQUEST = "request";
 
-    static void open(Context c, int series, int season, String seriesName) {
-        c.startActivity(new Intent(c, SeasonActivity.class).putExtra(SERIES, series).putExtra(SEASON, season).putExtra(NAME, seriesName));
+    /** request: the show's Where to watch request (docs/specs/provider.md), or null for no watch providers. */
+    static void open(Context c, int series, int season, String seriesName, String request) {
+        c.startActivity(new Intent(c, SeasonActivity.class).putExtra(SERIES, series).putExtra(SEASON, season).putExtra(NAME, seriesName)
+                .putExtra(REQUEST, request));
     }
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private float k;
     private int series, season;
     private LinearLayout list;
+    private String request;               // the show's request for the watch providers; null without
+    private boolean hasProviders, asking;   // an app is switched on / a question is open
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -43,6 +47,7 @@ public class SeasonActivity extends Activity {
         k = TvUi.k(this);
         series = getIntent().getIntExtra(SERIES, 0);
         season = getIntent().getIntExtra(SEASON, 1);
+        request = getIntent().getStringExtra(REQUEST);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(TvUi.BG);
         TvUi.Scroll scroll = new TvUi.Scroll(this);
@@ -62,7 +67,12 @@ public class SeasonActivity extends Activity {
         new Thread(() -> {
             try {
                 JSONObject o = Tmdb.get("/tv/" + series + "/season/" + season);
-                main.post(() -> { if (!isFinishing()) show(o); });
+                boolean providers = request != null && !WatchProviders.allowed(WatchProviders.found(this)).isEmpty();
+                main.post(() -> {
+                    if (isFinishing()) return;
+                    hasProviders = providers;
+                    show(o);
+                });
             } catch (Exception e) {
                 main.post(() -> sub.setText(Strings.get(R.string.couldnt_open_the_season_prefix) + e.getMessage()));
             }
@@ -138,8 +148,61 @@ public class SeasonActivity extends Activity {
         });
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.bottomMargin = Math.round(14 * k);
-        row.setLayoutParams(lp);
-        return row;
+        if (!hasProviders) {
+            row.setLayoutParams(lp);
+            return row;
+        }
+        // The Watch pill sits beside the row: OK on the row still marks it seen, Menu still rates it.
+        LinearLayout outer = new LinearLayout(this);
+        outer.setOrientation(LinearLayout.HORIZONTAL);
+        outer.setGravity(Gravity.CENTER_VERTICAL);
+        outer.setLayoutParams(lp);
+        outer.addView(row, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        row.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        View watch = TvUi.button(this, k, "▶  " + Strings.get(R.string.watch_episode_button), v -> watchEpisode(number));
+        LinearLayout.LayoutParams wp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        wp.leftMargin = Math.round(20 * k);
+        outer.addView(watch, wp);
+        return outer;
+    }
+
+    /** Asks the allowed apps about this episode: none has it, one opens at once, several are listed to pick from. */
+    private void watchEpisode(int number) {
+        if (asking || request == null) return;
+        asking = true;
+        new Thread(() -> {
+            List<WatchProviders.Item> items = new ArrayList<>();
+            try {
+                JSONObject req = new JSONObject(request).put("season", season).put("episode", number);
+                List<WatchProviders.Provider> on = WatchProviders.allowed(WatchProviders.found(this));
+                for (List<WatchProviders.Item> got : WatchProviders.ask(this, on, req.toString()).values()) items.addAll(got);
+            } catch (Exception ignored) {
+            }
+            main.post(() -> {
+                asking = false;
+                if (isFinishing() || isDestroyed()) return;
+                if (items.isEmpty()) {
+                    Toast.makeText(this, Strings.get(R.string.no_app_has_this_episode), Toast.LENGTH_LONG).show();
+                } else if (items.size() == 1) {
+                    WatchProviders.open(this, items.get(0));
+                } else {
+                    String[] labels = new String[items.size()];
+                    for (int i = 0; i < labels.length; i++) {
+                        WatchProviders.Item it = items.get(i);
+                        List<String> parts = new ArrayList<>();
+                        if (!it.label.isEmpty()) parts.add(it.label);
+                        if (!it.detail.isEmpty()) parts.add(it.detail);
+                        String resume = WatchProviders.resumeText(it);
+                        if (resume != null) parts.add(resume);
+                        labels[i] = it.provider.label + (parts.isEmpty() ? "" : " · " + TextUtils.join("  ·  ", parts));
+                    }
+                    new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                            .setTitle(Strings.get(R.string.watch_episode, season, number))
+                            .setItems(labels, (d, which) -> WatchProviders.open(this, items.get(which)))
+                            .show();
+                }
+            });
+        }).start();
     }
 
     private void rate(int number, String name) {

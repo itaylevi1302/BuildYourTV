@@ -422,4 +422,13 @@
     <string name="sleep_more">"15 more minutes"</string>
     <string name="sleep_keep_on">"Keep the TV on"</string>
     <string name="sleep_now">"Turn off now"</string>
+    <string name="watch_provider_consent">"%1$s wants to appear in Where to watch. It will learn which titles you open."</string>
+    <string name="allow">"Allow"</string>
+    <string name="not_now">"Not now"</string>
+    <string name="watch_provider_couldnt_open">"This app couldn\'t open the title"</string>
+    <string name="resume_from">"Resume from %1$s"</string>
+    <string name="watch_providers_section">"Apps in Where to watch"</string>
+    <string name="watch_providers_hint">"Apps that say which titles they have. OK switches one on or off, ← → changes the order: Watch opens the first one on that has the title."</string>
+    <string name="watch_episode_button">"Watch"</string>
+    <string name="no_app_has_this_episode">"None of your apps has this episode"</string>
 </resources>
