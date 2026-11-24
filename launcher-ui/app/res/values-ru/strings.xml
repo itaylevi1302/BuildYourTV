@@ -39,6 +39,9 @@
     <string name="clear">"Ясно"</string>
     <string name="clock_and_aurora">"Часы и сияние"</string>
     <string name="clock_format">"Формат времени"</string>
+    <string name="at_power_on">"При включении"</string>
+    <string name="power_on_tv">"На усмотрение ТВ"</string>
+    <string name="power_on_hint">"Только после полного включения, не после режима ожидания."</string>
     <string name="close">"Закрыть"</string>
     <string name="connect_tmdb_account">"Подключить аккаунт TMDB"</string>
     <string name="connect_your_tmdb_account">"Подключите аккаунт TMDB"</string>

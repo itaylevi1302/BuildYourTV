@@ -21,6 +21,7 @@ public class HomeActivity extends Activity {
         getWindow().setBackgroundDrawable(null);
         if (wantsAllApps(getIntent())) home.showAllApps();
         openFrom(getIntent());
+        PowerOn.created(this);   // Home Settings > At power-on (#61)
     }
 
     @Override protected void onResume() {
@@ -33,10 +34,12 @@ public class HomeActivity extends Activity {
             return;
         }
         if (home != null) home.resume();
+        PowerOn.resumed(this);
         Images.trimSoon();   // Explore's caches, if it was open: Home doesn't use them
     }
 
     @Override protected void onPause() {
+        PowerOn.paused(this);
         if (home != null) home.pause();
         super.onPause();
     }
@@ -44,6 +47,7 @@ public class HomeActivity extends Activity {
     /** Home button pressed on the home screen: back to the entry state (focus on the first app, sheet closed). */
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        PowerOn.homeIntent();
         if (home != null && wantsAllApps(intent)) {   // the Apps key: opens the sheet, or closes it (#53)
             home.showAllApps();
             return;
@@ -68,11 +72,13 @@ public class HomeActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        PowerOn.destroyed(this);
         if (home != null) home.destroy();
         super.onDestroy();
     }
 
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        PowerOn.key(event);   // a key first: At power-on leaves the screen alone
         if (RemoteKeys.onKey(this, event)) return true;
         // The Apps key, unless it has a row in Remote Buttons on this TV: there the row decides, and with no action
         // the key is left to the TV (#53).

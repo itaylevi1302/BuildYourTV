@@ -99,6 +99,7 @@ logged, never guessed. [`config.example.json`](config.example.json) has them all
 | `theme` | `auto`, `light`, `dark` | `auto` is dark from sunset to sunrise. |
 | `temperature` | `auto`, `C`, `F` | |
 | `clock` | `auto`, `24h`, `12h` | |
+| `power_on` | `tv`, `home`, `live` | Settings → Home Settings → At power-on. Only after the TV starts from off, never when it wakes from standby (a TV that starts in standby after a power cut acts when the screen first comes on). `tv` (default) changes nothing; `live` opens Live TV 10 s after Home comes up, unless a key is pressed first; `home` brings Home back when another app takes the screen within 5 s of Home first showing, before any key. |
 | `forecast` | `hours`, `days` | The weather card: the next 6 hours (default) or the next 5 days. Also Home Settings → Forecast. |
 | `screensaver` | `photos`, `aurora`, `google` | `google` is Google TV's own screensaver (a Google Photos album): it needs dreamx enabled and `adb shell pm grant io.cleanyourtv.ui android.permission.WRITE_SECURE_SETTINGS`, or only the choice is saved. |
 | `weather` | `true` / `false` | The weather widget. |

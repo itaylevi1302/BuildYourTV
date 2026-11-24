@@ -32,6 +32,9 @@
     <string name="clear">"Effacer"</string>
     <string name="clock_and_aurora">"Horloge et aurore"</string>
     <string name="clock_format">"Format de l\'heure"</string>
+    <string name="at_power_on">"À l\'allumage"</string>
+    <string name="power_on_tv">"Au choix de la TV"</string>
+    <string name="power_on_hint">"Seulement après un démarrage complet, pas en sortie de veille."</string>
     <string name="close">"Fermer"</string>
     <string name="connect_tmdb_account">"Connecter le compte TMDB"</string>
     <string name="connect_your_tmdb_account">"Connectez votre compte TMDB"</string>

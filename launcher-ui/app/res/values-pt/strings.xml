@@ -38,6 +38,9 @@
     <string name="clear">"Limpar"</string>
     <string name="clock_and_aurora">"Relógio e aurora"</string>
     <string name="clock_format">"Formato do relógio"</string>
+    <string name="at_power_on">"Ao ligar"</string>
+    <string name="power_on_tv">"Escolha da TV"</string>
+    <string name="power_on_hint">"Só depois de ligar do zero, não ao sair do modo de espera."</string>
     <string name="close">"Sair"</string>
     <string name="connect_tmdb_account">"Conectar conta TMDB"</string>
     <string name="connect_your_tmdb_account">"Conectar sua conta TMDB"</string>

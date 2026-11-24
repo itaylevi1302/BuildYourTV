@@ -39,6 +39,9 @@
     <string name="clear">"Clear"</string>
     <string name="clock_and_aurora">"Clock and aurora"</string>
     <string name="clock_format">"Clock format"</string>
+    <string name="at_power_on">"At power-on"</string>
+    <string name="power_on_tv">"TV\'s choice"</string>
+    <string name="power_on_hint">"Only after a full start, not from standby."</string>
     <string name="close">"Close"</string>
     <string name="connect_tmdb_account">"Connect TMDB account"</string>
     <string name="connect_your_tmdb_account">"Connect your TMDB account"</string>

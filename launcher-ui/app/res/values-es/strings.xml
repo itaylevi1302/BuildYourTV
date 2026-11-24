@@ -8,6 +8,9 @@
     <string name="city">"Ciudad"</string>
     <string name="clock_and_aurora">"Reloj y aurora"</string>
     <string name="clock_format">"Formato del reloj"</string>
+    <string name="at_power_on">"Al encender"</string>
+    <string name="power_on_tv">"Lo que elija la TV"</string>
+    <string name="power_on_hint">"Solo tras un encendido completo, no al salir del modo de espera."</string>
     <string name="couldnt_open_prefix">"No se pudo abrir "</string>
     <string name="couldnt_search_now_prefix">"No se pudo buscar ahora: "</string>
     <string name="crypto">"Cripto"</string>

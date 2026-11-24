@@ -32,6 +32,9 @@
     <string name="clear">"Temizle"</string>
     <string name="clock_and_aurora">"Saat ve Aurora"</string>
     <string name="clock_format">"Saat biçimi"</string>
+    <string name="at_power_on">"Açılışta"</string>
+    <string name="power_on_tv">"TV\'nin seçimi"</string>
+    <string name="power_on_hint">"Yalnızca tam açılıştan sonra, bekleme modundan değil."</string>
     <string name="close">"Kapat"</string>
     <string name="connect_tmdb_account">"TMDB hesabını bağla"</string>
     <string name="connect_your_tmdb_account">"TMDB hesabınızı bağlayın"</string>

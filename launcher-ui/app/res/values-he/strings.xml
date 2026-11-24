@@ -33,6 +33,9 @@
     <string name="clear">"ניקוי"</string>
     <string name="clock_and_aurora">"שעון וזוהר צפוני"</string>
     <string name="clock_format">"תצוגת שעון"</string>
+    <string name="at_power_on">"בהדלקה"</string>
+    <string name="power_on_tv">"לפי הטלוויזיה"</string>
+    <string name="power_on_hint">"רק אחרי הפעלה מלאה, לא ביציאה ממצב המתנה."</string>
     <string name="close">"סגירה"</string>
     <string name="connect_tmdb_account">"חיבור חשבון TMDB"</string>
     <string name="connect_your_tmdb_account">"חיבור חשבון ה־TMDB שלך"</string>
