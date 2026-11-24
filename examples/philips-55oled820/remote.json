@@ -1,0 +1,49 @@
+{
+  "remote": "Philips Google TV remote (TA5)",
+  "device": "Philips 55OLED820/12, Philips Google TV TA5 (PH1M_WW_9972, MediaTek), Google TV 14",
+  "note": "Key codes from Free My TV (Prefs.java, #437), TP Vision's own key codes read on a 65OLED910, also a Philips Google TV TA5; untested on a TV there and here. org.droidtv.GlobalKey hands the gear and the Apps button to launcherx, so they do nothing once it is off (examples/philips-google-tv-ta1/README.md logs them as scancodes 141 and 801). Free My TV's Apps button opens its All Apps; here it starts on Home. Netflix, YouTube and Prime Video keep working through GlobalKey and start empty, as does Guide. On this board a bound key filter costs the held-volume ramp (one step per press): see the same README.",
+  "buttons": [
+    {
+      "name": "Settings (gear)",
+      "key": 811,
+      "label": "GLOBAL_FUNCTION",
+      "kind": "configurable",
+      "default": "settings"
+    },
+    {
+      "name": "Apps",
+      "key": 816,
+      "label": "LOCAL_OTT1",
+      "kind": "configurable",
+      "default": "home"
+    },
+    {
+      "name": "Guide",
+      "key": 172,
+      "label": "GUIDE",
+      "kind": "configurable",
+      "default": ""
+    },
+    {
+      "name": "Netflix",
+      "key": 475,
+      "label": "NETFLIX",
+      "kind": "configurable",
+      "default": ""
+    },
+    {
+      "name": "YouTube",
+      "key": 781,
+      "label": "YOUTUBE",
+      "kind": "configurable",
+      "default": ""
+    },
+    {
+      "name": "Prime Video",
+      "key": 788,
+      "label": "AMAZON_PRIME_VIDEO",
+      "kind": "configurable",
+      "default": ""
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "remote": "onn remote (Vendor_0957_Product_0031)",
+  "device": "onn. 4K Plus Streaming (2025, coffey, Amlogic S905X5M), Google TV 14",
+  "vendor": "0957",
+  "product": "0031",
+  "note": "Key codes from Free My TV (Prefs.java, #492), read on an onn 4K Pro with the same remote layout file; this folder's debloat.txt lists the same file and codes. Not yet tried with this launcher. vendor and product make only this remote's buttons ours: another onn remote (the 2023 box's Vendor_0957_Product_0005), a gamepad or a keyboard keep their BUTTON_3 to BUTTON_10. YouTube and Free TV (FEATURED_APP_1, 297) go to launcherx and do nothing once it is off, so YouTube starts on YouTube; Netflix, Disney+ and Paramount+ keep working through com.droidlogic's GlobalKeyReceiver and start empty.",
+  "buttons": [
+    {
+      "name": "YouTube",
+      "key": 190,
+      "label": "BUTTON_3",
+      "kind": "configurable",
+      "default": "com.google.android.youtube.tv"
+    },
+    {
+      "name": "Netflix",
+      "key": 191,
+      "label": "BUTTON_4",
+      "kind": "configurable",
+      "default": ""
+    },
+    {
+      "name": "Disney+",
+      "key": 196,
+      "label": "BUTTON_9",
+      "kind": "configurable",
+      "default": ""
+    },
+    {
+      "name": "Paramount+",
+      "key": 197,
+      "label": "BUTTON_10",
+      "kind": "configurable",
+      "default": ""
+    },
+    {
+      "name": "Free TV",
+      "key": 297,
+      "label": "FEATURED_APP_1",
+      "kind": "configurable",
+      "default": ""
+    }
+  ]
+}
