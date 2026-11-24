@@ -104,6 +104,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private final Recs recs;
     private final Click click;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    /** The background follows the focused pick once it has been there this long (see bgFollow). */
+    private static final long BG_FOLLOW_MS = 500;
     private final SharedPreferences ui;
     private final TvInputManager tvInputs;
     private final Spoken spoken = new Spoken(this, new Spoken.Source() {
@@ -454,6 +456,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     void pause() {
         if (!running) return;
         running = false;
+        handler.removeCallbacks(bgFollow);
         cancelReorder(true);
         handler.removeCallbacks(holdStart);
         okHeld = holdArmed = false;
@@ -479,6 +482,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         wake();
         cancelReorder(!animated);
         zone = Z_SHELF;
+        cardIndex = 0;      // with tab 0 and page 0 below: the first pick and its background
         shelfIndex = 0;
         sheetOpen = false;
         drawerOpen = false;
@@ -494,9 +498,9 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             updatePicks();
         }
         if (tab != 0) selectTab(0);
-        else if (page != 0) {
+        else {
             page = 0;
-            updateCards();
+            updateCards();      // also when already on page 0: cardIndex went back to 0, so does the background
         }
         retarget(!animated);
         motionDirty = true;
@@ -877,6 +881,22 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         spoken.focusMoved();
         return true;
     }
+
+    /**
+     * The background is the focused pick's, as on Netflix and Prime Video: once the focus has rested on a card
+     * BG_FOLLOW_MS, so a quick run along the cards fades once. Its backdrop is already in memory: updateCards builds
+     * this page's (the cards draw from it), so nothing is decoded here. Leaving the cards keeps the last one's.
+     */
+    private final Runnable bgFollow = new Runnable() {
+        @Override public void run() {
+            if (!running || sheetOpen || drawerOpen || zone != Z_CARDS || cards.isEmpty()) return;
+            Backdrop b = recs.backdrop(cards.get(Math.min(cardIndex, cards.size() - 1)));
+            // Not built yet (updateCards shows it when it is), or already there: nothing to fade, no frame to draw
+            if (b == null || b == bgTo) return;
+            showBackdrop(b);
+            wake();
+        }
+    };
 
     /** Swaps the background with a cross-fade (from one image to another, from the gradient to an image, or back). */
     private void showBackdrop(Backdrop b) {
@@ -1801,6 +1821,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         if (snap) heroFocus.snap(heroFocus.target);
         boolean topChanged = aim(topFocus, !sheetOpen && zone == Z_TOP ? topIndex : -1, snap);
         heroChanged |= aim(cardFocus, !sheetOpen && zone == Z_CARDS ? cardIndex : -1, snap) | topChanged;
+        handler.removeCallbacks(bgFollow);
+        if (!sheetOpen && zone == Z_CARDS && !cards.isEmpty()) handler.postDelayed(bgFollow, BG_FOLLOW_MS);
         statusChanged |= topChanged;
         tilesDirty |= snap || tilesChanged;
         statusDirty |= snap || statusChanged;
@@ -2800,7 +2822,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         heroDirty = statusDirty = true;
     }
 
-    /** The three cards of the current page and the background from the first one; the pages around it get ready. */
+    /** The three cards of the current page and the background from the focused one; the pages around it get ready. */
     private void updateCards() {
         // Where we are in the tab: a new list (every hour, or details that drop a pick) keeps the tab and the page.
         int inTab = Math.max(0, page - tabFirst[tab]);
@@ -2835,7 +2857,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             near.addAll(cards);
             recs.details(near);
         }
-        Backdrop b = cards.isEmpty() ? null : recs.backdrop(cards.get(0));
+        Backdrop b = cards.isEmpty() ? null : recs.backdrop(cards.get(Math.min(cardIndex, cards.size() - 1)));
         if (cards.isEmpty() || b != null) showBackdrop(b);
         heroDirty = true;
         spoken.focusMoved();    // new picks under the focused card
@@ -2870,8 +2892,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     }
 
     /**
-     * Background: the first card's photo, heavily blurred and almost white; without it, a light gradient. At night, the
-     * same photo almost black (or a dark gradient), drawn on top during the transition.
+     * Background: the focused card's photo, heavily blurred and almost white; without it, a light gradient. At night,
+     * the same photo almost black (or a dark gradient), drawn on top during the transition.
      */
     private void drawLightSky(Canvas c) {
         long up = SystemClock.uptimeMillis();
@@ -3089,12 +3111,14 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 break;
             case Z_CARDS:
                 if (Ui.he) dx = -dx;   // mirrored cards (layoutLight): ← goes on to the next card, further left
+                // The index first: turnPage's updateCards shows the focused card's background, not the old index's
                 if (dx > 0 && cardIndex == cards.size() - 1 && tabFirst[3] > 1) {
-                    turnPage(1);
                     cardIndex = 0;
+                    turnPage(1);
                 } else if (dx < 0 && cardIndex == 0 && tabFirst[3] > 1) {
+                    cardIndex = 2;      // a page's last card; updateCards keeps it within a shorter page
                     turnPage(-1);
-                    cardIndex = Math.max(0, cards.size() - 1);
+                    cardIndex = Math.max(0, Math.min(cardIndex, cards.size() - 1));
                 } else if (dx != 0) {
                     int next = Math.max(0, Math.min(cards.size() - 1, cardIndex + dx));
                     if (next == cardIndex) return true;
