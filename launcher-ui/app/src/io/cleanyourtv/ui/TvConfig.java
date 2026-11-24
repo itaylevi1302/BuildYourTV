@@ -144,6 +144,7 @@ final class TvConfig {
                 }
             }
             if (o.has("show_all_providers")) Prefs.setShowAllProviders(o.getBoolean("show_all_providers"));
+            if (o.has("app_store_button")) Prefs.setStoreButton(o.getBoolean("app_store_button"));
             AppLog.w("config.json applied");
             return true;
         } catch (Exception e) {

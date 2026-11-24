@@ -230,6 +230,58 @@ final class HomeApps {
         return shortcut(kind, key, label, symbol);
     }
 
+    // MARK: - Round top buttons (Explore, HDMI Inputs, Settings, and the App Store once added)
+
+    static final String TOP_EXPLORE = "explore", TOP_INPUTS = "inputs", TOP_SETTINGS = "settings", TOP_STORE = "store";
+    /** Every round top button, in the default order: the App Store one comes last, and only once added. */
+    static final List<String> TOP_ALL = Collections.unmodifiableList(
+            java.util.Arrays.asList(TOP_EXPLORE, TOP_INPUTS, TOP_SETTINGS, TOP_STORE));
+    static final int MAX_TOP = TOP_ALL.size();
+
+    /** Every top button's key in the saved order (a hidden one keeps its slot); keys never saved go last. */
+    static List<String> topButtonKeys() {
+        List<String> saved = Prefs.topButtons(), keys = new ArrayList<>();
+        if (saved != null) for (String key : saved) if (TOP_ALL.contains(key) && !keys.contains(key)) keys.add(key);
+        for (String key : TOP_ALL) if (!keys.contains(key)) keys.add(key);
+        return keys;
+    }
+
+    /** The round top buttons to draw. A null context leaves the App Store out until reload() looks for a store. */
+    static List<Item> topButtons(Context c) {
+        List<Item> items = new ArrayList<>();
+        for (String key : topButtonKeys()) {
+            switch (key) {
+                case TOP_EXPLORE:
+                    items.add(action(EXPLORE, key, Strings.get(R.string.explore_movies_and_shows), "play"));
+                    break;
+                case TOP_INPUTS:
+                    items.add(action(INPUTS, key, Strings.get(R.string.hdmi_inputs), "hdmi"));
+                    break;
+                case TOP_SETTINGS:
+                    items.add(action(SETTINGS, key, Strings.get(R.string.settings_2), "settings"));
+                    break;
+                default: {   // TOP_STORE
+                    String pkg = c == null || !Prefs.storeButton() ? null : storePackage(c);
+                    if (pkg == null) break;   // off, or no store on this TV: the saved slot stays, no dead button
+                    Item it = action(APP, key, Strings.get(R.string.app_store), "store");
+                    it.pkg = pkg;
+                    items.add(it);
+                }
+            }
+        }
+        return items;
+    }
+
+    /** Google Play, or Amazon Appstore (tried first on Fire TV): only a store the TV can open; no web page, nothing installed. */
+    static String storePackage(Context c) {
+        PackageManager pm = c.getPackageManager();
+        boolean amazon = "Amazon".equalsIgnoreCase(android.os.Build.MANUFACTURER);
+        String first = amazon ? "com.amazon.venezia" : "com.android.vending";
+        String second = amazon ? "com.android.vending" : "com.amazon.venezia";
+        if (launchIntent(pm, first) != null) return first;
+        return launchIntent(pm, second) != null ? second : null;
+    }
+
     /** The app's settings, in the corner of the home screen. */
     static Item settings() {
         return shortcut(SETTINGS, "settings", Strings.get(R.string.settings), "settings");

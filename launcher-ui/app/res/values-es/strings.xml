@@ -21,6 +21,9 @@
     <string name="for_you">"Para ti"</string>
     <string name="go_to_settings">"Ir a Ajustes"</string>
     <string name="hdmi_inputs">"Entradas HDMI"</string>
+    <string name="app_store">"Tienda de apps"</string>
+    <string name="add_app_store_button">"Añadir el botón de la tienda"</string>
+    <string name="remove_app_store_button">"Quitar el botón de la tienda"</string>
     <string name="high_prefix">". Máxima "</string>
     <string name="home_settings">"Ajustes de inicio"</string>
     <string name="home_tab_explore">"Explorar"</string>

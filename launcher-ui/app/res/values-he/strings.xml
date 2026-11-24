@@ -90,6 +90,9 @@
     <string name="go_to_settings">"להגדרות"</string>
     <string name="google_photos">"תמונות Google"</string>
     <string name="hdmi_inputs">"כניסות HDMI"</string>
+    <string name="app_store">"חנות אפליקציות"</string>
+    <string name="add_app_store_button">"הוספת כפתור חנות האפליקציות"</string>
+    <string name="remove_app_store_button">"הסרת כפתור חנות האפליקציות"</string>
     <string name="hidden">"מוסתר"</string>
     <string name="hide">"להסתיר את „"</string>
     <string name="hide_2">"הסתרה"</string>

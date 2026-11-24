@@ -20,6 +20,9 @@
     <string name="for_you">"Für dich"</string>
     <string name="go_to_settings">"Zu den Einstellungen"</string>
     <string name="hdmi_inputs">"HDMI-Eingänge"</string>
+    <string name="app_store">"App Store"</string>
+    <string name="add_app_store_button">"App-Store-Taste hinzufügen"</string>
+    <string name="remove_app_store_button">"App-Store-Taste entfernen"</string>
     <string name="high_prefix">". Höchstwert "</string>
     <string name="home_settings">"Start-Einstellungen"</string>
     <string name="home_tab_explore">"Entdecken"</string>

@@ -121,6 +121,9 @@
     <string name="go_to_settings">"Go to Settings"</string>
     <string name="google_photos">"Google Photos"</string>
     <string name="hdmi_inputs">"HDMI Inputs"</string>
+    <string name="app_store">"App Store"</string>
+    <string name="add_app_store_button">"Add the App Store button"</string>
+    <string name="remove_app_store_button">"Remove the App Store button"</string>
     <string name="hidden">"Hidden"</string>
     <string name="hide">"Hide “"</string>
     <string name="hide_2">"Hide"</string>

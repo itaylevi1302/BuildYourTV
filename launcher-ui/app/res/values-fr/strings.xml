@@ -85,6 +85,9 @@
     <string name="getting_ready">"Préparation…"</string>
     <string name="go_to_settings">"Aller aux Réglages"</string>
     <string name="hdmi_inputs">"Entrées HDMI"</string>
+    <string name="app_store">"Boutique d\'applis"</string>
+    <string name="add_app_store_button">"Ajouter le bouton Boutique"</string>
+    <string name="remove_app_store_button">"Retirer le bouton Boutique"</string>
     <string name="hidden">"Masqué"</string>
     <string name="hide">"Masquer « "</string>
     <string name="hide_2">"Masquer"</string>
