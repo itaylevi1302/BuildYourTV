@@ -8,6 +8,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Granted from ADB (pm grant): lets the screensaver picker switch between this screensaver and Google's. -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <!-- Granted from ADB (pm grant; build-and-install.sh WATCH_NEXT=1) and read only while Home Settings → Top of the
+         screen is Continue Watching: what apps note as half-watched in Android TV's Watch Next list (WatchNext). -->
+    <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
 
     <!-- Android 11+: without this list the app can't "see" the other apps (getLeanbackLaunchIntentForPackage
          returns null). The shelf and streaming apps, the live TV apps and, through the <intent>, every TV app
@@ -55,6 +58,8 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="content" android:host="android.media.tv" />
         </intent>
+        <!-- Android TV's own lists (TvProvider), for Continue Watching's Watch Next (WatchNext). -->
+        <provider android:authorities="android.media.tv" />
         <!-- The TV's inputs panel (RemoteKeys.inputsAnswered): unseen, the Input key would open our drawer over it. -->
         <intent>
             <action android:name="com.android.tv.action.VIEW_INPUTS" />

@@ -261,6 +261,12 @@
     <string name="the_link_expired_go_back_and_open_it_again">"Le lien a expiré. Revenez en arrière et rouvrez-le."</string>
     <string name="the_tvs_own">"Celui de la TV"</string>
     <string name="theme">"Thème"</string>
+    <string name="top_of_screen">"Haut de l\'écran"</string>
+    <string name="continue_watching">"Reprendre"</string>
+    <string name="watch_nothing">"Rien en cours dans vos applis."</string>
+    <string name="watch_needs_permission">"Autorisez-le depuis un ordinateur : %1$s"</string>
+    <string name="watch_time_left">"reste %1$s"</string>
+    <string name="watch_episode">"S%1$s É%2$s"</string>
     <string name="this_afternoon">"CET APRÈS-MIDI"</string>
     <string name="this_morning">"CE MATIN"</string>
     <string name="tmdb_attribution">"Ce produit utilise l\'API TMDB mais n\'est ni approuvé ni certifié par TMDB."</string>

@@ -36,6 +36,9 @@ Free My TV. This project is for people who want both and a full Explore.
 
 **Home screen**
 - "For You" with TMDB picks on your services, and Explore, Movies and Shows tabs.
+- Optional Continue Watching in their place (Home Settings → Top of the screen): what your apps left half-way in
+  Android TV's Watch Next list, with progress; OK resumes it. It needs `READ_TV_LISTINGS`, granted from the computer
+  (see [launcher-ui/README.md](launcher-ui/README.md#continue-watching-optional)).
 - An app shelf with official logos; holding OK on an app drops a menu from its card: move, logo and color (a PNG's URL
   and a background color, or through `config.json`), the app's Android settings (force stop, clear cache) and close.
 - Round buttons at the top right (Explore, HDMI Inputs, Settings); holding OK on one drops a menu: move it (← →, OK

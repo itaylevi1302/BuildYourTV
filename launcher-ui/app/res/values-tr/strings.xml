@@ -289,6 +289,12 @@
     <string name="the_link_expired_go_back_and_open_it_again">"Bağlantının süresi doldu. Geri dönüp yeniden açın."</string>
     <string name="the_tvs_own">"TV Varsayılanı"</string>
     <string name="theme">"Tema"</string>
+    <string name="top_of_screen">"Ekranın üstü"</string>
+    <string name="continue_watching">"İzlemeye devam et"</string>
+    <string name="watch_nothing">"Uygulamalarınızda yarım kalan bir şey yok."</string>
+    <string name="watch_needs_permission">"Bilgisayardan izin verin: %1$s"</string>
+    <string name="watch_time_left">"%1$s kaldı"</string>
+    <string name="watch_episode">"S%1$s B%2$s"</string>
     <string name="this_afternoon">"ÖĞLEDEN SONRA"</string>
     <string name="this_morning">"BU SABAH"</string>
     <string name="tmdb_attribution">"Bu ürün TMDB API\'sini kullanır ancak TMDB tarafından onaylanmamıştır."</string>

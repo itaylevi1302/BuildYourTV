@@ -79,7 +79,7 @@ class InputsKeyTest(unittest.TestCase):
         self.assertIn('<action android:name="com.android.tv.action.VIEW_INPUTS" />', queries)
         self.assertEqual(sorted(re.findall(r'<uses-permission android:name="([^"]+)"', text)),
                          ["android.permission.ACCESS_NETWORK_STATE", "android.permission.INTERNET",
-                          "android.permission.WRITE_SECURE_SETTINGS"])
+                          "android.permission.READ_TV_LISTINGS", "android.permission.WRITE_SECURE_SETTINGS"])
 
     def test_documented(self):
         readme = (ROOT / "launcher-ui/README.md").read_text(encoding="utf-8")

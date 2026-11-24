@@ -73,6 +73,20 @@ final class Prefs {
 
     static void setTheme(String v) { put("theme", v); }
 
+    static final String TOP_PICKS = "picks", TOP_CONTINUE = "continue";
+
+    /**
+     * What the top of the home screen shows: "picks" (TMDB's, the default) or "continue" (Continue Watching, from
+     * Android TV's Watch Next list; it needs READ_TV_LISTINGS, granted from ADB).
+     */
+    static String topOfScreen() {
+        return TOP_CONTINUE.equals(sp().getString("topOfScreen", TOP_PICKS)) ? TOP_CONTINUE : TOP_PICKS;
+    }
+
+    static void setTopOfScreen(String v) { put("topOfScreen", TOP_CONTINUE.equals(v) ? TOP_CONTINUE : TOP_PICKS); }
+
+    static boolean continueWatching() { return TOP_CONTINUE.equals(topOfScreen()); }
+
     /**
      * The screensaver: "photos" (the picks, as before), "aurora" (the clock over the sky, without photos) or "google"
      * (Google TV's own screensaver, which can show a Google Photos album).

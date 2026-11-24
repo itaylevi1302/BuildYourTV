@@ -308,6 +308,12 @@
     <string name="the_link_expired_go_back_and_open_it_again">"O link expirou. Volte e abra de novo."</string>
     <string name="the_tvs_own">"Padrão da TV"</string>
     <string name="theme">"Tema"</string>
+    <string name="top_of_screen">"Topo da tela"</string>
+    <string name="continue_watching">"Continuar assistindo"</string>
+    <string name="watch_nothing">"Nada pela metade nos seus apps."</string>
+    <string name="watch_needs_permission">"Permita pelo computador: %1$s"</string>
+    <string name="watch_time_left">"faltam %1$s"</string>
+    <string name="watch_episode">"T%1$s E%2$s"</string>
     <string name="this_afternoon">"PARA ESTA TARDE"</string>
     <string name="this_morning">"PARA ESTA MANHÃ"</string>
     <string name="tmdb_attribution">"Usa a API do TMDB, sem endosso ou certificação do TMDB."</string>

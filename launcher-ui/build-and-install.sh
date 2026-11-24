@@ -5,6 +5,7 @@
 #   TV_HOST=192.168.1.50 launcher-ui/build-and-install.sh                                  # build here, then install
 #   TV_HOST=192.168.1.50 APK=~/Downloads/CleanYourTV-UI.apk launcher-ui/build-and-install.sh  # a release APK, no build
 #   ... CONFIG=my-config.json ...                                       # and push this TV's config.json at the end
+#   ... WATCH_NEXT=1 ...                                                # let Continue Watching read Watch Next
 set -euo pipefail
 # APK and CONFIG are paths as the caller typed them: resolve them before moving into launcher-ui/.
 for v in APK CONFIG; do
@@ -133,6 +134,21 @@ if [ "${SCREENSAVER:-1}" = 1 ]; then
     *) echo "Screensaver: $DREAM (was ${WAS:-unset}; put it back with: tools/tv.py 'settings put secure screensaver_components $WAS')" ;;
   esac
 fi
+
+# Continue Watching (Home Settings → Top of the screen) reads Android TV's Watch Next list, which needs READ_TV_LISTINGS.
+# Only with WATCH_NEXT=1 (WATCH_NEXT=0 takes it back; a reinstall keeps either). A TV that refuses only gets a warning:
+# the home screen then says how to grant it.
+case "${WATCH_NEXT:-}" in
+  1)
+    G=$(tv "pm grant $PKG android.permission.READ_TV_LISTINGS 2>&1; echo rc=\$?" 2>&1 | tr -d '\r' || true)
+    case "$G" in
+      *rc=0*) echo "Continue Watching: READ_TV_LISTINGS granted" ;;
+      *) echo "WARNING: the TV did not grant READ_TV_LISTINGS (${G:-no answer}); Continue Watching stays empty." >&2 ;;
+    esac ;;
+  0)
+    tv "pm revoke $PKG android.permission.READ_TV_LISTINGS" >/dev/null 2>&1 || true
+    echo "Continue Watching: READ_TV_LISTINGS revoked" ;;
+esac
 
 # The remote's app buttons from inside any app, with KEY_SERVICE=1 (once: a reinstall keeps them on). Replacing the
 # APK unbinds the service while it stays listed, and Android binds it again only when the list changes, so a listed

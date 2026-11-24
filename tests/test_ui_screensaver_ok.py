@@ -165,7 +165,8 @@ class ScreensaverOkTest(unittest.TestCase):
         text = (APP / "AndroidManifest.xml").read_text(encoding="utf-8")
         perms = set(re.findall(r'<uses-permission android:name="([\w.]+)"', text))
         self.assertEqual(perms, {"android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE",
-                                 "android.permission.WRITE_SECURE_SETTINGS"})
+                                 "android.permission.WRITE_SECURE_SETTINGS",
+                                 "android.permission.READ_TV_LISTINGS"})   # READ_TV_LISTINGS: Continue Watching (#66), granted only from ADB
 
 
 if __name__ == "__main__":

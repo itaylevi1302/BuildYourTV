@@ -81,6 +81,25 @@ TV_HOST=192.168.1.50 launcher-ui/config.sh --file tomato.png      # a logo for a
 TV_HOST=192.168.1.50 launcher-ui/config.sh --reset
 ```
 
+## Continue Watching (optional)
+
+Home Settings → **Top of the screen** → *Continue Watching* shows, in place of the picks, what your apps left half-way in
+Android TV's own Watch Next list (and in the "Continue Watching" rows some apps publish instead): up to 6 titles, 2 per
+app, newest first, with how far you got. OK resumes it in its app (the app's own link; the app itself if that fails).
+It's off until you pick it, and the list is read only while it's picked, each time the home screen comes back: nothing
+runs in the background. To read other apps' entries Android asks for `READ_TV_LISTINGS`, which only ADB can grant:
+
+```bash
+TV_HOST=192.168.1.50 WATCH_NEXT=1 launcher-ui/build-and-install.sh      # with the clone (WATCH_NEXT=0 takes it back)
+adb shell pm grant io.cleanyourtv.ui android.permission.READ_TV_LISTINGS     # or by hand
+adb shell pm revoke io.cleanyourtv.ui android.permission.READ_TV_LISTINGS    # to take it back
+```
+
+What it reads, from the apps' entries only: the app, the title, season and episode, length and position, when it was
+last watched, the link that resumes it and the picture's address. It never leaves the TV. Pictures come only from the TV
+(`content://`, `android.resource://`); a title without one shows its app's banner. Without the permission the home
+screen says how to give it.
+
 ## config.json
 
 Each new file is applied once, the next time Home opens, as if those choices were made on the TV; what is changed on
@@ -100,6 +119,7 @@ logged, never guessed. [`config.example.json`](config.example.json) has them all
 | `screensaver_ok` | `true` / `false` | OK on the screensaver opens the title on screen in its app (straight to the title when its link is known, else the app's home); any other key still wakes it, and the caption says so. Off by default: the screensaver then wakes on any key, shows no hint and looks up no links. Also Home Settings, OK on the screensaver opens the title. |
 | `city` | `{ "name", "latitude", "longitude" }` | The weather and the sunset that turns the theme dark. Without a city there is no weather. |
 | `theme` | `auto`, `light`, `dark` | `auto` is dark from sunset to sunrise. |
+| `top_of_screen` | `picks`, `continue` | The top of the home screen: TMDB's picks (default) or Continue Watching, which needs `READ_TV_LISTINGS` (see Continue Watching above). Also Home Settings → Top of the screen. |
 | `temperature` | `auto`, `C`, `F` | |
 | `clock` | `auto`, `24h`, `12h` | |
 | `power_on` | `tv`, `home`, `live` | Settings → Home Settings → At power-on. Only after the TV starts from off, never when it wakes from standby (a TV that starts in standby after a power cut acts when the screen first comes on). `tv` (default) changes nothing; `live` opens Live TV 10 s after Home comes up, unless a key is pressed first; `home` brings Home back when another app takes the screen within 5 s of Home first showing, before any key. |
