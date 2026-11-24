@@ -132,6 +132,12 @@ public class SettingsActivity extends Activity {
         // The shelf editor: the apps it can hold (selected ones first, in order) and the selection.
         private final List<String[]> shelfRows = new ArrayList<>();
         private final List<String> shelfOrder = new ArrayList<>();
+        // The same editor on the drawer's inputs (Settings > Inputs, #60): Live TV and every HDMI port, shown or hidden.
+        private boolean editingInputs, liveRow;
+        /** The inputs editor's first row, where a remote button runs "live": what that button opens. */
+        private static final String LIVE_ROW = "#live-button";
+        private String liveButtonText;   // that row's value, read again after a change (the TV's inputs are a system call)
+        private int liveButtonAt;
         private int pickFor, pickCurrent, pickScroll, keysScroll;   // pickFor: the remote button (index + 1)
         private static final int PICK_CITY = 0;
         private final List<String[]> cities = new ArrayList<>();
@@ -216,8 +222,9 @@ public class SettingsActivity extends Activity {
                 case MAIN: {
                     String[] names = {Strings.get(R.string.screensaver_preview) + ", " + styleName(Prefs.screensaverStyle()),
                             Strings.get(R.string.home_settings),
-                            Strings.get(R.string.shelf), Strings.get(R.string.remote_buttons), Strings.get(R.string.services),
-                            Strings.get(R.string.tmdb_account_prefix_2) + account(), Strings.get(R.string.tv_settings)};
+                            Strings.get(R.string.shelf), Strings.get(R.string.inputs), Strings.get(R.string.remote_buttons),
+                            Strings.get(R.string.services), Strings.get(R.string.tmdb_account_prefix_2) + account(),
+                            Strings.get(R.string.tv_settings)};
                     return row < names.length ? names[row] : "";
                 }
                 case HOME_SETTINGS: {
@@ -240,6 +247,11 @@ public class SettingsActivity extends Activity {
                     if (at >= shelfRows.size()) return "";
                     String[] app = shelfRows.get(at);
                     int place = shelfOrder.indexOf(app[0]);
+                    if (LIVE_ROW.equals(app[0])) return app[1] + ", " + liveButtonValue();
+                    if (editingInputs) {
+                        return app[1] + ", " + (place >= 0 ? Strings.get(R.string.in_the_inputs_place_prefix) + (place + 1)
+                                : Strings.get(R.string.not_in_the_inputs));
+                    }
                     return app[1] + ", " + (place >= 0 ? Strings.get(R.string.on_the_shelf_place_prefix) + (place + 1)
                             : Strings.get(R.string.not_on_the_shelf));
                 }
@@ -273,6 +285,7 @@ public class SettingsActivity extends Activity {
         void resume() {
             if (running) return;
             running = true;
+            liveButtonText = null;   // the device on a port may have another name by now
             lastNanos = 0;
             // Once here, so the first frame already shows it (as before); then every 2 s off the UI thread.
             showRecs(Recs.status(getContext()));
@@ -330,7 +343,7 @@ public class SettingsActivity extends Activity {
 
         private int rowCount() {
             switch (screen) {
-                case MAIN: return 7;
+                case MAIN: return 8;
                 case HOME_SETTINGS: return settingLabels().length;
                 case PICKER: return Math.min(PICK_VISIBLE, pickLabels.size());
                 case SHELF_EDIT: return Math.min(PICK_VISIBLE, shelfRows.size());
@@ -375,8 +388,8 @@ public class SettingsActivity extends Activity {
 
         private void drawMain(Canvas c) {
             String[] labels = {Strings.get(R.string.screensaver), Strings.get(R.string.home_settings),
-                    Strings.get(R.string.shelf), Strings.get(R.string.remote_buttons), Strings.get(R.string.services),
-                    Strings.get(R.string.tmdb_account), Strings.get(R.string.tv_settings)};
+                    Strings.get(R.string.shelf), Strings.get(R.string.inputs), Strings.get(R.string.remote_buttons),
+                    Strings.get(R.string.services), Strings.get(R.string.tmdb_account), Strings.get(R.string.tv_settings)};
             for (int i = 0; i < labels.length; i++) {
                 float y = (LIST_TOP + i * (ROW_H + ROW_GAP)) * k;
                 rowRect.set(LIST_X * k, y, LIST_R * k, y + ROW_H * k);
@@ -385,11 +398,11 @@ public class SettingsActivity extends Activity {
                 float base = rowRect.centerY() + Ui.halfCap(rowLabel);
                 c.drawText(labels[i], rowRect.left + 30 * k, base, rowLabel);
                 float right = rowRect.right - 30 * k;
-                if (i == 0 || i == 5) {
+                if (i == 0 || i == 6) {   // 6: TMDB account
                     rowValue.setColor(blend(0x8CFFFFFF, 0x8C1C1C1E, f));
                     // The screensaver's style: ← → change it (shown while focused), OK shows it.
                     String style = styleName(Prefs.screensaverStyle());
-                    c.drawText(i == 5 ? account() : f > 0.5f ? "‹  " + style + "  ›" : style, right, base, rowValue);
+                    c.drawText(i == 6 ? account() : f > 0.5f ? "‹  " + style + "  ›" : style, right, base, rowValue);
                 } else {
                     float cw = Symbols.width(getContext(), "chevron_right", 22 * k);
                     Symbols.draw(getContext(), c, "chevron_right", right - cw / 2, rowRect.centerY(), 22 * k, blend(0x66FFFFFF, 0x991C1C1E, f));
@@ -501,7 +514,7 @@ public class SettingsActivity extends Activity {
                     }
                     return true;
                 case KeyEvent.KEYCODE_MENU:
-                    if (screen != SHELF_EDIT) return false;
+                    if (screen != SHELF_EDIT || editingInputs) return false;   // a tile's logo and colour: apps only
                     if (!down && !shelfRows.isEmpty()) customizeTile(shelfRows.get(pickScroll + focus));
                     return true;
                 case KeyEvent.KEYCODE_BACK:
@@ -517,7 +530,8 @@ public class SettingsActivity extends Activity {
                                 focus = pickFor - 1 - keysScroll;
                                 screen = REMOTE_KEYS;
                             } else {
-                                focus = screen == HOME_SETTINGS ? 1 : screen == SHELF_EDIT ? 2 : screen == REMOTE_KEYS ? 3 : 0;
+                                focus = screen == HOME_SETTINGS ? 1 : screen == SHELF_EDIT ? (editingInputs ? 3 : 2)
+                                        : screen == REMOTE_KEYS ? 4 : 0;
                                 screen = MAIN;
                             }
                         }
@@ -773,6 +787,7 @@ public class SettingsActivity extends Activity {
         // MARK: - Shelf editor
 
         private void openShelfEditor() {
+            editingInputs = false;
             shelfOrder.clear();
             shelfOrder.addAll(HomeApps.shelfPackages(getContext()));
             rebuildShelfRows(HomeApps.shelfCandidates(getContext()));
@@ -781,13 +796,35 @@ public class SettingsActivity extends Activity {
             screen = SHELF_EDIT;
         }
 
-        /** Selected apps first, in shelf order, then the rest in the order they came. */
+        /**
+         * Settings > Inputs (#60; Free My TV 9ee0103): the shelf editor on the drawer's inputs, Live TV among them. OK
+         * shows or hides one, ← → move it. First, where a remote button runs "live", the Live TV button's row.
+         */
+        private void openInputsEditor() {
+            editingInputs = true;
+            liveRow = !Prefs.liveButton().isEmpty() || remoteOpensLive();
+            shelfOrder.clear();
+            for (HomeApps.Item it : HomeApps.orderedInputs(getContext())) shelfOrder.add(it.key);
+            rebuildShelfRows(HomeApps.inputCandidates(getContext()));
+            pickScroll = 0;
+            focus = 0;
+            screen = SHELF_EDIT;
+        }
+
+        /** A remote button here runs the "live" action (remote.json's default or the person's pick). */
+        private boolean remoteOpensLive() {
+            for (RemoteKeys.Button b : RemoteKeys.buttons(getContext())) if ("live".equals(RemoteKeys.action(b))) return true;
+            return false;
+        }
+
+        /** The Live TV button's row first (inputs only), then the selected ones in order, then the rest as they came. */
         private void rebuildShelfRows(List<String[]> candidates) {
             shelfRows.clear();
+            if (editingInputs && liveRow) shelfRows.add(new String[] {LIVE_ROW, Strings.get(R.string.live_tv_button)});
             for (String pkg : shelfOrder) {
                 for (String[] cand : candidates) if (cand[0].equals(pkg)) { shelfRows.add(cand); break; }
             }
-            for (String[] cand : candidates) if (!shelfOrder.contains(cand[0])) shelfRows.add(cand);
+            for (String[] cand : candidates) if (!LIVE_ROW.equals(cand[0]) && !shelfOrder.contains(cand[0])) shelfRows.add(cand);
         }
 
         /** Same rows after a change: keeps the focus on the app that was focused. */
@@ -802,26 +839,67 @@ public class SettingsActivity extends Activity {
                 focus = i - pickScroll;
                 break;
             }
-            Prefs.setShelf(shelfOrder);
+            if (editingInputs) saveInputs(); else Prefs.setShelf(shelfOrder);
         }
 
-        /** OK: puts the app on the shelf (at the end) or takes it off. */
+        /** The order keeps the place of inputs the TV no longer lists; a hidden one stays hidden until it is shown. */
+        private void saveInputs() {
+            List<String> saved = Prefs.inputsOrder();
+            Prefs.setInputsOrder(VisibleOrder.replace(saved == null ? shelfOrder : saved, shelfOrder));
+            List<String> hidden = new ArrayList<>(Prefs.inputsHidden());
+            hidden.removeAll(shelfOrder);
+            for (String[] row : shelfRows) {
+                if (!LIVE_ROW.equals(row[0]) && !shelfOrder.contains(row[0]) && !hidden.contains(row[0])) hidden.add(row[0]);
+            }
+            Prefs.setInputsHidden(hidden);
+        }
+
+        /** OK: puts the app on the shelf (at the end) or takes it off; shows or hides an input. */
         private void toggleShelfApp() {
+            if (shelfRows.isEmpty()) return;
             String pkg = shelfRows.get(pickScroll + focus)[0];
+            if (LIVE_ROW.equals(pkg)) {
+                cycleLiveButton(1);
+                return;
+            }
             if (shelfOrder.contains(pkg)) shelfOrder.remove(pkg);
-            else if (shelfOrder.size() < HomeApps.MAX_SHELF) shelfOrder.add(pkg);
+            else if (editingInputs || shelfOrder.size() < HomeApps.MAX_SHELF) shelfOrder.add(pkg);
             else return;
             refreshShelfRows(pkg);
         }
 
-        /** ← → : moves a shelf app one place earlier or later. */
+        /** ← → : moves a shelf app or an input one place earlier or later; on the Live TV button's row, its choice. */
         private void moveShelfApp(int dir) {
+            if (shelfRows.isEmpty()) return;
             String pkg = shelfRows.get(pickScroll + focus)[0];
+            if (LIVE_ROW.equals(pkg)) {
+                cycleLiveButton(dir);
+                return;
+            }
             int at = shelfOrder.indexOf(pkg), to = at + dir;
             if (at < 0 || to < 0 || to >= shelfOrder.size()) return;
             shelfOrder.remove(at);
             shelfOrder.add(to, pkg);
             refreshShelfRows(pkg);
+        }
+
+        /** The Live TV button: Live TV, then every HDMI port the TV lists (the dimmed ones too), round and round. */
+        private void cycleLiveButton(int dir) {
+            List<String> ids = new ArrayList<>();
+            ids.add("");
+            for (HomeApps.Item it : HomeApps.allInputs(getContext())) if (it.inputId != null) ids.add(it.inputId);
+            int at = Math.max(0, ids.indexOf(Prefs.liveButton()));
+            Prefs.setLiveButton(ids.get((at + dir + ids.size()) % ids.size()));
+        }
+
+        /** The Live TV button's value: Live TV, or the input it opens instead; read again only after a change. */
+        private String liveButtonValue() {
+            if (liveButtonText == null || liveButtonAt != Prefs.version) {
+                HomeApps.Item box = HomeApps.liveButtonInput(getContext());
+                liveButtonText = box != null ? HomeApps.inputName(box) : Strings.get(R.string.live_tv_2);
+                liveButtonAt = Prefs.version;
+            }
+            return liveButtonText;
         }
 
         /** Menu on an app in the shelf editor: its logo (a PNG's URL, or empty for the app's icon) and background color. */
@@ -831,23 +909,29 @@ public class SettingsActivity extends Activity {
 
         private void drawShelfEditor(Canvas c) {
             Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
-            c.drawText(Strings.get(R.string.shelf), LIST_X * k + 30 * k, (LIST_TOP - 24) * k, heading);
+            c.drawText(Strings.get(editingInputs ? R.string.inputs : R.string.shelf), LIST_X * k + 30 * k, (LIST_TOP - 24) * k, heading);
             int rows = rowCount();
             for (int i = 0; i < rows; i++) {
                 String[] app = shelfRows.get(pickScroll + i);
+                boolean live = LIVE_ROW.equals(app[0]);
                 int place = shelfOrder.indexOf(app[0]);
+                boolean on = live || place >= 0;
                 float y = (LIST_TOP + 20 + i * (LIST_ROW_H + LIST_ROW_GAP)) * k;
                 rowRect.set(LIST_X * k, y, LIST_R * k, y + LIST_ROW_H * k);
                 float f = drawRowBackground(c, i);
-                rowLabel.setColor(blend(place >= 0 ? 0xF2FFFFFF : 0x80FFFFFF, place >= 0 ? INK : 0x801C1C1E, f));
+                rowLabel.setColor(blend(on ? 0xF2FFFFFF : 0x80FFFFFF, on ? INK : 0x801C1C1E, f));
                 rowValue.setColor(blend(0xB3FFFFFF, 0xB31C1C1E, f));
                 float base = rowRect.centerY() + Ui.halfCap(rowLabel);
                 c.drawText(TextUtils.ellipsize(app[1], new TextPaint(rowLabel), 520 * k, TextUtils.TruncateAt.END).toString(), rowRect.left + 30 * k, base, rowLabel);
-                c.drawText(place >= 0 ? "#" + (place + 1) : Strings.get(R.string.off_2), rowRect.right - 30 * k, base, rowValue);
+                String value = live ? liveButtonValue() : place >= 0 ? "#" + (place + 1)
+                        : Strings.get(editingInputs ? R.string.input_hidden : R.string.off_2);
+                c.drawText(TextUtils.ellipsize(value, new TextPaint(rowValue), 380 * k, TextUtils.TruncateAt.END).toString(),
+                        rowRect.right - 30 * k, base, rowValue);
             }
             Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
             float hy = (LIST_TOP + 20 + rows * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
-            c.drawText(Strings.get(R.string.shelf_edit_hint, HomeApps.MAX_SHELF), LIST_X * k + 30 * k, hy, hint);
+            c.drawText(editingInputs ? Strings.get(R.string.inputs_edit_hint) : Strings.get(R.string.shelf_edit_hint, HomeApps.MAX_SHELF),
+                    LIST_X * k + 30 * k, hy, hint);
         }
 
         private void openPicker(int which) {
@@ -991,13 +1075,15 @@ public class SettingsActivity extends Activity {
             } else if (focus == 2) {
                 openShelfEditor();
             } else if (focus == 3) {
+                openInputsEditor();
+            } else if (focus == 4) {
                 loadApps();
                 screen = REMOTE_KEYS;
                 focus = 0;
                 keysScroll = 0;
-            } else if (focus == 4) {
-                activity.startActivity(new Intent(c, ServicesActivity.class));
             } else if (focus == 5) {
+                activity.startActivity(new Intent(c, ServicesActivity.class));
+            } else if (focus == 6) {
                 // A release APK comes without a key: it is typed here once (or pushed in config.json "tmdb_key").
                 if (Tmdb.hasKey()) activity.startActivity(new Intent(c, TmdbLoginActivity.class)); else askTmdbKey();
             } else {

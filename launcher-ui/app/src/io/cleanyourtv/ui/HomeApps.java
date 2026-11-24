@@ -318,6 +318,49 @@ final class HomeApps {
         return items;
     }
 
+    /**
+     * The drawer's inputs in the person's order (Settings > Inputs, #60; Free My TV 9ee0103): the saved order first, an
+     * input the TV no longer lists keeping its place, then the ones never ordered in the TV's order; the hidden ones stay
+     * out. Until the editor is used, allInputs as it is.
+     */
+    static List<Item> orderedInputs(Context c) {
+        List<Item> inputs = allInputs(c);
+        List<String> order = Prefs.inputsOrder(), hidden = Prefs.inputsHidden();
+        if (order == null && hidden.isEmpty()) return inputs;
+        List<String> keys = new ArrayList<>();
+        for (Item it : inputs) keys.add(it.key);
+        List<Item> out = new ArrayList<>();
+        for (String key : VisibleOrder.arrange(order, hidden, keys)) {
+            for (Item it : inputs) if (it.key.equals(key)) { out.add(it); break; }
+        }
+        return out;
+    }
+
+    /** Every input the TV lists, shown or hidden, for Settings > Inputs: {key, name}. */
+    static List<String[]> inputCandidates(Context c) {
+        List<String[]> out = new ArrayList<>();
+        for (Item it : allInputs(c)) out.add(new String[] {it.key, inputName(it)});
+        return out;
+    }
+
+    /** "HDMI 2", or "HDMI 2 · PlayStation 5" when the port has a name (Live TV as it is): for the settings' lists. */
+    static String inputName(Item it) {
+        if (it.inputId == null) return it.label;
+        String port = "HDMI " + it.number;
+        return it.label.equals(port) ? port : port + " · " + it.label;
+    }
+
+    /**
+     * Settings > Inputs > Live TV button (#60; Free My TV eb2fbfb): the HDMI input the "live" action opens instead of
+     * Live TV, while the TV still lists it; else null (Live TV).
+     */
+    static Item liveButtonInput(Context c) {
+        String id = Prefs.liveButton();
+        if (id.isEmpty()) return null;
+        for (Item it : inputs(c, true)) if (id.equals(it.inputId)) return it;
+        return null;
+    }
+
     private static List<Item> inputs(Context c) {
         return inputs(c, false);
     }

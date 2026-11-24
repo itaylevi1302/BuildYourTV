@@ -156,6 +156,11 @@
     <string name="not_installed">"לא מותקן"</string>
     <string name="not_on_any_streaming_service_in_the_region_right_now">"כרגע לא זמין באף שירות סטרימינג באזור."</string>
     <string name="not_on_the_shelf">"לא במדף"</string>
+    <string name="inputs_edit_hint">"הצגה או הסתרה של כניסה ב־OK. שינוי הסדר ב־← →."</string>
+    <string name="in_the_inputs_place_prefix">"בכניסות, מקום "</string>
+    <string name="not_in_the_inputs">"לא בכניסות"</string>
+    <string name="input_hidden">"מוסתרת"</string>
+    <string name="live_tv_button">"כפתור שידור חי"</string>
     <string name="nothing_found">"לא נמצא כלום."</string>
     <string name="nothing_here_yet_open_a_title_to_add_it">"עדיין אין כאן כלום. פותחים כותר כדי להוסיף אותו."</string>
     <string name="nothing_matches_this_filter">"אין תוצאות למסנן הזה."</string>

@@ -194,6 +194,11 @@
     <string name="not_installed">"Не встановлено"</string>
     <string name="not_on_any_streaming_service_in_the_region_right_now">"Наразі недоступно в жодному стримінговому сервісі регіону."</string>
     <string name="not_on_the_shelf">"не в обраному"</string>
+    <string name="inputs_edit_hint">"OK — показати або приховати вхід. ← → — змінити порядок."</string>
+    <string name="in_the_inputs_place_prefix">"у входах, позиція "</string>
+    <string name="not_in_the_inputs">"не у входах"</string>
+    <string name="input_hidden">"Приховано"</string>
+    <string name="live_tv_button">"Кнопка «Телеканали»"</string>
     <string name="nothing_found">"Нічого не знайдено."</string>
     <string name="nothing_here_yet_open_a_title_to_add_it">"Поки що тут порожньо. Відкрийте картку, щоб додати її до списку."</string>
     <string name="nothing_matches_this_filter">"За цим фільтром нічого не знайдено."</string>

@@ -40,6 +40,11 @@
     <string name="no_weather_data_right_now">"No hay datos del clima ahora."</string>
     <string name="not_installed">"No instalada"</string>
     <string name="not_on_the_shelf">"fuera del estante"</string>
+    <string name="inputs_edit_hint">"OK muestra u oculta una entrada. ← → cambian el orden."</string>
+    <string name="in_the_inputs_place_prefix">"en las entradas, posición "</string>
+    <string name="not_in_the_inputs">"fuera de las entradas"</string>
+    <string name="input_hidden">"Oculta"</string>
+    <string name="live_tv_button">"Botón TV en vivo"</string>
     <string name="of_3_suffix">" de 3"</string>
     <string name="of_suffix_prefix">" de "</string>
     <string name="off">"Desactivado"</string>

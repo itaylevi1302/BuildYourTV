@@ -226,6 +226,30 @@ final class Prefs {
         put("shelf", sb.toString());
     }
 
+    // MARK: - Drawer inputs (Settings > Inputs, #60)
+
+    /**
+     * The drawer's inputs in the person's order: their keys ("live", "hdmi1"...), an input the TV no longer lists keeping
+     * its place. null until Settings > Inputs is used: the TV's order then.
+     */
+    static List<String> inputsOrder() {
+        String v = sp().getString("inputsOrder", null);
+        return v == null ? null : keyList(v);
+    }
+
+    static void setInputsOrder(List<String> keys) { put("inputsOrder", String.join(",", keys)); }
+
+    /** The inputs Settings > Inputs hides; none until it is used. */
+    static List<String> inputsHidden() { return keyList(sp().getString("inputsHidden", "")); }
+
+    static void setInputsHidden(List<String> keys) { put("inputsHidden", String.join(",", keys)); }
+
+    private static List<String> keyList(String v) {
+        List<String> out = new ArrayList<>();
+        for (String p : v.split(",")) if (!p.isEmpty()) out.add(p);
+        return out;
+    }
+
     // MARK: - Hidden apps
 
     /** Packages kept out of All Apps (config.json "hidden_apps"), on top of HomeApps' own list. */
@@ -342,5 +366,23 @@ final class Prefs {
         StringBuilder sb = new StringBuilder();
         for (java.util.Map.Entry<String, String> e : all.entrySet()) sb.append(e.getKey()).append('=').append(e.getValue()).append('\n');
         if (writeKeys(sb.toString())) version++;
+    }
+
+    // MARK: - Live TV button (Settings > Inputs, #60)
+
+    /**
+     * Kept in the buttons file under a name no button has (buttons are "s<scancode>" and "k<keycode>"): the key service
+     * (:keys) runs the "live" action too, and it doesn't see this process's SharedPreferences.
+     */
+    private static final String LIVE_BUTTON = "liveButton";
+
+    /** The TV input (its id) the "live" action opens instead of Live TV, or "" for Live TV. */
+    static String liveButton() {
+        String v = button(LIVE_BUTTON);
+        return v == null ? "" : v;
+    }
+
+    static void setLiveButton(String inputId) {
+        setButton(LIVE_BUTTON, inputId == null || inputId.isEmpty() ? null : inputId);
     }
 }

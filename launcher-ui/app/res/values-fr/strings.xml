@@ -151,6 +151,11 @@
     <string name="not_installed">"Non installé"</string>
     <string name="not_on_any_streaming_service_in_the_region_right_now">"Disponible sur aucune plateforme de streaming dans la région pour le moment."</string>
     <string name="not_on_the_shelf">"pas dans la barre d\'applis"</string>
+    <string name="inputs_edit_hint">"OK affiche ou masque une source. ← → changent l\'ordre."</string>
+    <string name="in_the_inputs_place_prefix">"dans les sources, place "</string>
+    <string name="not_in_the_inputs">"hors des sources"</string>
+    <string name="input_hidden">"Masquée"</string>
+    <string name="live_tv_button">"Bouton TV en direct"</string>
     <string name="nothing_found">"Aucun résultat."</string>
     <string name="nothing_here_yet_open_a_title_to_add_it">"Rien ici pour l\'instant. Ouvrez un titre pour l\'ajouter."</string>
     <string name="nothing_matches_this_filter">"Aucun résultat pour ce filtre."</string>

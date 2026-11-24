@@ -175,6 +175,11 @@
     <string name="not_installed">"Yüklü değil"</string>
     <string name="not_on_any_streaming_service_in_the_region_right_now">"Şu anda bölgenizdeki hiçbir dijital platformda yer almıyor."</string>
     <string name="not_on_the_shelf">"rafta değil"</string>
+    <string name="inputs_edit_hint">"OK bir girişi gösterir veya gizler. ← → sırayı değiştirir."</string>
+    <string name="in_the_inputs_place_prefix">"girişlerde, sıra "</string>
+    <string name="not_in_the_inputs">"girişlerde değil"</string>
+    <string name="input_hidden">"Gizli"</string>
+    <string name="live_tv_button">"Canlı TV tuşu"</string>
     <string name="nothing_found">"Hiçbir şey bulunamadı."</string>
     <string name="nothing_here_yet_open_a_title_to_add_it">"Henüz içerik yok. Eklemek için bir içeriği açın."</string>
     <string name="nothing_matches_this_filter">"Bu filtreyle eşleşen içerik bulunamadı."</string>
