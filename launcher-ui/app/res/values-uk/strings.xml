@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="remote_key_service">Кнопки застосунків на пульті (Netflix, YouTube, Prime Video, TCL Channel) відкривають вибрані вами застосунки. Служба зчитує лише ці кнопки.</string>
+    <string name="remote_key_service">Кнопки застосунків на пульті (Netflix, YouTube, Prime Video, TCL Channel) відкривають вибрані вами застосунки; через службу таймер сну вимикає ТВ. Служба зчитує лише ці кнопки.</string>
     <string name="a_pngs_url_empty_the_apps_icon">"URL зображення PNG (порожньо — іконка застосунку)"</string>
     <string name="account_services_and_the_menus_order">"Обліковий запис, сервіси й порядок пунктів меню"</string>
     <string name="acting">"Акторські роботи"</string>
@@ -416,5 +416,14 @@
     <string name="forecast_next_5_days">"Найближчі 5 днів"</string>
     <string name="duration_minutes">"%1$d хв"</string>
     <string name="duration_hours_minutes">"%1$d год %2$d хв"</string>
+    <string name="sleep_timer">"Таймер сну"</string>
+    <string name="sleep_minutes">"%1$d хв"</string>
+    <string name="sleep_left">"Залишилось %1$d хв"</string>
+    <string name="sleep_unavailable">"Потрібна служба кнопок"</string>
+    <string name="sleep_unavailable_why">"Таймер сну вимикає ТВ через службу кнопок пульта, а вона на цьому ТВ вимкнена. Увімкніть її з комп’ютера: KEY_SERVICE=1 launcher-ui/build-and-install.sh"</string>
+    <string name="sleep_warning">"ТВ вимкнеться через %1$d с"</string>
+    <string name="sleep_more">"Ще 15 хвилин"</string>
+    <string name="sleep_keep_on">"Не вимикати ТВ"</string>
+    <string name="sleep_now">"Вимкнути зараз"</string>
     <string name="stale_quote_prefix">""</string>
 </resources>

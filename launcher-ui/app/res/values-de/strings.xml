@@ -163,4 +163,13 @@
     <string name="forecast_next_5_days">"Nächste 5 Tage"</string>
     <string name="duration_minutes">"%1$d Min."</string>
     <string name="duration_hours_minutes">"%1$d Std. %2$d Min."</string>
+    <string name="sleep_timer">"Sleep-Timer"</string>
+    <string name="sleep_minutes">"%1$d Min."</string>
+    <string name="sleep_left">"noch %1$d Min."</string>
+    <string name="sleep_unavailable">"Braucht den Tastendienst"</string>
+    <string name="sleep_unavailable_why">"Der Sleep-Timer schaltet den Fernseher über den Dienst für die Fernbedienungstasten aus, der auf diesem Fernseher aus ist. Am Computer einschalten: KEY_SERVICE=1 launcher-ui/build-and-install.sh"</string>
+    <string name="sleep_warning">"Der Fernseher schaltet sich in %1$d s aus"</string>
+    <string name="sleep_more">"15 Minuten länger"</string>
+    <string name="sleep_keep_on">"Fernseher anlassen"</string>
+    <string name="sleep_now">"Jetzt ausschalten"</string>
 </resources>

@@ -404,4 +404,13 @@
     <string name="forecast_next_5_days">"Próximos 5 dias"</string>
     <string name="duration_minutes">"%1$d min"</string>
     <string name="duration_hours_minutes">"%1$d h %2$d min"</string>
+    <string name="sleep_timer">"Timer de desligamento"</string>
+    <string name="sleep_minutes">"%1$d min"</string>
+    <string name="sleep_left">"%1$d min restantes"</string>
+    <string name="sleep_unavailable">"Precisa do serviço de teclas"</string>
+    <string name="sleep_unavailable_why">"O timer desliga a TV pelo serviço dos botões do controle, que está desligado nesta TV. Ligue-o de um computador: KEY_SERVICE=1 launcher-ui/build-and-install.sh"</string>
+    <string name="sleep_warning">"A TV desliga em %1$d s"</string>
+    <string name="sleep_more">"Mais 15 minutos"</string>
+    <string name="sleep_keep_on">"Manter a TV ligada"</string>
+    <string name="sleep_now">"Desligar agora"</string>
 </resources>

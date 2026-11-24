@@ -147,9 +147,14 @@ public class SettingsActivity extends Activity {
         private String liveButtonText;   // that row's value, read again after a change (the TV's inputs are a system call)
         private int liveButtonAt;
         private int pickFor, pickCurrent, pickScroll, keysScroll;   // pickFor: the remote button (index + 1)
-        private static final int PICK_CITY = 0;
+        private static final int PICK_CITY = 0, PICK_SLEEP = -1;   // PICK_SLEEP: Sleep Timer's choices
+        /** Main menu: the Sleep Timer row, just above TV Settings (the last row). */
+        private static final int MAIN_SLEEP = 7;
         private final List<String[]> cities = new ArrayList<>();
         private String cityStatus = "";
+        // The sleep timer's row: minutes left (0: off) and whether the key service can turn the TV off; read by the poll.
+        private int sleepLeft;
+        private boolean sleepReady;
         private final RectF tmp = new RectF(), rowRect = new RectF(), focusBox = new RectF();
         private JSONObject recs = new JSONObject();
         private boolean hasKey;
@@ -174,11 +179,24 @@ public class SettingsActivity extends Activity {
                 Context c = getContext().getApplicationContext();
                 IO.execute(() -> {
                     JSONObject next = Recs.status(c);
-                    handler.post(() -> showRecs(next));
+                    int left = SleepTimer.minutesLeft(c);
+                    boolean ready = SleepTimer.available(c);
+                    handler.post(() -> {
+                        showRecs(next);
+                        showSleep(left, ready);
+                    });
                 });
                 handler.postDelayed(this, 2000);
             }
         };
+
+        /** The sleep timer's row: redrawn only when its minutes or the key service changed. */
+        private void showSleep(int left, boolean ready) {
+            if (!running || (left == sleepLeft && ready == sleepReady)) return;
+            sleepLeft = left;
+            sleepReady = ready;
+            invalidate();
+        }
 
         /** The recommendations' status: redrawn only when it (or the key) changed. */
         private void showRecs(JSONObject next) {
@@ -232,7 +250,7 @@ public class SettingsActivity extends Activity {
                             Strings.get(R.string.home_settings),
                             Strings.get(R.string.shelf), Strings.get(R.string.inputs), Strings.get(R.string.remote_buttons),
                             Strings.get(R.string.services), Strings.get(R.string.tmdb_account_prefix_2) + account(),
-                            Strings.get(R.string.tv_settings)};
+                            Strings.get(R.string.sleep_timer) + ", " + sleepValue(), Strings.get(R.string.tv_settings)};
                     return row < names.length ? names[row] : "";
                 }
                 case HOME_SETTINGS: {
@@ -300,6 +318,7 @@ public class SettingsActivity extends Activity {
             lastNanos = 0;
             // Once here, so the first frame already shows it (as before); then every 2 s off the UI thread.
             showRecs(Recs.status(getContext()));
+            showSleep(SleepTimer.minutesLeft(getContext()), SleepTimer.available(getContext()));
             playingAllowed = NowPlaying.allowed(getContext());
             handler.postDelayed(poll, 2000);
             invalidate();
@@ -355,7 +374,7 @@ public class SettingsActivity extends Activity {
 
         private int rowCount() {
             switch (screen) {
-                case MAIN: return 8;
+                case MAIN: return 9;
                 case HOME_SETTINGS: return settingLabels().length;
                 case PICKER: return Math.min(PICK_VISIBLE, pickLabels.size());
                 case SHELF_EDIT: return Math.min(PICK_VISIBLE, shelfRows.size());
@@ -401,7 +420,7 @@ public class SettingsActivity extends Activity {
         private void drawMain(Canvas c) {
             String[] labels = {Strings.get(R.string.screensaver), Strings.get(R.string.home_settings),
                     Strings.get(R.string.shelf), Strings.get(R.string.inputs), Strings.get(R.string.remote_buttons),
-                    Strings.get(R.string.services), Strings.get(R.string.tmdb_account), Strings.get(R.string.tv_settings)};
+                    Strings.get(R.string.services), Strings.get(R.string.tmdb_account), Strings.get(R.string.sleep_timer), Strings.get(R.string.tv_settings)};
             for (int i = 0; i < labels.length; i++) {
                 float y = (LIST_TOP + i * (ROW_H + ROW_GAP)) * k;
                 rowRect.set(LIST_X * k, y, LIST_R * k, y + ROW_H * k);
@@ -410,7 +429,11 @@ public class SettingsActivity extends Activity {
                 float base = rowRect.centerY() + Ui.halfCap(rowLabel);
                 c.drawText(labels[i], rowRect.left + 30 * k, base, rowLabel);
                 float right = rowRect.right - 30 * k;
-                if (i == 0 || i == 6) {   // 6: TMDB account
+                if (i == MAIN_SLEEP) {
+                    // Off, the minutes left, or (dimmed) that it needs the key service.
+                    rowValue.setColor(sleepReady ? blend(0x8CFFFFFF, 0x8C1C1C1E, f) : blend(0x59FFFFFF, 0x591C1C1E, f));
+                    c.drawText(sleepValue(), right, base, rowValue);
+                } else if (i == 0 || i == 6) {   // 6: TMDB account
                     rowValue.setColor(blend(0x8CFFFFFF, 0x8C1C1C1E, f));
                     // The screensaver's style: ← → change it (shown while focused), OK shows it.
                     String style = styleName(Prefs.screensaverStyle());
@@ -421,6 +444,11 @@ public class SettingsActivity extends Activity {
                 }
             }
             drawRecs(c, (LIST_TOP + labels.length * (ROW_H + ROW_GAP) + 46) * k);
+        }
+
+        private String sleepValue() {
+            if (!sleepReady) return Strings.get(R.string.sleep_unavailable);
+            return sleepLeft == 0 ? Strings.get(R.string.off) : Strings.get(R.string.sleep_left, sleepLeft);
         }
 
         private String account() {
@@ -539,6 +567,9 @@ public class SettingsActivity extends Activity {
                             if (screen == PICKER && pickFor == PICK_CITY) {
                                 focus = CITY_ROW;
                                 screen = HOME_SETTINGS;
+                            } else if (screen == PICKER && pickFor == PICK_SLEEP) {
+                                focus = MAIN_SLEEP;
+                                screen = MAIN;
                             } else if (screen == PICKER) {
                                 focus = pickFor - 1 - keysScroll;
                                 screen = REMOTE_KEYS;
@@ -1012,6 +1043,11 @@ public class SettingsActivity extends Activity {
             if (which == PICK_CITY) {
                 for (String[] city : cities) pickLabels.add(city[0]);
                 pickCurrent = -1;
+            } else if (which == PICK_SLEEP) {
+                for (int m : SleepTimer.CHOICES) {
+                    pickLabels.add(m == 0 ? Strings.get(R.string.off) : Strings.get(R.string.sleep_minutes, m));
+                }
+                pickCurrent = sleepLeft == 0 ? 0 : -1;   // a running timer: focus on Off, which cancels it
             } else {
                 pickLabels.addAll(appLabels);
                 pickCurrent = appPkgs.indexOf(RemoteKeys.action(RemoteKeys.buttons(getContext()).get(which - 1)));
@@ -1026,7 +1062,9 @@ public class SettingsActivity extends Activity {
         /** A long list (the apps): nine rows at a time, the one in use checked. */
         private void drawPicker(Canvas c) {
             Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
-            String title = pickFor == PICK_CITY ? Strings.get(R.string.city) : RemoteKeys.buttons(getContext()).get(pickFor - 1).name;
+            String title = pickFor == PICK_CITY ? Strings.get(R.string.city)
+                    : pickFor == PICK_SLEEP ? Strings.get(R.string.sleep_timer)
+                    : RemoteKeys.buttons(getContext()).get(pickFor - 1).name;
             c.drawText(title, LIST_X * k + 30 * k, (LIST_TOP - 24) * k, heading);
             int rows = rowCount();
             for (int i = 0; i < rows; i++) {
@@ -1108,7 +1146,13 @@ public class SettingsActivity extends Activity {
 
         private void activate() {
             Context c = getContext();
-            if (screen == PICKER && pickFor == PICK_CITY) {
+            if (screen == PICKER && pickFor == PICK_SLEEP) {
+                int minutes = SleepTimer.CHOICES[pickScroll + focus];
+                SleepTimer.set(c, minutes);
+                sleepLeft = minutes;
+                focus = MAIN_SLEEP;
+                screen = MAIN;
+            } else if (screen == PICKER && pickFor == PICK_CITY) {
                 String[] city = cities.get(pickScroll + focus);
                 Prefs.setCity(city[1], city[2], city[3]);
                 HomeData.get(c).settingsChanged();
@@ -1162,6 +1206,14 @@ public class SettingsActivity extends Activity {
             } else if (focus == 6) {
                 // A release APK comes without a key: it is typed here once (or pushed in config.json "tmdb_key").
                 if (Tmdb.hasKey()) activity.startActivity(new Intent(c, TmdbLoginActivity.class)); else askTmdbKey();
+            } else if (focus == MAIN_SLEEP) {
+                sleepReady = SleepTimer.available(c);
+                if (!sleepReady) {   // only the key service can turn the TV off: say so, and how to turn it on
+                    Toast.makeText(activity, Strings.get(R.string.sleep_unavailable_why), Toast.LENGTH_LONG).show();
+                    invalidate();
+                    return;
+                }
+                openPicker(PICK_SLEEP);
             } else {
                 activity.startActivity(HomeApps.tvSettings(c).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             }

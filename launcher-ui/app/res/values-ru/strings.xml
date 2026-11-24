@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="remote_key_service">Кнопки приложений на пульте (Netflix, YouTube, Prime Video, TCL Channel) открывают приложения, выбранные в CleanYourTV UI, поверх любого приложения. Служба считывает только эти кнопки.</string>
+    <string name="remote_key_service">Кнопки приложений на пульте (Netflix, YouTube, Prime Video, TCL Channel) открывают приложения, выбранные в CleanYourTV UI, поверх любого приложения; через службу таймер сна выключает ТВ. Служба считывает только эти кнопки.</string>
     <string name="a_pngs_url_empty_the_apps_icon">"URL изображения PNG (пусто — иконка приложения)"</string>
     <string name="account_services_and_the_menus_order">"Аккаунт, сервисы и порядок пунктов меню"</string>
     <string name="acting">"Актёрские работы"</string>
@@ -415,4 +415,13 @@
     <string name="forecast_next_5_days">"Ближайшие 5 дней"</string>
     <string name="duration_minutes">"%1$d мин"</string>
     <string name="duration_hours_minutes">"%1$d ч %2$d мин"</string>
+    <string name="sleep_timer">"Таймер сна"</string>
+    <string name="sleep_minutes">"%1$d мин"</string>
+    <string name="sleep_left">"Осталось %1$d мин"</string>
+    <string name="sleep_unavailable">"Нужна служба кнопок"</string>
+    <string name="sleep_unavailable_why">"Таймер сна выключает ТВ через службу кнопок пульта, а она на этом ТВ выключена. Включите её с компьютера: KEY_SERVICE=1 launcher-ui/build-and-install.sh"</string>
+    <string name="sleep_warning">"ТВ выключится через %1$d с"</string>
+    <string name="sleep_more">"Ещё 15 минут"</string>
+    <string name="sleep_keep_on">"Не выключать ТВ"</string>
+    <string name="sleep_now">"Выключить сейчас"</string>
 </resources>

@@ -354,4 +354,13 @@
     <string name="forecast_next_5_days">"5 prochains jours"</string>
     <string name="duration_minutes">"%1$d min"</string>
     <string name="duration_hours_minutes">"%1$d h %2$d min"</string>
+    <string name="sleep_timer">"Minuterie de veille"</string>
+    <string name="sleep_minutes">"%1$d min"</string>
+    <string name="sleep_left">"Encore %1$d min"</string>
+    <string name="sleep_unavailable">"Nécessite le service des touches"</string>
+    <string name="sleep_unavailable_why">"La minuterie met la TV en veille via le service des touches de la télécommande, désactivé sur cette TV. Activez-le depuis un ordinateur : KEY_SERVICE=1 launcher-ui/build-and-install.sh"</string>
+    <string name="sleep_warning">"La TV s\'éteint dans %1$d s"</string>
+    <string name="sleep_more">"15 minutes de plus"</string>
+    <string name="sleep_keep_on">"Garder la TV allumée"</string>
+    <string name="sleep_now">"Éteindre maintenant"</string>
 </resources>

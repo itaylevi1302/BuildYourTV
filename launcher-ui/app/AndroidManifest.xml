@@ -237,6 +237,25 @@
                 android:resource="@xml/remote_key_service" />
         </service>
 
+        <!-- The sleep timer's alarms (Settings > Sleep Timer), in the key service's process: its "lock screen" action puts
+             the TV to sleep. Not exported: the app's own alarms reach it by component name. -->
+        <receiver
+            android:name=".SleepReceiver"
+            android:process=":keys"
+            android:exported="false" />
+
+        <!-- The sleep timer's last minute over whatever plays: our own window, started by the key service's process,
+             so no overlay permission. -->
+        <activity
+            android:name=".SleepWarningActivity"
+            android:process=":keys"
+            android:exported="false"
+            android:taskAffinity="io.cleanyourtv.ui.sleep"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/CleanYourTV.Warning" />
+
         <!-- Now Playing (#67): Android hands the apps' media sessions (what plays: title, artist, the app) only to an allowed
              notification listener. Off until launcher-ui/build-and-install.sh NOW_PLAYING=1 allows it. It never reads a
              notification and unbinds itself as soon as it connects. In :home, so binding it starts no other process.

@@ -383,4 +383,13 @@
     <string name="forecast_next_5_days">"Önümüzdeki 5 gün"</string>
     <string name="duration_minutes">"%1$d dk"</string>
     <string name="duration_hours_minutes">"%1$d sa %2$d dk"</string>
+    <string name="sleep_timer">"Uyku zamanlayıcısı"</string>
+    <string name="sleep_minutes">"%1$d dk"</string>
+    <string name="sleep_left">"%1$d dk kaldı"</string>
+    <string name="sleep_unavailable">"Tuş hizmeti gerekli"</string>
+    <string name="sleep_unavailable_why">"Uyku zamanlayıcısı TV\'yi kumanda tuşları hizmetiyle kapatır; bu hizmet bu TV\'de kapalı. Bir bilgisayardan açın: KEY_SERVICE=1 launcher-ui/build-and-install.sh"</string>
+    <string name="sleep_warning">"TV %1$d sn içinde kapanacak"</string>
+    <string name="sleep_more">"15 dakika daha"</string>
+    <string name="sleep_keep_on">"TV açık kalsın"</string>
+    <string name="sleep_now">"Şimdi kapat"</string>
 </resources>

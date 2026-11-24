@@ -107,7 +107,7 @@ class Editor(unittest.TestCase):
     def test_inputs_row_after_the_shelf(self):
         self.assertEqual(self.settings.count(
             "Strings.get(R.string.shelf), Strings.get(R.string.inputs), Strings.get(R.string.remote_buttons),"), 2)
-        self.assertIn("case MAIN: return 8;", self.settings)
+        self.assertIn("case MAIN: return 9;", self.settings)
         activate = settings_method("        private void activate() {")
         self.assertLess(activate.index("openShelfEditor();"), activate.index("openInputsEditor();"))
         self.assertLess(activate.index("openInputsEditor();"), activate.index("loadApps();"))
