@@ -96,9 +96,11 @@ adb shell pm revoke io.cleanyourtv.ui android.permission.READ_TV_LISTINGS    # t
 ```
 
 What it reads, from the apps' entries only: the app, the title, season and episode, length and position, when it was
-last watched, the link that resumes it and the picture's address. It never leaves the TV. Pictures come only from the TV
-(`content://`, `android.resource://`); a title without one shows its app's banner. Without the permission the home
-screen says how to give it.
+last watched, the link that resumes it and the picture's address. The list never leaves the TV. Pictures come from the
+TV (`content://`, `android.resource://`) or, where an app left an `https` address instead (Netflix does), from that
+address, the app's own server: `https` only, never an address on your home network, pictures only, 4 MB and 10 s at
+most, kept in memory and never on disk. A title without a picture shows its app's banner. Without the permission the
+home screen says how to give it.
 
 ## config.json
 

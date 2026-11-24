@@ -64,7 +64,8 @@ Free My TV. This project is for people who want both and a full Explore.
   copy when offline) and images too (up to 160 MB, a week). When an app or the TV is on, the launcher lets go of what it
   kept in memory: on a 2 GB TCL, about 66 MB in the background, down from ~155 MB.
 - No ads and no telemetry: it only talks to TMDB, Wikidata (the services' ids) and Open-Meteo (weather), plus Binance
-  for the crypto prices when `show_crypto=true` (off by default).
+  for the crypto prices when `show_crypto=true` (off by default), and, with Continue Watching on, the picture addresses
+  your apps left in Android TV's Watch Next list (`https` only, never your home network).
 
 **Remote and configuration**
 - `examples/<model>/remote.json` says which remote buttons can be changed; on the TV each one opens an app, an HDMI

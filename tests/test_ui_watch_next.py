@@ -53,10 +53,12 @@ class WatchNextReader(unittest.TestCase):
     def test_watchlist_entries_are_not_half_watched(self):
         self.assertIn("WATCH_NEXT_TYPE_WATCHLIST) continue;", self.src)
 
-    def test_pictures_only_from_the_tv(self):
+    def test_pictures_from_the_tv_or_https(self):
+        # https ones are fetched only by NetPicture (tests/test_ui_net_picture.py)
         body = method(self.src, "    static Uri picture(String s) {")
         self.assertIn('"content".equalsIgnoreCase(scheme)', body)
         self.assertIn('"android.resource".equalsIgnoreCase(scheme)', body)
+        self.assertIn('"https".equalsIgnoreCase(scheme)', body)
         self.assertNotIn('"file"', body)
         self.assertNotIn('"http"', body)
 

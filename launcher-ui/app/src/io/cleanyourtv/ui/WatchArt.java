@@ -28,18 +28,23 @@ import java.util.concurrent.Executors;
 /**
  * Continue Watching's pictures, decoded in the background once, at the card's size on screen (16:9, centre-cropped),
  * and kept in memory: CACHE_MAX of them at most (~0.7 MB each on a 1080p screen), and none while the home screen is
- * hidden (App.onTrimMemory). Only pictures already on the TV are read, through the apps' own providers (content:// and
- * android.resource://); never a file (file://). A picture is sampled down before it's decoded (inSampleSize), so a
- * huge one never lands whole in memory. Anything else, or a picture that can't be read, shows the app's TV banner
- * instead, and isn't tried again for RETRY_MS. From Free My TV PR 42 (WatchArt.java) and 8490c56 (sampled decoding).
+ * hidden (App.onTrimMemory). Pictures on the TV are read through the apps' own providers (content:// and
+ * android.resource://). Some apps (Netflix) leave an https address instead: those are fetched only through NetPicture's
+ * checks (https only, never the home network, pictures only, size and time limits), on a thread of their own so a slow
+ * server doesn't hold the others back. Never a file (file://) or plain http. A picture is sampled down before it's
+ * decoded (inSampleSize), so a huge one never lands whole in memory. Anything else, or a picture that can't be read,
+ * shows the app's TV banner instead, and isn't tried again for a while (sooner for the network, which may only be late
+ * after the TV starts). From Free My TV PR 42 (WatchArt.java), 8490c56 (sampled decoding) and PR 506 (NetPicture).
  */
 final class WatchArt {
     private static final int MAX_BYTES = 8 << 20, CACHE_MAX = 8;
     /** At most this many pixels decoded (~8 MB): a 60000×300 picture is sampled down before it's decoded. */
     private static final long MAX_PIXELS = 2_000_000;
-    private static final long RETRY_MS = 10 * 60_000L, READ_MS = 12_000;
+    private static final long RETRY_MS = 10 * 60_000L, NET_RETRY_MS = 2 * 60_000L, READ_MS = 12_000;
     /** One thread for the whole process: a home screen started over doesn't leave one behind. */
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
+    /** The pictures that come from the network wait on their own thread. */
+    private static final ExecutorService NET = Executors.newSingleThreadExecutor();
     private static volatile WatchArt live;
 
     private final Context app;
@@ -118,8 +123,13 @@ final class WatchArt {
     private boolean failedRecently(String key) {
         synchronized (cache) {
             Long at = failed.get(key);
-            return at != null && System.currentTimeMillis() - at < RETRY_MS;
+            return at != null && System.currentTimeMillis() - at < retryMs(key);
         }
+    }
+
+    /** How long a picture that failed waits (the keys of the network's pictures are their addresses). */
+    private static long retryMs(String key) {
+        return key.regionMatches(true, 0, "https:", 0, 6) ? NET_RETRY_MS : RETRY_MS;
     }
 
     private Bitmap fetch(String key, Uri uri, String pkg) {
@@ -129,12 +139,12 @@ final class WatchArt {
             Bitmap b = cache.get(key);
             if (b != null || pending.contains(key)) return b;
             Long at = failed.get(key);
-            if (at != null && System.currentTimeMillis() - at < RETRY_MS) return null;
+            if (at != null && System.currentTimeMillis() - at < retryMs(key)) return null;
             pending.add(key);
             gen = generation;
         }
         final int w = pw, h = ph;
-        IO.execute(() -> {
+        (uri != null && "https".equalsIgnoreCase(uri.getScheme()) ? NET : IO).execute(() -> {
             Bitmap b = null;
             if (!closed) {
                 try {
@@ -208,8 +218,9 @@ final class WatchArt {
         return out;
     }
 
-    /** content:// and android.resource:// come from the app's own provider, with a size and a time limit. */
+    /** https:// only through NetPicture's checks; content:// and android.resource:// from the app's own provider. */
     private byte[] read(Uri uri) throws IOException {
+        if ("https".equalsIgnoreCase(uri.getScheme())) return NetPicture.get(uri.toString());
         try (InputStream in = app.getContentResolver().openInputStream(uri)) {
             if (in == null) throw new IOException("no picture there");
             return readAll(in, MAX_BYTES, System.currentTimeMillis() + READ_MS);

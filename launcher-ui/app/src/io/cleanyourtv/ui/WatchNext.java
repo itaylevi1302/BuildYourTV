@@ -57,12 +57,16 @@ final class WatchNext {
         }
     }
 
-    /** Only pictures already on the TV, read through the apps' own providers: never a file, never the network. */
+    /**
+     * Pictures on the TV, read through the apps' own providers, or an https address the app left there (Netflix does),
+     * which only NetPicture fetches. Never a file, never plain http.
+     */
     static Uri picture(String s) {
         if (s == null || s.isEmpty()) return null;
         Uri uri = Uri.parse(s);
         String scheme = uri.getScheme();
-        return "content".equalsIgnoreCase(scheme) || "android.resource".equalsIgnoreCase(scheme) ? uri : null;
+        return "content".equalsIgnoreCase(scheme) || "android.resource".equalsIgnoreCase(scheme)
+                || "https".equalsIgnoreCase(scheme) ? uri : null;
     }
 
     static boolean allowed(Context c) {
