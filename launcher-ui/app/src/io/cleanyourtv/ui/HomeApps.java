@@ -59,6 +59,8 @@ final class HomeApps {
     static final int INPUTS = 7, EXPLORE = 8;
     /** The TV's own network screen (Wi-Fi and Ethernet), from the bottom drawer. */
     static final int NETWORK = 9;
+    /** Android's list of apps, in the bottom drawer where TV Settings opens the maker's own menu (#56). */
+    static final int APP_SETTINGS = 10;
     /** Image size of each card (16:9; on screen it shows up to ~330 px wide). */
     static final int TILE_W = 384, TILE_H = 216;
 
@@ -231,13 +233,34 @@ final class HomeApps {
     }
 
     /** Shortcuts in the bottom drawer. */
-    static List<Item> drawerShortcuts() {
+    static List<Item> drawerShortcuts(Context c) {
         List<Item> items = new ArrayList<>();
         items.add(shortcut(ALL_APPS, "all", Strings.get(R.string.all_apps), "apps"));
         items.add(shortcut(NETWORK, "network", Strings.get(R.string.wi_fi_network), "wifi"));
         items.add(shortcut(SETTINGS, "settings", Strings.get(R.string.home_settings), "settings"));
         items.add(shortcut(ANDROID_SETTINGS, "tv-settings", Strings.get(R.string.tv_settings), "tv_settings"));
+        if (appSettings(c) != null) {
+            items.add(shortcut(APP_SETTINGS, "app-settings", Strings.get(R.string.apps_settings), "apps"));
+        }
         return items;
+    }
+
+    /**
+     * Android's list of apps (force stop, clear data, uninstall), only where TV Settings opens the maker's own menu
+     * rather than com.android.tv.settings: a Philips Android 8 has no Apps in its menu (Free My TV 8d13879). Else null.
+     */
+    static Intent appSettings(Context c) {
+        String tv = answers(c, tvSettings(c));
+        if (tv == null || tv.equals("com.android.tv.settings")) return null;
+        Intent apps = new Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS);
+        String list = answers(c, apps);
+        return list != null && !list.equals(tv) ? apps : null;
+    }
+
+    /** The package whose activity answers the intent, or null. */
+    private static String answers(Context c, Intent intent) {
+        ResolveInfo r = c.getPackageManager().resolveActivity(intent, 0);
+        return r != null && r.activityInfo != null ? r.activityInfo.packageName : null;
     }
 
     /** A streaming service's app (the "Watch" button of the featured pick). */
@@ -431,6 +454,9 @@ final class HomeApps {
                 break;
             case NETWORK:
                 intent = networkSettings(a);
+                break;
+            case APP_SETTINGS:
+                intent = appSettings(a);
                 break;
             case EXPLORE:
                 intent = new Intent().setComponent(new ComponentName(a, ExploreActivity.class));

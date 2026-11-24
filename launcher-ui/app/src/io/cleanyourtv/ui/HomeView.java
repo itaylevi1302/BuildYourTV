@@ -1452,7 +1452,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
 
     private static List<HomeApps.Item> drawerList(Context c) {
         List<HomeApps.Item> list = HomeApps.allInputs(c);
-        list.addAll(HomeApps.drawerShortcuts());
+        list.addAll(HomeApps.drawerShortcuts(c));
         return list;
     }
 
