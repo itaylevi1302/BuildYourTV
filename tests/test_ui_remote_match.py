@@ -32,7 +32,7 @@ class RemoteMatchSource(unittest.TestCase):
     def test_on_key_order(self):
         b = body(source(), "    static boolean onKey(Context c, KeyEvent e) {")
         gamepad = b.index("InputDevice.SOURCE_GAMEPAD")
-        found = b.index("if (found == null) return false;")
+        found = b.index("if (found == null) return ")
         remote = b.index("if (!fromRemote(e)) return false;")
         action = b.index("if (action.isEmpty()) return false;")
         self.assertLess(gamepad, found)

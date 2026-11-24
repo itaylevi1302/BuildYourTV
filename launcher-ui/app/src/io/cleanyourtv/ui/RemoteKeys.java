@@ -22,7 +22,8 @@ import java.util.List;
  * "native" button is never touched, a "configurable" one runs the action the person picked in Settings > Remote
  * Buttons, or its default. Without remote.json, TCL and Vestel TVs keep the app buttons Free My TV handled.
  *
- * Actions: a package, "input:<tv input id>", "input:next" (the next HDMI input, press after press), "live", "settings", "home", "tmdb:explore", "tmdb:watchlist", or ""
+ * Actions: a package, "input:<tv input id>", "input:next" (the next HDMI input, press after press), "live", "settings", "home", "tmdb:explore", "tmdb:watchlist",
+ * "inputs" (the TV's inputs panel, or the home screen's drawer on the inputs when nothing answers it), or ""
  * (the button does what it did before).
  *
  * remote.json may also name its remote: "vendor" and "product" (a number as Android gives it, or hex as in the .kl file's
@@ -33,7 +34,7 @@ import java.util.List;
 final class RemoteKeys {
     private RemoteKeys() {}
 
-    static final boolean TCL = is("TCL"), VESTEL = is("Vestel");
+    static final boolean TCL = is("TCL"), VESTEL = is("Vestel"), HISENSE = is("Hisense");
 
     /** Brands whose maker answers the plain settings request with its own menu, or nothing (Free My TV ed6be1e). */
     private static final boolean ANDROID_TV_SETTINGS_BRAND = is("TCL") || is("Philips") || is("Sony") || is("JVC")
@@ -136,10 +137,11 @@ final class RemoteKeys {
             if (b.id.equals(scan)) { found = b; break; }
             if (b.id.equals(key) && found == null) found = b;
         }
-        if (found == null) return false;
+        if (found == null) return HISENSE && keyCode == KeyEvent.KEYCODE_TV_INPUT && hisenseInputs(c, e);
         if (!fromRemote(e)) return false;
         String action = action(found);
         if (action.isEmpty()) return false;
+        if (action.equals(INPUTS) && keyCode == KeyEvent.KEYCODE_TV_INPUT && inputsAnswered(c)) return false;   // the TV's own panel
         if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) {
             // Within debounce_ms of this button's last press it is the same press (a burst): consumed, not run again.
             boolean again = burst(lastButton, lastDown, found.id, e.getEventTime(), cachedDebounce);
@@ -209,6 +211,10 @@ final class RemoteKeys {
                 return HomeApps.tvSettings(c);
             case "live":
                 return HomeApps.liveTv(c);
+            case INPUTS:   // the TV's inputs panel; with none (Hisense with its stock home off), our drawer on the inputs
+                if (inputsAnswered(c)) return new Intent(VIEW_INPUTS);
+                return new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(c.getPackageName())
+                        .putExtra("open", "inputs");
             case "tmdb:explore":    // a fresh Explore: whatever was open in it before is dropped
                 return new Intent().setClassName(c, ExploreActivity.class.getName()).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
             case "tmdb:watchlist":
@@ -229,6 +235,30 @@ final class RemoteKeys {
 
     /** Each press goes to the next HDMI input (see nextInput), instead of one fixed input. */
     static final String NEXT_INPUT = "input:next";
+
+    /** The TV's inputs panel, or the home screen's drawer on the inputs where nothing answers it (#55). */
+    static final String INPUTS = "inputs";
+    private static final String VIEW_INPUTS = "com.android.tv.action.VIEW_INPUTS";
+
+    /**
+     * Something answers the TV's inputs request. Hisense's firmware turns the Input key into it
+     * (HisensePhoneWindowHelper), and only the stock home screen's inputs panel answers: with that home screen off
+     * nothing does and the key is lost (Free My TV 5dbe7bf, fdabf9d). Flags 0, as upstream: any match counts.
+     */
+    static boolean inputsAnswered(Context c) {
+        return c.getPackageManager().resolveActivity(new Intent(VIEW_INPUTS), 0) != null;
+    }
+
+    /**
+     * Hisense's Input key with no Remote Buttons row: ours only while nothing answers it, then the drawer on the inputs
+     * (down and up consumed, as for the app keys). Only on Hisense: another firmware may open its own panel some other
+     * way, and both would come up. Needs the key service: the window never sees this key.
+     */
+    private static boolean hisenseInputs(Context c, KeyEvent e) {
+        if (inputsAnswered(c)) return false;
+        if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) run(c, INPUTS);
+        return true;
+    }
 
     private static Intent input(Context c, String id) {
         rememberInput(c, id);

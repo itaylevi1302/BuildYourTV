@@ -57,13 +57,14 @@ public class HomeActivity extends Activity {
         return intent != null && Intent.ACTION_ALL_APPS.equals(intent.getAction());
     }
 
-    /** `--es open explore|watchlist`: Explore from the computer (adb), as the remote's buttons open it. */
+    /** `--es open explore|watchlist|inputs`: Explore, or the drawer on the inputs, as the remote's buttons open them. */
     private void openFrom(Intent intent) {
         String what = intent == null ? null : intent.getStringExtra("open");
         if (what == null) return;
         intent.removeExtra("open");
         if (what.equals("explore")) RemoteKeys.run(this, "tmdb:explore");
         else if (what.equals("watchlist")) RemoteKeys.run(this, "tmdb:watchlist");
+        else if (what.equals("inputs") && home != null) home.showInputs();   // the Input key (RemoteKeys, #55)
     }
 
     @Override protected void onDestroy() {

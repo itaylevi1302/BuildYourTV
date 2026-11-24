@@ -39,7 +39,7 @@ final class TvConfig {
 
     static boolean validAction(String action) {
         return action.isEmpty() || action.equals("home") || action.equals("settings") || action.equals("live")
-                || action.equals("tmdb:explore") || action.equals("tmdb:watchlist")
+                || action.equals("tmdb:explore") || action.equals("tmdb:watchlist") || action.equals(RemoteKeys.INPUTS)
                 || action.matches("input:[A-Za-z0-9_.$/]{1,200}") || validPackage(action);
     }
 
