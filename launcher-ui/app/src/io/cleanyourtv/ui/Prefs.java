@@ -159,6 +159,26 @@ final class Prefs {
         Ui.applyLanguage(app);
     }
 
+    // MARK: - At power-on
+
+    /**
+     * After the TV starts from off, never from standby (Home Settings > At power-on, #61; PowerOn): "tv" (the TV's
+     * choice, nothing changes), "home" (the home screen, when another app takes the screen right after it came up) or
+     * "live" (Live TV).
+     */
+    static final String[] POWER_ON = {"tv", "home", "live"};
+
+    static String powerOn() {
+        String v = sp().getString("powerOn", "tv");
+        return v.equals("home") || v.equals("live") ? v : "tv";
+    }
+
+    static void setPowerOn(String v) { put("powerOn", v); }
+
+    /** The boot (Settings.Global.BOOT_COUNT) whose first home screen PowerOn saw. Not a setting: no version bump. */
+    static int powerOnBoot() { return sp().getInt("powerOnBoot", -1); }
+    static void setPowerOnBoot(int boot) { sp().edit().putInt("powerOnBoot", boot).apply(); }
+
     // MARK: - City
 
     static String city() { return sp().getString("city", Config.CITY).trim(); }

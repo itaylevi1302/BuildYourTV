@@ -20,6 +20,7 @@
   "theme": "auto",
   "temperature": "C",
   "clock": "auto",
+  "power_on": "tv",
   "forecast": "hours",
   "screensaver": "photos",
   "weather": true,

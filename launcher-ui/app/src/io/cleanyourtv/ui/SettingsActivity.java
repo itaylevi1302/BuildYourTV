@@ -125,7 +125,7 @@ public class SettingsActivity extends Activity {
         private final SettingsActivity activity;
         private final Scene scene = new Scene();
         private final Handler handler = new Handler(Looper.getMainLooper());
-        private final Spring[] pop = new Spring[12];
+        private final Spring[] pop = new Spring[16];
         private final List<String> appPkgs = new ArrayList<>(), appLabels = new ArrayList<>();
         // The list picker (the app of a remote button): what it shows, which one is in use, where we are.
         private final List<String> pickLabels = new ArrayList<>();
@@ -260,14 +260,16 @@ public class SettingsActivity extends Activity {
             }
         }
 
-        /** Home Settings with 12 rows (reais add the dollar) packs them 6 px closer, so the last row and the hint stay on screen. */
+        /** Home Settings past 11 rows (the dollar row for reais) packs them closer: the pitch shrinks with the count so the last row and the hint stay on screen. */
         private boolean tightList() {
             return screen == HOME_SETTINGS && settingLabels().length > 11;
         }
 
-        private float listPitch() { return tightList() ? 68 : LIST_ROW_H + LIST_ROW_GAP; }
+        private float listPitch() {
+            return tightList() ? Math.min(68f, 816f / settingLabels().length) : LIST_ROW_H + LIST_ROW_GAP;
+        }
 
-        private float listRowH() { return tightList() ? 62 : LIST_ROW_H; }
+        private float listRowH() { return tightList() ? listPitch() - 6 : LIST_ROW_H; }
 
         private RectF rowBox(int row) {
             float top, height;
@@ -549,8 +551,8 @@ public class SettingsActivity extends Activity {
 
         private static final String[] LANGUAGES = {"auto", "pt", "en", "es", "de", "ru", "uk", "fr", "tr", "he"}, UNITS = {"auto", "C", "F"}, THEMES = {"auto", "light", "dark"};
         private static final String[] CLOCKS = {"auto", "24h", "12h"}, STYLES = {"photos", "aurora", "google"};
-        /** Home Settings: language, temperature, theme, clock, weather, city, forecast, quotes, then one row per coin. */
-        private static final int CLOCK_ROW = 3, WEATHER_ROW = 4, CITY_ROW = 5, FORECAST_ROW = 6, QUOTES_ROW = 7, COIN_ROWS = 8;
+        /** Home Settings: language, temperature, theme, clock, at power-on, weather, city, forecast, quotes, then one row per coin. */
+        private static final int CLOCK_ROW = 3, POWER_ON_ROW = 4, WEATHER_ROW = 5, CITY_ROW = 6, FORECAST_ROW = 7, QUOTES_ROW = 8, COIN_ROWS = 9;
 
         private static String styleName(String style) {
             return style.equals("aurora") ? Strings.get(R.string.clock_and_aurora)
@@ -567,6 +569,7 @@ public class SettingsActivity extends Activity {
             l.add(Strings.get(R.string.temperature));
             l.add(Strings.get(R.string.theme));
             l.add(Strings.get(R.string.clock_format));
+            l.add(Strings.get(R.string.at_power_on));
             l.add(Strings.get(R.string.weather_widget));
             l.add(Strings.get(R.string.city));
             l.add(Strings.get(R.string.forecast));
@@ -592,6 +595,9 @@ public class SettingsActivity extends Activity {
             String clock = Prefs.clockFormat();
             v[CLOCK_ROW] = clock.equals("24h") ? Strings.get(R.string.label_24_hour) : clock.equals("12h") ? Strings.get(R.string.label_12_hour)
                     : Strings.get(R.string.automatic);
+            String power = Prefs.powerOn();
+            v[POWER_ON_ROW] = power.equals("home") ? Strings.get(R.string.home_screen)
+                    : power.equals("live") ? Strings.get(R.string.live_tv) : Strings.get(R.string.power_on_tv);
             v[WEATHER_ROW] = onOff(Prefs.weather());
             v[CITY_ROW] = !cityStatus.isEmpty() ? cityStatus : Prefs.city().isEmpty() ? "—" : Prefs.city();
             v[FORECAST_ROW] = Prefs.forecast().equals("days") ? Strings.get(R.string.forecast_next_5_days) : Strings.get(R.string.forecast_next_hours);
@@ -677,6 +683,11 @@ public class SettingsActivity extends Activity {
                     int at = java.util.Arrays.asList(CLOCKS).indexOf(Prefs.clockFormat());
                     Prefs.setClockFormat(CLOCKS[(at + dir + CLOCKS.length) % CLOCKS.length]);
                     break;
+                }
+                case POWER_ON_ROW: {   // read at the next full start (PowerOn, from HomeActivity)
+                    int at = java.util.Arrays.asList(Prefs.POWER_ON).indexOf(Prefs.powerOn());
+                    Prefs.setPowerOn(Prefs.POWER_ON[(at + dir + Prefs.POWER_ON.length) % Prefs.POWER_ON.length]);
+                    return;
                 }
                 case WEATHER_ROW: Prefs.setWeather(!Prefs.weather()); break;
                 case CITY_ROW: return;
@@ -999,7 +1010,8 @@ public class SettingsActivity extends Activity {
             }
             Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
             float hy = (LIST_TOP + 20 + labels.length * pitch + 36) * k;
-            c.drawText(Strings.get(R.string.ok_or_the_arrows_change_the_value), LIST_X * k + 30 * k, hy, hint);
+            c.drawText(Strings.get(focus == POWER_ON_ROW ? R.string.power_on_hint : R.string.ok_or_the_arrows_change_the_value),
+                    LIST_X * k + 30 * k, hy, hint);
         }
 
         /** The remote's configurable buttons, nine at a time, each with what it does now. */

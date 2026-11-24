@@ -65,7 +65,9 @@ class WeatherForecastTest(unittest.TestCase):
 
     def test_settings_row_switches_without_a_fetch(self):
         settings = read("SettingsActivity.java")
-        self.assertIn("FORECAST_ROW = 6, QUOTES_ROW = 7, COIN_ROWS = 8", settings)
+        rows = dict(re.findall(r"(\w+_ROWS?) = (\d+)", settings[settings.index("CLOCK_ROW ="):]))
+        self.assertEqual(int(rows["QUOTES_ROW"]), int(rows["FORECAST_ROW"]) + 1, "quotes follow the forecast row")
+        self.assertEqual(int(rows["COIN_ROWS"]), int(rows["QUOTES_ROW"]) + 1, "the coin rows follow the quotes row")
         case = settings[settings.index("case FORECAST_ROW:"):]
         case = case[:case.index("default:")]
         self.assertIn("Prefs.setForecast(", case)

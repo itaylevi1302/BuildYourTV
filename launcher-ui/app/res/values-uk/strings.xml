@@ -39,6 +39,9 @@
     <string name="clear">"Ясно"</string>
     <string name="clock_and_aurora">"Годинник і сяйво"</string>
     <string name="clock_format">"Формат годинника"</string>
+    <string name="at_power_on">"Після увімкнення"</string>
+    <string name="power_on_tv">"На розсуд ТВ"</string>
+    <string name="power_on_hint">"Лише після повного увімкнення, не після режиму очікування."</string>
     <string name="close">"Закрити"</string>
     <string name="connect_tmdb_account">"Підключити обліковий запис TMDB"</string>
     <string name="connect_your_tmdb_account">"Підключіть обліковий запис TMDB"</string>
