@@ -1,7 +1,7 @@
 {
   "remote": "Sony BRAVIA remote (VU31)",
   "device": "BRAVIA_VU31_4K, Google TV 14 (UKR1.240726.001), Realtek SoC, 2 GB",
-  "note": "This set's buttons arrive as ordinary Android keycodes, so they are listed by \"key\" (from `dumpsys window policy`, the global-key table) rather than by Linux scancode. Listing them is what makes them configurable in Settings > Remote Buttons; \"native\" ones are shown for reference and never intercepted. Not yet pressed against the physical remote: the five \"App button\" names are by elimination, and the defaults are a starting point.",
+  "note": "This set's buttons arrive as ordinary Android keycodes, so they are listed by \"key\" (from `dumpsys window policy`, the global-key table) rather than by Linux scancode. Listing them is what makes them configurable in Settings > Remote Buttons; \"native\" ones are shown for reference and never intercepted. Netflix (191, scan 758), Prime Video (189, scan 652), YouTube (202, scan 653) and SonyLIV (3004) are the codes Free My TV read from a VU31 (Free My TV PR 395); the gear sends 83, checked with the real remote (SONY TV VRC 001). On one VU31 SonyLIV never reached Android's input pipeline, so its row may do nothing. On another unit key 201 was also set to YouTube, so it stays a YouTube row for remotes that send it. The remaining \"App button\" names are by elimination.",
   "buttons": [
     {
       "name": "Power",
@@ -65,6 +65,13 @@
       "default": "live"
     },
     {
+      "name": "Settings (gear)",
+      "key": 83,
+      "label": "NOTIFICATION",
+      "kind": "configurable",
+      "default": "settings"
+    },
+    {
       "name": "Netflix",
       "key": 191,
       "label": "BUTTON_4",
@@ -80,15 +87,22 @@
     },
     {
       "name": "YouTube",
-      "key": 201,
-      "label": "BUTTON_14",
+      "key": 202,
+      "label": "BUTTON_15",
       "kind": "configurable",
       "default": "com.google.android.youtube.tv"
     },
     {
-      "name": "YouTube (second)",
-      "key": 202,
-      "label": "BUTTON_15",
+      "name": "SonyLIV",
+      "key": 3004,
+      "label": "SONY_LIV",
+      "kind": "configurable",
+      "default": "com.sonyliv"
+    },
+    {
+      "name": "YouTube (some remotes)",
+      "key": 201,
+      "label": "BUTTON_14",
       "kind": "configurable",
       "default": "com.google.android.youtube.tv"
     },
