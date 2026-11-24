@@ -345,7 +345,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
     }
 
     /** Three box blurs on a small copy: close to a Gaussian, smooth when stretched over the screen. */
-    private static Bitmap blur(Bitmap small, int radius) {
+    static Bitmap blur(Bitmap small, int radius) {
         int w = small.getWidth(), h = small.getHeight();
         int[] px = new int[w * h], tmp = new int[w * h];
         small.getPixels(px, 0, w, 0, 0, w, h);

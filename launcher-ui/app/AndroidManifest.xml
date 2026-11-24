@@ -168,14 +168,6 @@
             android:theme="@style/CleanYourTV.Home" />
 
         <activity
-            android:name=".SeasonActivity"
-            android:process=":home"
-            android:exported="false"
-            android:screenOrientation="landscape"
-            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
-            android:theme="@style/CleanYourTV.Home" />
-
-        <activity
             android:name=".ServicesActivity"
             android:process=":home"
             android:exported="false"

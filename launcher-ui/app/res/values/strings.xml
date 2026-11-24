@@ -63,7 +63,6 @@
     <string name="couldnt_save_the_rating_prefix">"Couldn\'t save the rating: "</string>
     <string name="couldnt_search_now_prefix">"Couldn\'t search now: "</string>
     <string name="create">"Create"</string>
-    <string name="created_by_prefix">"Created by "</string>
     <string name="crypto">"Crypto"</string>
     <string name="dark">"Dark"</string>
     <string name="data_from_tmdb">"Data from TMDB"</string>
@@ -71,7 +70,6 @@
     <string name="decade_back_vowel">"The %1$ss"</string>
     <string name="details">"Details"</string>
     <string name="died_prefix">"Died: "</string>
-    <string name="directed_by_prefix">"Directed by "</string>
     <string name="directing">"Directing"</string>
     <string name="disconnect">"Disconnect"</string>
     <string name="dollar">"Dollar"</string>
@@ -151,7 +149,6 @@
     <string name="language">"Language"</string>
     <string name="light">"Light"</string>
     <string name="like_prefix">"Like "</string>
-    <string name="list">"List"</string>
     <string name="list_created">"List created"</string>
     <string name="list_name">"List name"</string>
     <string name="live_tv">"Live TV"</string>
@@ -371,7 +368,6 @@
     <string name="where_to_watch">"Where to watch"</string>
     <string name="wi_fi_network">"Wi-Fi &amp; Network"</string>
     <string name="writing">"Writing"</string>
-    <string name="you_may_also_like">"You may also like"</string>
     <string name="your_rating_for_prefix">"Your rating for "</string>
     <string name="your_rating_prefix">"Your rating: "</string>
     <string name="your_ratings">"Your ratings"</string>
@@ -441,4 +437,20 @@
     <string name="reconnect">"Reconnect"</string>
     <string name="read_access_token">"API read access token"</string>
     <string name="not_a_read_token">"That looks like the v3 key. Paste the API read access token, the long text that starts with eyJ."</string>
+    <string name="back">"Back"</string>
+    <string name="watch">"Watch"</string>
+    <string name="start_over">"Start over"</string>
+    <string name="episodes">"Episodes"</string>
+    <string name="more_like_this">"More like this"</string>
+    <string name="credit_director">"Director"</string>
+    <string name="credit_creators">"Created by"</string>
+    <string name="credit_network">"Network"</string>
+    <string name="facts">"Facts"</string>
+    <string name="original_title">"Original title"</string>
+    <string name="released">"Released"</string>
+    <string name="last_aired">"Last aired"</string>
+    <string name="runtime">"Runtime"</string>
+    <string name="original_language">"Original language"</string>
+    <string name="budget">"Budget"</string>
+    <string name="revenue">"Box office"</string>
 </resources>

@@ -451,6 +451,79 @@ final class TvUi {
         return b;
     }
 
+    /**
+     * The title page's button: a Material icon (tinted in code) with a label, or round without one. White when
+     * focused; at rest the icon takes `onColor` when the thing it stands for is on (My list, Favorite, Seen), else ink.
+     */
+    static final class Action extends LinearLayout {
+        private final float k;
+        private final int onColor;
+        private final ImageView icon;
+        private final TextView text;
+        private String label = "";
+        private boolean on;
+        private int rest = 0x33FFFFFF;
+
+        Action(Context c, float k, int iconRes, String label, int onColor, View.OnClickListener click) {
+            super(c);
+            this.k = k;
+            this.onColor = onColor;
+            setOrientation(HORIZONTAL);
+            setGravity(Gravity.CENTER);
+            icon = new ImageView(c);
+            addView(icon, new LinearLayout.LayoutParams(Math.round(32 * k), Math.round(32 * k)));
+            text = text(c, k, 28, Ui.medium, INK);
+            text.setPadding(Math.round(14 * k), 0, 0, 0);
+            addView(text);
+            setFocusable(true);
+            setFocusableInTouchMode(true);
+            setOnClickListener(click);
+            setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+            setOnFocusChangeListener((v, has) -> {
+                paint();
+                v.animate().scaleX(has ? 1.06f : 1f).scaleY(has ? 1.06f : 1f).translationZ(has ? 12 * k : 0).setDuration(140).start();
+            });
+            set(iconRes, label, false);
+        }
+
+        /** Another icon, another label (null or empty: round) and whether it is on. */
+        void set(int iconRes, String newLabel, boolean isOn) {
+            label = newLabel == null ? "" : newLabel;
+            on = isOn;
+            icon.setImageResource(iconRes);
+            boolean round = label.isEmpty();
+            text.setText(label);
+            text.setVisibility(round ? GONE : VISIBLE);
+            if (round) setPadding(Math.round(17 * k), Math.round(17 * k), Math.round(17 * k), Math.round(17 * k));
+            else setPadding(Math.round(30 * k), Math.round(16 * k), Math.round(34 * k), Math.round(16 * k));
+            setContentDescription(round ? null : label);
+            paint();
+        }
+
+        String label() {
+            return label;
+        }
+
+        /** The fill at rest (a darker one over a picture); returns this. */
+        Action rest(int color) {
+            rest = color;
+            paint();
+            return this;
+        }
+
+        private void paint() {
+            boolean f = hasFocus();
+            setBackground(round(f ? INK : rest, 40 * k));
+            int tint = f ? 0xFF14161A : on ? onColor : INK;
+            icon.setImageTintList(android.content.res.ColorStateList.valueOf(tint));
+            text.setTextColor(f ? 0xFF14161A : INK);
+        }
+    }
+
+    static Action action(Context c, float k, int icon, String label, View.OnClickListener click) {
+        return new Action(c, k, icon, label, ACCENT, click);
+    }
+
     /** A chip that is on or off (filters): on shows a check on a light pill; focused it turns white. */
     static TextView toggle(Context c, float k, String label, boolean on, View.OnClickListener click) {
         TextView b = text(c, k, 26, Ui.medium, INK);
@@ -721,6 +794,77 @@ final class TvUi {
         pop.showAtLocation(parent, Gravity.NO_GRAVITY, x, y);
         View focus = first;
         if (focus != null) focus.post(focus::requestFocus);
+        return pop;
+    }
+
+    /** `anchor` in window coordinates, as TitleMenu.pick works it out. */
+    static Rect rectOf(View v) {
+        int[] xy = new int[2];
+        v.getLocationInWindow(xy);
+        return new Rect(xy[0], xy[1], xy[0] + v.getWidth(), xy[1] + v.getHeight());
+    }
+
+    /**
+     * A menu that drops below a button (the season picker, the rating): like popover, but the rows scroll when there
+     * are many, `selected` shows a check and takes the focus. It flips above the anchor when there is no room below.
+     */
+    static PopupWindow dropdown(Activity a, View parent, Rect anchor, String title, String[] items, int selected, OnPick pick) {
+        float k = k(a);
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(Math.round(14 * k), Math.round(18 * k), Math.round(14 * k), Math.round(14 * k));
+        box.setBackground(round(0xF2202329, 26 * k));
+        box.setElevation(30 * k);
+        TextView h = text(a, k, 22, Ui.semibold, FAINT);
+        h.setText(title.toUpperCase(java.util.Locale.ROOT));
+        h.setLetterSpacing(0.1f);
+        h.setPadding(Math.round(22 * k), 0, Math.round(22 * k), Math.round(12 * k));
+        box.addView(h);
+        PopupWindow pop = new PopupWindow(box, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        pop.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
+        pop.setElevation(30 * k);
+        LinearLayout rows = new LinearLayout(a);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        ScrollView scroll = new ScrollView(a);
+        scroll.setFocusable(false);
+        scroll.setVerticalScrollBarEnabled(false);
+        View focus = null;
+        for (int i = 0; i < items.length; i++) {
+            final int which = i;
+            boolean on = i == selected;
+            TextView row = text(a, k, 28, on ? Ui.semibold : Ui.medium, INK);
+            row.setText(on ? "✓  " + items[i] : items[i]);
+            row.setMinWidth(Math.round(380 * k));
+            row.setPadding(Math.round(22 * k), Math.round(16 * k), Math.round(22 * k), Math.round(16 * k));
+            row.setFocusable(true);
+            row.setOnFocusChangeListener((v, has) -> {
+                v.setBackground(has ? round(INK, 16 * k) : null);
+                ((TextView) v).setTextColor(has ? 0xFF14161A : INK);
+            });
+            row.setOnClickListener(v -> {
+                pop.dismiss();
+                pick.pick(which);
+            });
+            row.setOnKeyListener((v, code, e) -> code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT
+                    || (code == KeyEvent.KEYCODE_DPAD_UP && which == 0) || (code == KeyEvent.KEYCODE_DPAD_DOWN && which == items.length - 1));
+            rows.addView(row);
+            if (on || (focus == null && selected < 0)) focus = row;
+        }
+        if (focus == null && rows.getChildCount() > 0) focus = rows.getChildAt(0);
+        scroll.addView(rows);
+        int screenH = a.getResources().getDisplayMetrics().heightPixels, screenW = a.getResources().getDisplayMetrics().widthPixels;
+        rows.measure(View.MeasureSpec.makeMeasureSpec(screenW, View.MeasureSpec.AT_MOST), View.MeasureSpec.UNSPECIFIED);
+        int rowsH = Math.min(rows.getMeasuredHeight(), Math.round(screenH * 0.62f));
+        box.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, rowsH));
+        box.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        int w = box.getMeasuredWidth(), hgt = box.getMeasuredHeight();
+        int x = Math.max(Math.round(24 * k), Math.min(screenW - w - Math.round(24 * k), anchor.centerX() - w / 2));
+        int y = anchor.bottom + Math.round(16 * k);
+        if (y + hgt > screenH - Math.round(24 * k)) y = Math.max(Math.round(24 * k), anchor.top - hgt - Math.round(16 * k));
+        pop.setAnimationStyle(android.R.style.Animation_Dialog);
+        pop.showAtLocation(parent, Gravity.NO_GRAVITY, x, y);
+        View f = focus;
+        if (f != null) f.post(f::requestFocus);
         return pop;
     }
 }

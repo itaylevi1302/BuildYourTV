@@ -63,7 +63,6 @@
     <string name="couldnt_save_the_rating_prefix">"Не вдалося зберегти оцінку: "</string>
     <string name="couldnt_search_now_prefix">"Не вдалося виконати пошук: "</string>
     <string name="create">"Створити"</string>
-    <string name="created_by_prefix">"Автори: "</string>
     <string name="crypto">"Криптовалюти"</string>
     <string name="dark">"Темна"</string>
     <string name="data_from_tmdb">"Дані TMDB"</string>
@@ -71,7 +70,6 @@
     <string name="decade_back_vowel">"%1$s-ті"</string>
     <string name="details">"Докладніше"</string>
     <string name="died_prefix">"Дата смерті: "</string>
-    <string name="directed_by_prefix">"Режисер: "</string>
     <string name="directing">"Режисура"</string>
     <string name="disconnect">"Відключити"</string>
     <string name="dollar">"Долар"</string>
@@ -150,7 +148,6 @@
     <string name="language">"Мова"</string>
     <string name="light">"Світла"</string>
     <string name="like_prefix">"Схоже на "</string>
-    <string name="list">"Список"</string>
     <string name="list_created">"Список створено"</string>
     <string name="list_name">"Назва списку"</string>
     <string name="live_tv">"Телеканали"</string>
@@ -370,7 +367,6 @@
     <string name="where_to_watch">"Де дивитися"</string>
     <string name="wi_fi_network">"Wi-Fi та мережа"</string>
     <string name="writing">"Сценарії"</string>
-    <string name="you_may_also_like">"Вам також може сподобатися"</string>
     <string name="your_rating_for_prefix">"Ваша оцінка для "</string>
     <string name="your_rating_prefix">"Ваша оцінка: "</string>
     <string name="your_ratings">"Ваші оцінки"</string>
@@ -445,4 +441,20 @@
     <string name="reconnect">"Під\'єднати знову"</string>
     <string name="read_access_token">"Токен доступу для читання API"</string>
     <string name="not_a_read_token">"Схоже, це ключ v3. Вставте токен доступу для читання API — довгий текст, що починається з eyJ."</string>
+    <string name="back">"Назад"</string>
+    <string name="watch">"Дивитися"</string>
+    <string name="start_over">"З початку"</string>
+    <string name="episodes">"Епізоди"</string>
+    <string name="more_like_this">"Більше схожого"</string>
+    <string name="credit_director">"Режисер"</string>
+    <string name="credit_creators">"Автори"</string>
+    <string name="credit_network">"Телеканал"</string>
+    <string name="facts">"Технічні дані"</string>
+    <string name="original_title">"Оригінальна назва"</string>
+    <string name="released">"Вихід"</string>
+    <string name="last_aired">"Останній показ"</string>
+    <string name="runtime">"Тривалість"</string>
+    <string name="original_language">"Мова оригіналу"</string>
+    <string name="budget">"Бюджет"</string>
+    <string name="revenue">"Касові збори"</string>
 </resources>

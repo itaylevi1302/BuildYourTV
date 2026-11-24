@@ -13,6 +13,7 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntConsumer;
 
 /**
  * Hold OK on a movie or a show (a poster, Explore's banner): seen, My list, favorites and the account's lists, without
@@ -35,21 +36,21 @@ final class TitleMenu {
             JSONObject states = account ? Tmdb.states(a, t.kind, t.id) : new JSONObject();
             boolean inList = account ? states.optBoolean("watchlist") : Tmdb.inWatchlist(a, t.kind, t.id);
             boolean favorite = states.optBoolean("favorite");
+            int rated = account ? Tmdb.ratingOf(states) : 0;
             MAIN.post(() -> {
-                if (!a.isFinishing() && anchor.isAttachedToWindow()) pick(a, anchor, t, account, inList, favorite);
+                if (!a.isFinishing() && anchor.isAttachedToWindow()) pick(a, anchor, t, account, inList, favorite, rated);
             });
         }, "title-menu").start();
     }
 
-    private static void pick(Activity a, View anchor, Tmdb.Title t, boolean account, boolean inList, boolean favorite) {
+    private static void pick(Activity a, View anchor, Tmdb.Title t, boolean account, boolean inList, boolean favorite, int rated) {
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
         boolean seen = Tmdb.isSeen(a, t.kind, t.id);
-        labels.add(seen ? Strings.get(R.string.unmark_as_seen) : "✓  " + Strings.get(R.string.mark_as_seen));
-        actions.add(() -> {
-            TmdbLists.markSeen(a, t, !seen);
-            changed(a, seen ? Strings.get(R.string.unmarked) : Strings.get(R.string.marked_as_seen), false);
-        });
+        labels.add("▶  " + Strings.get(R.string.watch));
+        actions.add(() -> QuickWatch.open(a, t));
+        labels.add(Strings.get(R.string.details));
+        actions.add(() -> DetailActivity.open(a, t.kind, t.id));
         labels.add(inList ? Strings.get(R.string.remove_from_my_list) : "+  " + Strings.get(R.string.add_to_my_list));
         actions.add(() -> background(a, Strings.get(R.string.couldnt_save_prefix), () -> Tmdb.setWatchlist(a, t, !inList),
                 inList ? Strings.get(R.string.removed_from_my_list) : Strings.get(R.string.added_to_my_list)));
@@ -57,22 +58,56 @@ final class TitleMenu {
             labels.add(favorite ? Strings.get(R.string.remove_from_favorites) : "♥  " + Strings.get(R.string.mark_favorite));
             actions.add(() -> background(a, Strings.get(R.string.couldnt_favorite_prefix), () -> Tmdb.setFavorite(a, t, !favorite),
                     favorite ? Strings.get(R.string.removed_from_favorites) : Strings.get(R.string.added_to_favorites)));
+        }
+        labels.add(seen ? Strings.get(R.string.unmark_as_seen) : "✓  " + Strings.get(R.string.mark_as_seen));
+        actions.add(() -> {
+            TmdbLists.markSeen(a, t, !seen);
+            changed(a, seen ? Strings.get(R.string.unmarked) : Strings.get(R.string.marked_as_seen), false);
+        });
+        if (account) {
+            labels.add(rated > 0 ? "★  " + Strings.get(R.string.your_rating_prefix) + rated : "★  " + Strings.get(R.string.rate));
+            actions.add(() -> rate(a, t, rated, v -> {
+                changed(a, v > 0 ? Strings.get(R.string.your_rating_prefix) + v : Strings.get(R.string.unmarked), false);
+                TvUi.refreshSeen(a.getWindow().getDecorView());
+            }));
             if ("movie".equals(t.kind)) {   // TMDB's v3 lists hold movies only
                 labels.add("≡  " + Strings.get(R.string.add_to_a_list));
                 actions.add(() -> addToList(a, t.id));
             }
         }
-        labels.add(Strings.get(R.string.details));
-        actions.add(() -> DetailActivity.open(a, t.kind, t.id));
         labels.add(Strings.get(R.string.cancel));
         actions.add(null);
-        int[] xy = new int[2];
-        anchor.getLocationInWindow(xy);
-        Rect at = new Rect(xy[0], xy[1], xy[0] + anchor.getWidth(), xy[1] + anchor.getHeight());
+        Rect at = TvUi.rectOf(anchor);
         TvUi.popover(a, anchor, at, t.name, labels.toArray(new String[0]), which -> {
             Runnable r = actions.get(which);
             if (r != null) r.run();
         });
+    }
+
+    /** The 1 to 10 rating (or removing it) in a dropdown at the middle of the screen; `done` gets the new rating, 0 when removed. */
+    static void rate(Activity a, Tmdb.Title t, int current, IntConsumer done) {
+        String[] items = new String[current > 0 ? 11 : 10];
+        for (int i = 0; i < 10; i++) items[i] = "★ " + (10 - i);
+        if (current > 0) items[10] = Strings.get(R.string.remove_my_rating);
+        View root = a.getWindow().getDecorView();
+        int w = root.getWidth(), h = root.getHeight();
+        Rect middle = new Rect(w / 2, h / 2, w / 2, h / 2 + 1);
+        TvUi.dropdown(a, root, middle, Strings.get(R.string.your_rating_for_prefix) + t.name, items, current > 0 ? 10 - current : -1, which -> new Thread(() -> {
+            try {
+                int value = 0;
+                if (which == 10) {
+                    Tmdb.unrate(a, t);
+                } else {
+                    value = 10 - which;
+                    Tmdb.rate(a, t, value);
+                    Tmdb.setSeen(a, t, true);
+                }
+                int v = value;
+                MAIN.post(() -> done.accept(v));
+            } catch (Exception e) {
+                MAIN.post(() -> Toast.makeText(a, Strings.get(R.string.couldnt_save_the_rating_prefix) + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        }, "title-rate").start());
     }
 
     /** The account's lists to pick from, or a new one (movies only). */

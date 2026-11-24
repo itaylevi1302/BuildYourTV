@@ -62,7 +62,6 @@
     <string name="couldnt_save_the_rating_prefix">"Não deu para salvar a nota: "</string>
     <string name="couldnt_search_now_prefix">"Não deu para buscar agora: "</string>
     <string name="create">"Criar"</string>
-    <string name="created_by_prefix">"Criação: "</string>
     <string name="crypto">"Cotações"</string>
     <string name="dark">"Escuro"</string>
     <string name="data_from_tmdb">"Dados do TMDB"</string>
@@ -70,7 +69,6 @@
     <string name="decade_back_vowel">"Anos %1$s"</string>
     <string name="details">"Ver detalhes"</string>
     <string name="died_prefix">"Morte: "</string>
-    <string name="directed_by_prefix">"Direção: "</string>
     <string name="directing">"Direção"</string>
     <string name="disconnect">"Desconectar"</string>
     <string name="dollar">"Dólar"</string>
@@ -144,7 +142,6 @@
     <string name="language">"Idioma"</string>
     <string name="light">"Claro"</string>
     <string name="like_prefix">"Parecidos com "</string>
-    <string name="list">"Lista"</string>
     <string name="list_created">"Lista criada"</string>
     <string name="list_name">"Nome da lista"</string>
     <string name="live_tv">"TV ao Vivo"</string>
@@ -362,7 +359,6 @@
     <string name="where_to_watch">"Onde assistir"</string>
     <string name="wi_fi_network">"Wi-Fi e Rede"</string>
     <string name="writing">"Roteiro"</string>
-    <string name="you_may_also_like">"Você também pode gostar"</string>
     <string name="your_rating_for_prefix">"Sua nota para "</string>
     <string name="your_rating_prefix">"Sua nota: "</string>
     <string name="your_ratings">"Suas notas"</string>
@@ -432,4 +428,20 @@
     <string name="reconnect">"Reconectar"</string>
     <string name="read_access_token">"Token de leitura da API"</string>
     <string name="not_a_read_token">"Isso parece a chave v3. Cole o token de leitura da API, o texto longo que começa com eyJ."</string>
+    <string name="back">"Voltar"</string>
+    <string name="watch">"Assistir"</string>
+    <string name="start_over">"Do começo"</string>
+    <string name="episodes">"Episódios"</string>
+    <string name="more_like_this">"Mais como este"</string>
+    <string name="credit_director">"Direção"</string>
+    <string name="credit_creators">"Criação"</string>
+    <string name="credit_network">"Canal"</string>
+    <string name="facts">"Ficha técnica"</string>
+    <string name="original_title">"Título original"</string>
+    <string name="released">"Lançamento"</string>
+    <string name="last_aired">"Último episódio"</string>
+    <string name="runtime">"Duração"</string>
+    <string name="original_language">"Idioma original"</string>
+    <string name="budget">"Orçamento"</string>
+    <string name="revenue">"Bilheteria"</string>
 </resources>

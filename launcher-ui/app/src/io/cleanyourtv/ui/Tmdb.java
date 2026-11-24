@@ -486,6 +486,18 @@ final class Tmdb {
         return sp(c).getStringSet("episodes", new java.util.HashSet<>()).contains(series + ":" + season + ":" + episode);
     }
 
+    /** The season of the show's last episode marked as seen on the TV, or -1 when there is none. */
+    static int lastSeenSeason(Context c, int series) {
+        int best = -1;
+        for (String key : sp(c).getStringSet("episodes", new java.util.HashSet<>())) {
+            String[] p = key.split(":");
+            if (p.length == 3 && p[0].equals(String.valueOf(series))) {
+                try { best = Math.max(best, Integer.parseInt(p[1])); } catch (NumberFormatException ignored) {}
+            }
+        }
+        return best;
+    }
+
     static void setEpisodeSeen(Context c, int series, int season, int episode, boolean on) {
         java.util.Set<String> all = new java.util.HashSet<>(sp(c).getStringSet("episodes", new java.util.HashSet<>()));
         String key = series + ":" + season + ":" + episode;
