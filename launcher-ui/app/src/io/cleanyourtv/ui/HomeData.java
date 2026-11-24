@@ -2,6 +2,8 @@ package io.cleanyourtv.ui;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.Network;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -137,6 +139,23 @@ final class HomeData {
                 weatherAt = cache.getLong("weatherAt", 0);
             }
         } catch (Exception ignored) {}
+        // As for the picks: a fetch made before the Wi-Fi is up (the TV just started) is tried again when it comes.
+        try {
+            ConnectivityManager cm = c.getSystemService(ConnectivityManager.class);
+            if (cm != null) cm.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
+                @Override public void onAvailable(Network network) {
+                    if (pricesFailedAt == 0 && weatherFailedAt == 0) return;
+                    pricesFailedAt = 0;
+                    weatherFailedAt = 0;
+                    main.postDelayed(() -> {
+                        if (listeners.isEmpty()) return;   // nothing showing: no downloads under another app
+                        refreshIfStale();
+                    }, 2000);   // the routes and DNS settle just after
+                }
+            });
+        } catch (RuntimeException e) {
+            AppLog.w("weather: no network callback: " + e.getMessage());
+        }
     }
 
     void addListener(Listener l) { if (!listeners.contains(l)) listeners.add(l); }
