@@ -12,6 +12,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
@@ -66,12 +67,19 @@ final class HomeApps {
         int kind;
         String key, label, pkg, inputId, number;
         String symbol;      // icon for the shortcuts and special cards
-        Bitmap tile;        // 16:9 card (apps and specials)
+        Bitmap tile;        // 16:9 card (apps and specials): set with setTile
+        BitmapShader tileShader;   // LEGACY only: the card's, for its rounded corners; it goes away with the card
         Bitmap logo;        // colored logo with no background (shelf); null = use the card
         Bitmap logoDark;    // version for a light background (YouTube's white icon), if any
         float logoInk;      // fraction of the logo with ink (thin logos are drawn larger, with the same "weight")
         float logoScale = 1; // size tweak by eye (compact logos need more)
         boolean connected = true;
+
+        void setTile(Bitmap b) {
+            tile = b;
+            // Made once here, never while drawing: a shader cached by bitmap would keep that bitmap alive.
+            tileShader = b == null || !Ui.LEGACY ? null : new BitmapShader(b, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+        }
     }
 
     /**
@@ -146,12 +154,12 @@ final class HomeApps {
                 // An app picked in Settings > Shelf that isn't in SHELF: its own name and TV art.
                 it.key = pkg;
                 it.label = ri != null ? String.valueOf(ri.loadLabel(pm)) : pkg;
-                it.tile = appTile(c, null, pkg, 0);
+                it.setTile(appTile(c, null, pkg, 0));
             } else {
                 it.key = d[0];
                 it.label = d[1];
                 it.logo = shelfLogo(c, d[0], d[2], d[4], extract);
-                if (it.logo == null) it.tile = appTile(c, d[0], d[2], 0xFF000000 | Integer.parseInt(d[3], 16));
+                if (it.logo == null) it.setTile(appTile(c, d[0], d[2], 0xFF000000 | Integer.parseInt(d[3], 16)));
                 if (it.logo != null) it.logoInk = ink(it.logo);
                 it.logoDark = ownLogoCached(c, d[0] + "-dark");
                 it.logoScale = Float.parseFloat(d[5]);
@@ -383,7 +391,7 @@ final class HomeApps {
             it.pkg = pkg;
             it.key = pkg;
             it.label = app[1];
-            it.tile = appTile(c, null, pkg, 0);
+            it.setTile(appTile(c, null, pkg, 0));
             items.add(it);
         }
         Collections.sort(items, (a, b) -> a.label.toLowerCase(Locale.ROOT).compareTo(b.label.toLowerCase(Locale.ROOT)));
@@ -396,7 +404,7 @@ final class HomeApps {
 
     private static Item special(Context c, int kind, String key, String label, String symbol) {
         Item it = shortcut(kind, key, label, symbol);
-        it.tile = symbolTile(c, key, symbol);
+        it.setTile(symbolTile(c, key, symbol));
         return it;
     }
 
