@@ -55,6 +55,11 @@ class OnlyThroughNetPicture(unittest.TestCase):
                       "static final int MAX_BYTES = 4 << 20;", "TOTAL_MS = 10_000"):
             self.assertIn(check, src)
 
+    def test_the_peer_actually_connected_to_is_checked(self):
+        src = read("NetPicture.java")
+        for check in ("Proxy.NO_PROXY", "setSSLSocketFactory(", "class PublicOnly", "getInetAddress()"):
+            self.assertIn(check, src)
+
     def test_https_pictures_are_fetched_by_net_picture_alone(self):
         art = read("WatchArt.java")
         self.assertIn('if ("https".equalsIgnoreCase(uri.getScheme())) return NetPicture.get(uri.toString());', art)

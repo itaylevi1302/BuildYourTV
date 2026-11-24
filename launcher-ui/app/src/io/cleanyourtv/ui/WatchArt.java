@@ -1,6 +1,7 @@
 package io.cleanyourtv.ui;
 
 import android.content.Context;
+import android.content.res.AssetFileDescriptor;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -11,8 +12,10 @@ import android.graphics.Rect;
 import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.OperationCanceledException;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -24,6 +27,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Continue Watching's pictures, decoded in the background once, at the card's size on screen (16:9, centre-cropped),
@@ -45,6 +53,12 @@ final class WatchArt {
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
     /** The pictures that come from the network wait on their own thread. */
     private static final ExecutorService NET = Executors.newSingleThreadExecutor();
+    /** Cuts off a provider that blocks: readAll only looks at the clock after a read returns. */
+    private static final ScheduledExecutorService WATCHDOG = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "watch-art-watchdog");
+        t.setDaemon(true);
+        return t;
+    });
     private static volatile WatchArt live;
 
     private final Context app;
@@ -221,9 +235,41 @@ final class WatchArt {
     /** https:// only through NetPicture's checks; content:// and android.resource:// from the app's own provider. */
     private byte[] read(Uri uri) throws IOException {
         if ("https".equalsIgnoreCase(uri.getScheme())) return NetPicture.get(uri.toString());
-        try (InputStream in = app.getContentResolver().openInputStream(uri)) {
-            if (in == null) throw new IOException("no picture there");
-            return readAll(in, MAX_BYTES, System.currentTimeMillis() + READ_MS);
+        // A provider that never answers would hold the one IO thread (and every card behind it): after READ_MS the
+        // watchdog cancels the open and closes the picture, which fails a read that is blocked.
+        CancellationSignal sig = new CancellationSignal();
+        AtomicBoolean late = new AtomicBoolean();
+        AtomicReference<AssetFileDescriptor> open = new AtomicReference<>();
+        ScheduledFuture<?> dog = WATCHDOG.schedule(() -> {
+            late.set(true);
+            sig.cancel();
+            closeQuietly(open.get());
+        }, READ_MS, TimeUnit.MILLISECONDS);
+        try {
+            AssetFileDescriptor afd = "content".equalsIgnoreCase(uri.getScheme())
+                    ? app.getContentResolver().openTypedAssetFileDescriptor(uri, "image/*", null, sig)
+                    : app.getContentResolver().openAssetFileDescriptor(uri, "r", sig);   // android.resource://
+            if (afd == null) throw new IOException("no picture there");
+            open.set(afd);
+            if (late.get()) throw new IOException("picture took too long");
+            try (InputStream in = afd.createInputStream()) {
+                return readAll(in, MAX_BYTES, System.currentTimeMillis() + READ_MS);
+            }
+        } catch (OperationCanceledException | IOException e) {
+            if (late.get()) throw new IOException("picture took too long");
+            throw e;
+        } finally {
+            dog.cancel(false);
+            closeQuietly(open.get());
+        }
+    }
+
+    private static void closeQuietly(AssetFileDescriptor afd) {
+        if (afd == null) return;
+        try {
+            afd.close();
+        } catch (IOException ignored) {
+            // nothing more to do
         }
     }
 

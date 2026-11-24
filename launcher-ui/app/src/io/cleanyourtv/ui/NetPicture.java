@@ -5,9 +5,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
+import java.net.Proxy;
+import java.net.Socket;
 import java.net.URL;
 
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLSocketFactory;
 
 /**
  * A picture another app left as an address in the TV's Watch Next list (Continue Watching), fetched carefully, since
@@ -20,6 +23,8 @@ final class NetPicture {
     private NetPicture() {}
 
     static final int MAX_BYTES = 4 << 20;
+    /** Looks at who the socket really reached: the name may resolve again between the check below and the connect. */
+    private static final SSLSocketFactory PUBLIC = new PublicOnly();
     private static final int MAX_REDIRECTS = 3, CONNECT_MS = 6000, READ_MS = 6000, TOTAL_MS = 10_000;
 
     /** The picture's bytes. Throws when anything about the address or the answer isn't as it should be. */
@@ -44,11 +49,12 @@ final class NetPicture {
             for (InetAddress host : hosts) if (!isPublic(host.getAddress())) throw new IOException("not a public host");
             HttpURLConnection c;
             try {
-                c = (HttpURLConnection) url.openConnection();
+                c = (HttpURLConnection) url.openConnection(Proxy.NO_PROXY);   // a proxy would be the peer
             } catch (IOException | RuntimeException e) {
                 throw new IOException("no connection");
             }
             if (!(c instanceof HttpsURLConnection)) throw new IOException("not https");
+            ((HttpsURLConnection) c).setSSLSocketFactory(PUBLIC);   // every hop opens a new connection
             try {
                 c.setConnectTimeout(CONNECT_MS);
                 c.setReadTimeout(READ_MS);
@@ -92,6 +98,56 @@ final class NetPicture {
         throw new IOException("too many redirects");
     }
 
+    /** Refuses a socket whose peer isn't public, after the connect and before the TLS handshake or any request byte. */
+    private static final class PublicOnly extends SSLSocketFactory {
+        private final SSLSocketFactory base = HttpsURLConnection.getDefaultSSLSocketFactory();
+
+        private static Socket checked(Socket s) throws IOException {
+            if (s.getInetAddress() == null || !isPublic(s.getInetAddress().getAddress())) {
+                s.close();
+                throw new IOException("not a public host");
+            }
+            return s;
+        }
+
+        /** For the sockets that connect themselves: checked once connected. */
+        private static Socket afterConnect(Socket s) throws IOException {
+            return s.isConnected() ? checked(s) : s;
+        }
+
+        @Override public Socket createSocket(Socket s, String host, int port, boolean autoClose) throws IOException {
+            return base.createSocket(checked(s), host, port, autoClose);
+        }
+
+        @Override public Socket createSocket() throws IOException {
+            return afterConnect(base.createSocket());
+        }
+
+        @Override public Socket createSocket(String host, int port) throws IOException {
+            return afterConnect(base.createSocket(host, port));
+        }
+
+        @Override public Socket createSocket(String host, int port, InetAddress local, int localPort) throws IOException {
+            return afterConnect(base.createSocket(host, port, local, localPort));
+        }
+
+        @Override public Socket createSocket(InetAddress host, int port) throws IOException {
+            return afterConnect(base.createSocket(host, port));
+        }
+
+        @Override public Socket createSocket(InetAddress host, int port, InetAddress local, int localPort) throws IOException {
+            return afterConnect(base.createSocket(host, port, local, localPort));
+        }
+
+        @Override public String[] getDefaultCipherSuites() {
+            return base.getDefaultCipherSuites();
+        }
+
+        @Override public String[] getSupportedCipherSuites() {
+            return base.getSupportedCipherSuites();
+        }
+    }
+
     /** Reads it all, up to a size and until a moment (a server that trickles bytes can't hold a card's place). */
     static byte[] readAll(InputStream in, int max, long deadline) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -108,8 +164,8 @@ final class NetPicture {
     /**
      * False for this device, the home network and the other ranges that aren't the internet: loopback, private
      * (10/8, 172.16/12, 192.168/16), link-local, carrier NAT (100.64/10), multicast, reserved and "this network" in
-     * IPv4; loopback, unspecified, unique local (fc00::/7), link-local, multicast and IPv4 written inside IPv6 (mapped,
-     * NAT64, 6to4: checked as that IPv4) in IPv6.
+     * IPv4; in IPv6 only global unicast (2000::/3) except Teredo and documentation, with IPv4 written inside IPv6
+     * (mapped, NAT64, 6to4) checked as that IPv4.
      */
     static boolean isPublic(byte[] a) {
         if (a == null) return false;
@@ -133,12 +189,14 @@ final class NetPicture {
             if (compat) return false;   // ::, ::1 and the old IPv4-compatible form
         }
         int b0 = a[0] & 255, b1 = a[1] & 255;
-        if (b0 == 0xff || (b0 & 0xfe) == 0xfc) return false;                 // multicast, unique local
-        if (b0 == 0xfe && (b1 & 0xc0) == 0x80) return false;                 // link-local
-        if (b0 == 0xfe && (b1 & 0xc0) == 0xc0) return false;                 // the old site-local
-        if (b0 == 0x00 && b1 == 0x64 && (a[2] & 255) == 0xff && (a[3] & 255) == 0x9b) {   // NAT64 64:ff9b::/96
-            return isPublic(new byte[] {a[12], a[13], a[14], a[15]});
+        if (b0 == 0x00 && b1 == 0x64 && (a[2] & 255) == 0xff && (a[3] & 255) == 0x9b) {   // 64:ff9b::/32
+            boolean wellKnown = true;
+            for (int i = 4; i < 12; i++) wellKnown &= a[i] == 0;
+            return wellKnown && isPublic(new byte[] {a[12], a[13], a[14], a[15]});   // the local-use 64:ff9b:1::/48 isn't
         }
+        if ((b0 & 0xe0) != 0x20) return false;   // only global unicast 2000::/3: not unique local, link-local, multicast
+        if (b0 == 0x20 && b1 == 0x01 && a[2] == 0 && a[3] == 0) return false;                       // Teredo
+        if (b0 == 0x20 && b1 == 0x01 && a[2] == 0x0d && (a[3] & 255) == 0xb8) return false;         // documentation
         if (b0 == 0x20 && b1 == 0x02) return isPublic(new byte[] {a[2], a[3], a[4], a[5]});   // 6to4
         return true;
     }

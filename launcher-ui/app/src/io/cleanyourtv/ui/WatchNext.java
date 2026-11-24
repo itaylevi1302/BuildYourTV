@@ -77,9 +77,9 @@ final class WatchNext {
     static List<Item> load(Context c) {
         if (!allowed(c)) return Collections.emptyList();
         ContentResolver cr = c.getContentResolver();
-        List<Item> all = new ArrayList<>(read(cr, TvContract.WatchNextPrograms.CONTENT_URI));
+        List<Item> all = new ArrayList<>(read(c, cr, TvContract.WatchNextPrograms.CONTENT_URI));
         for (long channel : continueChannels(cr, c.getPackageName())) {
-            all.addAll(read(cr, TvContract.buildPreviewProgramsUriForChannel(channel)));
+            all.addAll(read(c, cr, TvContract.buildPreviewProgramsUriForChannel(channel)));
         }
         Collections.sort(all, (a, b) -> Long.compare(b.engaged, a.engaged));
         List<Item> out = new ArrayList<>();
@@ -183,8 +183,9 @@ final class WatchNext {
         return ids;
     }
 
-    private static List<Item> read(ContentResolver cr, Uri uri) {
+    private static List<Item> read(Context c, ContentResolver cr, Uri uri) {
         List<Item> out = new ArrayList<>();
+        PackageManager pm = c.getPackageManager();
         boolean watchNext = TvContract.WatchNextPrograms.CONTENT_URI.equals(uri);
         List<String> projection = new ArrayList<>(Arrays.asList(
                 TvContract.WatchNextPrograms.COLUMN_BROWSABLE,
@@ -220,6 +221,11 @@ final class WatchNext {
                 it.title = title.trim();
                 String thumbnail = text(cur, TvContract.WatchNextPrograms.COLUMN_THUMBNAIL_URI);
                 it.picture = picture(thumbnail != null ? thumbnail : text(cur, TvContract.WatchNextPrograms.COLUMN_POSTER_ART_URI));
+                // An app without network can't make the TV fetch an address for it.
+                if (it.picture != null && "https".equalsIgnoreCase(it.picture.getScheme())
+                        && pm.checkPermission(android.Manifest.permission.INTERNET, pkg) != PackageManager.PERMISSION_GRANTED) {
+                    it.picture = null;
+                }
                 it.season = text(cur, TvContract.WatchNextPrograms.COLUMN_SEASON_DISPLAY_NUMBER);
                 it.number = text(cur, TvContract.WatchNextPrograms.COLUMN_EPISODE_DISPLAY_NUMBER);
                 it.episodeTitle = text(cur, TvContract.WatchNextPrograms.COLUMN_EPISODE_TITLE);
