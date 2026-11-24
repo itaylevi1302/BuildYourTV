@@ -10,7 +10,7 @@ answer inside that app. Your repo, your licence, your signing key; the person si
 any other app.
 
 The contract is [`docs/specs/provider.md`](specs/provider.md). This page is the short version. A
-complete example lives in `addons/watch-provider-example/` (arrives with #107; linked once it exists).
+complete example lives in [`addons/watch-provider-example/`](../addons/watch-provider-example/).
 
 ## 1. Declare the provider
 
