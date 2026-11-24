@@ -15,8 +15,8 @@ import android.graphics.BitmapFactory;
 import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
+import android.graphics.Matrix;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -68,7 +68,7 @@ final class HomeApps {
         String key, label, pkg, inputId, number;
         String symbol;      // icon for the shortcuts and special cards
         Bitmap tile;        // 16:9 card (apps and specials): set with setTile
-        BitmapShader tileShader;   // LEGACY only: the card's, for its rounded corners; it goes away with the card
+        BitmapShader tileShader;   // the card's, for its rounded corners; it goes away with the card
         Bitmap logo;        // colored logo with no background (shelf); null = use the card
         Bitmap logoDark;    // version for a light background (YouTube's white icon), if any
         float logoInk;      // fraction of the logo with ink (thin logos are drawn larger, with the same "weight")
@@ -78,7 +78,7 @@ final class HomeApps {
         void setTile(Bitmap b) {
             tile = b;
             // Made once here, never while drawing: a shader cached by bitmap would keep that bitmap alive.
-            tileShader = b == null || !Ui.LEGACY ? null : new BitmapShader(b, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+            tileShader = b == null ? null : new BitmapShader(b, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
         }
     }
 
@@ -971,19 +971,25 @@ final class HomeApps {
         int size = Math.round(TILE_H * 0.56f);
         float left = (TILE_W - size) / 2f, top = (TILE_H - size) / 2f;
         if (icon instanceof AdaptiveIconDrawable) {
-            // Adaptive icon: the layers clipped to a squircle, like an Apple icon.
+            // Adaptive icon: the layers in a squircle, like an Apple icon. Drawn apart, then filling an anti-aliased
+            // rounded rectangle (clipPath leaves stair-stepped corners on some GPUs).
             AdaptiveIconDrawable a = (AdaptiveIconDrawable) icon;
-            Path clip = new Path();
-            clip.addRoundRect(new RectF(left, top, left + size, top + size), size * 0.2237f, size * 0.2237f, Path.Direction.CW);
-            canvas.save();
-            canvas.clipPath(clip);
+            Bitmap layers = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+            Canvas lc = new Canvas(layers);
             int pad = size / 4;
             for (Drawable layer : new Drawable[] {a.getBackground(), a.getForeground()}) {
                 if (layer == null) continue;
-                layer.setBounds(Math.round(left) - pad, Math.round(top) - pad, Math.round(left) + size + pad, Math.round(top) + size + pad);
-                layer.draw(canvas);
+                layer.setBounds(-pad, -pad, size + pad, size + pad);
+                layer.draw(lc);
             }
-            canvas.restore();
+            int x = Math.round(left), y = Math.round(top);
+            BitmapShader shader = new BitmapShader(layers, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+            Matrix m = new Matrix();
+            m.setTranslate(x, y);
+            shader.setLocalMatrix(m);
+            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+            p.setShader(shader);
+            canvas.drawRoundRect(x, y, x + size, y + size, size * 0.2237f, size * 0.2237f, p);
         } else {
             // Legacy icon (a free-form drawing with transparency): smaller, no frame.
             int s = Math.round(TILE_H * 0.46f);
@@ -997,6 +1003,7 @@ final class HomeApps {
     private static synchronized Bitmap symbolTile(Context c, String key, String symbol) {
         if (TILES.containsKey(key)) return TILES.get(key);
         Bitmap b = darkTile();
+        Symbols.warm(c, symbol, TILE_H * 0.36f);
         Symbols.draw(c, new Canvas(b), symbol, TILE_W / 2f, TILE_H / 2f, TILE_H * 0.36f, 0xF2FFFFFF);
         b.setHasMipMap(true);
         TILES.put(key, b);

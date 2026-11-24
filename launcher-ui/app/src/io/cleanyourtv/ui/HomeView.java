@@ -10,9 +10,7 @@ import android.graphics.BitmapShader;
 import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
-import android.graphics.Matrix;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -253,7 +251,6 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private final Paint shadowDeep = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint halo = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Shadows shadows = new Shadows();
-    private final Matrix imageMatrix = new Matrix();
     private final Paint imageFill = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final Paint border = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint rim = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -261,7 +258,6 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private final Paint veil = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint tileFill = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Path clip = new Path();
     private final RectF tmp = new RectF(), cell = new RectF(), screen = new RectF();
     private final TextPaint fitPaint = new TextPaint();
     private final RectF gridCell = new RectF();
@@ -571,6 +567,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         gridLabels = null;
         clockMinute = -1;
         updateClock();
+        Symbols.warm(getContext(), "bell", 26 * k);
         layoutShelf();
         layoutStatus();
         layoutDrawer();
@@ -1197,6 +1194,9 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
         // Hebrew: the first app on the right, the rest following leftward (the shelf is centred, so mirror on w).
         if (Ui.he) for (int i = 0; i < n; i++) tileRects[i].set(w - tileRects[i].right, tileRects[i].top, w - tileRects[i].left, tileRects[i].bottom);
+        // Whole pixels at rest: centred rows and the screen's scale put edges between two pixels, a little soft.
+        snap(platterRect);
+        for (int i = 0; i < n; i++) snap(tileRects[i]);
         crispLogos.clear();
     }
 
@@ -1383,27 +1383,16 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
 
     /**
      * `image` covering `cell` (scaled to fill it with its proportions kept, the overflow cropped evenly), with corners of
-     * radius `r`: the shelf's tiles are wider than the apps' 16:9 TV art, which a stretch would squash. Android 12+
-     * clips to the rounded shape; on Android 9 to 11 that anti-aliased clip costs the GPU a mask on every frame of a
-     * focus animation (measured on a Mi Box 3: most of a 49 ms frame), so there the image is the shader of a rounded
-     * rectangle instead, which looks the same. `shader` is the image's own, made with it (HomeApps.Item, Backdrop) and
-     * dropped with it: one cached by bitmap here kept every image alive (#38). The canvas does the scaling, so drawing
-     * changes nothing in the shader and allocates nothing.
+     * radius `r`: the shelf's tiles are wider than the apps' 16:9 TV art, which a stretch would squash. On every version
+     * the image is the shader of an anti-aliased rounded rectangle: a clipPath isn't anti-aliased on some GPUs
+     * (stair-stepped corners on a MediaTek TV), and on Android 9 to 11 it cost a mask on every frame of a focus
+     * animation (measured on a Mi Box 3: most of a 49 ms frame). `shader` is the image's own, made with it
+     * (HomeApps.Item, Backdrop) and dropped with it: one cached by bitmap here kept every image alive (#38). The canvas
+     * does the scaling, so drawing changes nothing in the shader and allocates nothing.
      */
     private void roundImage(Canvas c, Bitmap image, BitmapShader shader, RectF cell, float r) {
         float scale = Math.max(cell.width() / image.getWidth(), cell.height() / image.getHeight());
         float x = cell.centerX() - image.getWidth() * scale / 2, y = cell.centerY() - image.getHeight() * scale / 2;
-        if (!Ui.LEGACY || shader == null) {
-            imageMatrix.setScale(scale, scale);
-            imageMatrix.postTranslate(x, y);
-            clip.reset();
-            clip.addRoundRect(cell, r, r, Path.Direction.CW);
-            c.save();
-            c.clipPath(clip);
-            c.drawBitmap(image, imageMatrix, bitmapPaint);
-            c.restore();
-            return;
-        }
         c.save();
         c.translate(x, y);
         c.scale(scale, scale);
@@ -1516,6 +1505,18 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             for (int i = 0; i < n; i++) drawerRects[i].set(axis - drawerRects[i].right, drawerRects[i].top, axis - drawerRects[i].left, drawerRects[i].bottom);
             for (RectF r : new RectF[] {weatherCard, quotesCard}) r.set(axis - r.right, r.top, axis - r.left, r.bottom);
         }
+        for (int i = 0; i < n; i++) snap(drawerRects[i]);
+        snap(weatherCard);
+        snap(quotesCard);
+        // The symbols at their sizes at rest and focused: drawing them never scales one.
+        for (HomeApps.Item it : drawerItems) {
+            Symbols.warm(getContext(), it.symbol, 34 * k);
+            Symbols.warm(getContext(), it.symbol, 34 * k * 1.07f);
+        }
+        Symbols.warmWeather(getContext(), 52 * k);
+        Symbols.warmWeather(getContext(), 30 * k);
+        Symbols.warm(getContext(), "sunrise", 22 * k);
+        Symbols.warm(getContext(), "sunset", 22 * k);
         drawerDirty = true;
     }
 
@@ -2745,6 +2746,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             float axis = (MARGIN + CONTENT_R) * k;
             for (int i = 0; i < 6; i++) topRects[i].set(axis - topRects[i].right, topRects[i].top, axis - topRects[i].left, topRects[i].bottom);
         }
+        for (int i = 0; i < 3; i++) snap(topRects[i]);   // the text tabs; the round buttons stay exactly square
         float top = L_CARDS_TOP * k, ch = L_CARD_H * k, g = L_CARD_GAP * k, left = MARGIN * k, tall = L_TALL_W * k;
         float wide = (CONTENT_R - MARGIN) * k - 2 * tall - 2 * g;
         cardRects[0].set(left, top, left + wide, top + ch);
@@ -2755,6 +2757,12 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             float axis = (MARGIN + CONTENT_R) * k;
             for (RectF r : cardRects) r.set(axis - r.right, r.top, axis - r.left, r.bottom);
         }
+        for (RectF r : cardRects) snap(r);
+        for (HomeApps.Item it : lightButtons) {
+            Symbols.warm(getContext(), it.symbol, 27 * k);
+            Symbols.warm(getContext(), it.symbol, 27 * k * 1.1f);
+        }
+        Symbols.warmWeather(getContext(), 40 * k);
         heroDirty = statusDirty = true;
     }
 
@@ -3109,6 +3117,11 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     }
 
     // MARK: - Helpers
+
+    /** Rounds a shape's edges to whole pixels (crisp at rest; a scale animation moves them again). */
+    private static void snap(RectF r) {
+        r.set(Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom));
+    }
 
     private static float smoothstep(float e0, float e1, float x) {
         float t = Ui.clamp((x - e0) / (e1 - e0));

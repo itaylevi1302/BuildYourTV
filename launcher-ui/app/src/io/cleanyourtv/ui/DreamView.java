@@ -249,6 +249,8 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
         titlePaint.setLetterSpacing(0.005f);
         metaPaint = Ui.text(Ui.medium, 29 * k, 0xC7FFFFFF);
         metaPaint.setLetterSpacing(0.014f);
+        Symbols.warmWeather(getContext(), 30 * k);   // the corner's
+        Symbols.warmWeather(getContext(), 32 * k);   // under the clock
         for (Paint p : new Paint[] {cornerDate, cornerQuote, cornerStale, cornerClock, labelPaint, titlePaint, metaPaint}) {
             p.setShadowLayer(18 * k, 0, 2 * k, 0x66000000);
         }

@@ -289,6 +289,9 @@ public class SettingsActivity extends Activity {
             h = height;
             k = w / 1920f;
             scene.setSize(w, h);
+            Symbols.warm(getContext(), "sparkles", 150 * k);
+            Symbols.warm(getContext(), "chevron_right", 22 * k);
+            Symbols.warm(getContext(), "check", 26 * k);
             title = Ui.text(Ui.displaySemibold, 50 * k, 0xFFFFFFFF);
             title.setTextAlign(Paint.Align.CENTER);
             subtitle = Ui.text(Ui.regular, 26 * k, 0x99FFFFFF);
