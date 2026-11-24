@@ -38,7 +38,7 @@ class WatchNextReader(unittest.TestCase):
         self.assertIn('PERMISSION = "android.permission.READ_TV_LISTINGS"', self.src)
 
     def test_a_refusing_or_missing_provider_is_an_empty_list(self):
-        for sig in ("    private static List<Item> read(ContentResolver cr, Uri uri) {",
+        for sig in ("    private static List<Item> read(Context c, ContentResolver cr, Uri uri) {",
                     "    private static List<Long> continueChannels(ContentResolver cr, String self) {"):
             body = method(self.src, sig)
             self.assertIn("catch (RuntimeException e)", body)
@@ -61,6 +61,9 @@ class WatchNextReader(unittest.TestCase):
         self.assertIn('"https".equalsIgnoreCase(scheme)', body)
         self.assertNotIn('"file"', body)
         self.assertNotIn('"http"', body)
+
+    def test_https_pictures_only_from_apps_with_network(self):
+        self.assertIn("android.Manifest.permission.INTERNET", self.src)
 
     def test_a_link_opens_only_its_own_app(self):
         body = method(self.src, "    static Intent linkIntent(String uri, String pkg, String self) {")
@@ -93,6 +96,11 @@ class WatchArtPictures(unittest.TestCase):
     def test_reads_are_capped_in_size_and_time(self):
         self.assertIn("MAX_BYTES = 8 << 20", self.src)
         self.assertIn("readAll(in, MAX_BYTES, System.currentTimeMillis() + READ_MS)", self.src)
+
+    def test_a_provider_that_blocks_is_cut_off(self):
+        self.assertIn("openTypedAssetFileDescriptor(", self.src)
+        self.assertIn("CancellationSignal", self.src)
+        self.assertIn("WATCHDOG.schedule(", self.src)
 
     def test_logs_never_carry_the_address(self):
         self.assertNotIn("e.getMessage()", self.src)
