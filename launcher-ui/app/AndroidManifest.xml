@@ -47,6 +47,10 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="content" android:host="android.media.tv" />
         </intent>
+        <!-- The TV's inputs panel (RemoteKeys.inputsAnswered): unseen, the Input key would open our drawer over it. -->
+        <intent>
+            <action android:name="com.android.tv.action.VIEW_INPUTS" />
+        </intent>
     </queries>
 
     <uses-feature android:name="android.software.leanback" android:required="false" />

@@ -110,7 +110,8 @@ logged, never guessed. [`config.example.json`](config.example.json) has them all
 | `show_all_providers` | `true` / `false` | Explore shows every provider of the region, not only the installed apps'. |
 | `app_tiles` | `{ "com.app": { "logo", "color" } }` | A tile for an app without a banner: an `https://` logo or a PNG pushed with `config.sh --file`, and a `#RRGGBB` colour. |
 
-A button's action is a package, `input:<TV input id>`, `live`, `settings`, `home`, `tmdb:explore`, `tmdb:watchlist`,
+A button's action is a package, `input:<TV input id>`, `input:next`, `live`, `settings`, `home`, `tmdb:explore`,
+`tmdb:watchlist`, `inputs` (the TV's inputs panel, or the home screen's drawer on the inputs where nothing answers it),
 or `""` for what the button did before.
 
 ## remote.json
@@ -129,6 +130,13 @@ first, then by keycode. These top-level fields are optional:
 
 A `vendor` or `product` that is not an id (more than four hex digits, a decimal like `9.5`) makes the whole file
 unread, logged as `remote.json not read`, rather than letting every device's keys through.
+
+On Hisense TVs the firmware turns the Input key (`KEYCODE_TV_INPUT`, 178) into the TV's inputs request
+(`com.android.tv.action.VIEW_INPUTS`), which only the stock home screen's panel answers: with that home screen
+disabled the key did nothing. With the key service on (`KEY_SERVICE=1`) it now opens the home screen with the drawer on
+the first input, and only while nothing answers the request (re-enable the stock home and the key is the TV's again).
+A row for key 178 decides instead: `configurable` with `"default": "inputs"` gives the same on any TV, and `""` leaves
+the key alone on Hisense too; a `native` row does not switch it off.
 
 ## Translations
 

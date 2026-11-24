@@ -439,6 +439,11 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             closeSheet();
         }
         sheet.snap(sheet.target);
+        if (inputsOnResume) {   // the Input key pressed inside another app: the drawer on the inputs (#55)
+            inputsOnResume = false;
+            reset(false);
+            openInputs();
+        }
         motionDirty = true;
         invalidateAll();
         idle = false;
@@ -1512,6 +1517,30 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         drawerDirty = true;
     }
 
+    /** The remote's Input key (RemoteKeys "inputs", through HomeActivity): the drawer on the first input (#55). */
+    void showInputs() {
+        if (!running) {   // pressed inside another app, or at start: when the home screen resumes
+            inputsOnResume = true;
+            return;
+        }
+        reset(false);
+        openInputs();
+    }
+
+    private boolean inputsOnResume;
+
+    /** The drawer, focused on its first input: the Inputs button and the Input key. */
+    private void openInputs() {
+        openDrawer();
+        for (int i = 0; i < drawerItems.size(); i++) {
+            if (drawerItems.get(i).kind == HomeApps.INPUT) {
+                drawerIndex = i;
+                break;
+            }
+        }
+        retarget(false);
+    }
+
     private void openDrawer() {
         if (drawerItems.isEmpty()) return;
         drawerOpen = true;
@@ -2274,14 +2303,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             return;
         }
         if (it.kind == HomeApps.INPUTS) {
-            openDrawer();
-            for (int i = 0; i < drawerItems.size(); i++) {
-                if (drawerItems.get(i).kind == HomeApps.INPUT) {
-                    drawerIndex = i;
-                    break;
-                }
-            }
-            retarget(false);
+            openInputs();
             return;
         }
         boolean opened = HomeApps.open(activity, it, this, Math.round(r.left), Math.round(r.top),

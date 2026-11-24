@@ -61,7 +61,8 @@ Formato do `examples/tcl-55c725/remote.json` (o seu controle, já levantado):
 voltar e Home ficam `native`.)
 
 Ações possíveis de um botão configurável: um app (inclusive de celular, como o Tomato), `input:<id>` (uma entrada
-HDMI), `live` (TV ao vivo), `settings`, `tmdb:watchlist`, ou vazio (o botão faz o que fazia). A tela **Botões do
+HDMI), `live` (TV ao vivo), `settings`, `tmdb:watchlist`, `inputs` (o painel de entradas da TV, ou a gaveta do Início
+nas entradas quando nada atende o `VIEW_INPUTS`), ou vazio (o botão faz o que fazia). A tela **Botões do
 Controle** só lista os `configurable`; os `native` nunca aparecem nem são interceptados.
 
 Campos opcionais no topo do arquivo (#50, vindos do Free My TV): `vendor` e `product` (número como o Android informa,
@@ -69,6 +70,11 @@ Campos opcionais no topo do arquivo (#50, vindos do Free My TV): `vendor` e `pro
 gamepad, teclado ou outro controle segue normal; `debounce_ms` (0 a 5000) faz uma rajada do mesmo botão dentro desse
 tempo valer um toque só (controle Xiaomi: `1000`). Sem eles, nada muda. Um `vendor`/`product` inválido faz o arquivo
 inteiro ser ignorado (no log: `remote.json not read`).
+
+Na Hisense, o firmware troca a tecla Input (`KEYCODE_TV_INPUT`, 178) pelo `com.android.tv.action.VIEW_INPUTS`, que só
+o painel da Home original atende; com ela desativada a tecla não fazia nada. Com o serviço ligado, ela abre o Início
+com a gaveta nas entradas, só enquanto nada atende o `VIEW_INPUTS` (Free My TV 5dbe7bf, fdabf9d; #55). Uma linha
+`configurable` para a tecla 178 decide no lugar (`""` deixa a tecla com a TV); uma `native` não desliga isso.
 
 O serviço de acessibilidade que lê os botões é ligado pelo `build-and-install.sh` (`HOME_KEY_SERVICE=1`), como no
 CleanYourTV, e funciona com o ADB desligado depois.

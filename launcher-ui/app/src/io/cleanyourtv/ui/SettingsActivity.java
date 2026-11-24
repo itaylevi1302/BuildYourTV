@@ -599,6 +599,7 @@ public class SettingsActivity extends Activity {
                 {"tmdb:watchlist", Strings.get(R.string.my_watchlist_tmdb)},
                 {"live", Strings.get(R.string.live_tv_2)},
                 {RemoteKeys.NEXT_INPUT, Strings.get(R.string.next_hdmi_input)},
+                {RemoteKeys.INPUTS, Strings.get(R.string.hdmi_inputs)},
                 {"settings", Strings.get(R.string.tv_settings_2)},
             };
             for (String[] sp : special) {
