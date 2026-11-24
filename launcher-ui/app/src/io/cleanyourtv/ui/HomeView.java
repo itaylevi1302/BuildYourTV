@@ -24,7 +24,9 @@ import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.view.Choreographer;
+import android.view.InputDevice;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityManager;
@@ -2274,6 +2276,187 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private void appsChanged() {
         appsStale = true;
         if (running) reloadSoon();
+    }
+
+    // MARK: - Mouse and air mouse: the pointer moves the focus, a click is OK, the wheel is ← and →
+
+    /** Where the pointer last moved the focus (-1: not since it came in). */
+    private float hoverX = -1, hoverY = -1;
+    private float touchX, touchY;
+    private boolean touchArmed;
+
+    /** A click (a mouse's left button, or a tap on a touch screen) opens what is under it, like OK on the focused item. */
+    @Override public boolean onTouchEvent(MotionEvent e) {
+        switch (e.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                touchX = e.getX();
+                touchY = e.getY();
+                // The right and middle buttons open nothing.
+                touchArmed = (e.getButtonState() & (MotionEvent.BUTTON_SECONDARY | MotionEvent.BUTTON_TERTIARY)) == 0;
+                return true;
+            case MotionEvent.ACTION_UP:
+                // A drag is not a click.
+                if (touchArmed && Math.hypot(e.getX() - touchX, e.getY() - touchY) < 24 * k) pointAt(e.getX(), e.getY(), true);
+                touchArmed = false;
+                return true;
+            case MotionEvent.ACTION_CANCEL:
+                touchArmed = false;
+                return true;
+            default:
+                return true;
+        }
+    }
+
+    /** The pointer moves the focus to what is under it, as the arrows would; over nothing, the focus stays. */
+    @Override public boolean onHoverEvent(MotionEvent e) {
+        AccessibilityManager am = (AccessibilityManager) getContext().getSystemService(Context.ACCESSIBILITY_SERVICE);
+        if (am != null && am.isTouchExplorationEnabled()) return super.onHoverEvent(e);   // TalkBack's explore by touch
+        switch (e.getActionMasked()) {
+            case MotionEvent.ACTION_HOVER_ENTER:
+            case MotionEvent.ACTION_HOVER_MOVE: {
+                float x = e.getX(), y = e.getY();
+                // An air mouse held still drifts a few pixels: that keeps the focus the remote's arrows gave.
+                if (hoverX >= 0 && Math.hypot(x - hoverX, y - hoverY) < 6 * k) return true;
+                hoverX = x;
+                hoverY = y;
+                pointAt(x, y, false);
+                return true;
+            }
+            case MotionEvent.ACTION_HOVER_EXIT:
+                hoverX = hoverY = -1;
+                return true;
+            default:
+                return true;
+        }
+    }
+
+    /** The wheel: ← and → along the focused row (the shelf, the cards, the drawer), a row at a time in All Apps. */
+    @Override public boolean onGenericMotionEvent(MotionEvent e) {
+        if (e.getActionMasked() == MotionEvent.ACTION_SCROLL && e.isFromSource(InputDevice.SOURCE_CLASS_POINTER)) {
+            float v = e.getAxisValue(MotionEvent.AXIS_VSCROLL);
+            if (v != 0) {
+                wheel(v < 0 ? 1 : -1);   // rolled toward you: the next item
+                return true;
+            }
+        }
+        return super.onGenericMotionEvent(e);
+    }
+
+    /**
+     * The item under (x, y) takes the focus as the arrows would give it; with `open`, it also opens, like OK. Nothing
+     * there: nothing changes.
+     */
+    private void pointAt(float x, float y, boolean open) {
+        wake();
+        if (reordering) return;   // moving an app stays with the remote's arrows, OK and Back
+        if (sheetOpen) {
+            int hit = gridAt(x, y);
+            if (hit < 0) return;
+            if (hit != gridIndex) {
+                gridIndex = hit;
+                retargetGrid(false);
+                gridDirty = true;
+            }
+            if (open) activate();
+            return;
+        }
+        if (drawerOpen) {   // the drawer's row only: the shelf above it and the top are on their way out
+            int hit = hitIndex(drawerRects, x, y - drawerLayer.getTranslationY());
+            if (hit < 0 || hit >= drawerItems.size()) return;
+            if (zone != Z_DRAWER || drawerIndex != hit) {
+                zone = Z_DRAWER;
+                drawerIndex = hit;
+                retarget(false);
+            }
+            if (open) activate();
+            return;
+        }
+        // The layers draw in screen coordinates and move as a whole (updateMotion): the hit tests take that move off.
+        float top = y - heroLayer.getTranslationY();
+        int hit = hitIndex(topRects, x, top);
+        // The real count of round buttons (lightButtons): rects past it may hold an old layout.
+        if (hit >= 0 && hit < TABS.length + lightButtons.size() && (hit >= TABS.length || picksOn())) {   // tabs: only with the picks
+            if (zone != Z_TOP || topIndex != hit) {
+                zone = Z_TOP;
+                topIndex = hit;
+                if (hit < TABS.length) selectTab(hit);   // as with the arrows, the focused tab is the selected one
+                retarget(false);
+            }
+            if (open) activate();
+            return;
+        }
+        if (watchMode) {   // Continue Watching: its cards in view, in place of the picks
+            hit = hitIndex(watchRects, x, top);
+            int at = hit < 0 ? -1 : watchFirst + hit;
+            if (at >= 0 && at < watching.size()) {
+                if (zone != Z_WATCH || watchIndex != at) {
+                    zone = Z_WATCH;
+                    watchIndex = at;
+                    retarget(false);
+                }
+                if (open) activate();
+                return;
+            }
+        }
+        hit = picksOn() ? hitIndex(cardRects, x, top) : -1;
+        if (hit >= 0 && hit < cards.size()) {
+            if (zone != Z_CARDS || cardIndex != hit) {
+                zone = Z_CARDS;
+                cardIndex = hit;
+                retarget(false);
+            }
+            if (open) activate();
+            return;
+        }
+        hit = hitIndex(tileRects, x, y - tiles.getTranslationY());
+        if (hit < 0 || hit >= shelf.size()) return;
+        if (zone != Z_SHELF || shelfIndex != hit) {
+            zone = Z_SHELF;
+            shelfIndex = hit;
+            retarget(false);
+        }
+        if (open) activate();
+    }
+
+    /** One wheel notch: the next (1) or previous (-1) item of the focused row; in All Apps, the next or previous row. */
+    private void wheel(int dir) {
+        wake();
+        if (reordering) return;
+        if (sheetOpen) {
+            moveGrid(0, dir);
+            return;
+        }
+        int row = drawerOpen ? Z_DRAWER : zone == Z_CARDS || zone == Z_WATCH ? zone : Z_SHELF;   // from the top buttons: the shelf
+        if (zone != row) {
+            zone = row;
+            retarget(false);
+        }
+        move(Ui.he ? -dir : dir, 0);   // move() mirrors ← → in Hebrew; the wheel follows the items' order
+    }
+
+    /** The All Apps cell under (x, y) among the rows in view (drawSheet's layout), or -1. */
+    private int gridAt(float x, float y) {
+        float gridWidth = COLUMNS * GRID_W + (COLUMNS - 1) * GRID_GAP;
+        float left = (1920 - gridWidth) / 2 * k, top = GRID_TOP * k - scroll.value * GRID_ROW * k;
+        float cw = GRID_W * k, ch = GRID_H * k;
+        // Only the rows in view: a pointer on the half-shown row below would scroll the sheet under it, row after row.
+        int first = Math.round(scroll.target);
+        int end = Math.min(others.size(), (first + VISIBLE_ROWS) * COLUMNS);
+        for (int i = Math.max(0, first * COLUMNS); i < end; i++) {
+            int r = i / COLUMNS, col = i % COLUMNS;
+            float x0 = left + col * (GRID_W + GRID_GAP) * k, y0 = top + r * GRID_ROW * k;
+            if (x >= x0 && x < x0 + cw && y >= y0 && y < y0 + ch) {
+                focusedCell.set(x0, y0, x0 + cw, y0 + ch);   // where the app opens from, before the next frame draws it
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** The first laid-out rect holding (x, y), or -1. */
+    private static int hitIndex(RectF[] rects, float x, float y) {
+        for (int i = 0; i < rects.length; i++) if (!rects[i].isEmpty() && rects[i].contains(x, y)) return i;
+        return -1;
     }
 
     // MARK: - Keys: only the arrows, OK and Back (system keys pass through to the system)
