@@ -319,6 +319,8 @@
     <string name="trending_this_week">"Em alta na semana"</string>
     <string name="trending_today">"Em alta hoje"</string>
     <string name="tv_settings">"Ajustes da TV"</string>
+    <string name="keystone">"Keystone"</string>
+    <string name="screen_mirroring">"Espelhar Tela"</string>
     <string name="tv_settings_2">"Configurações da TV"</string>
     <string name="type">"Tipo"</string>
     <string name="type_the_citys_name">"Digite o nome da cidade"</string>

@@ -33,6 +33,11 @@
         <package android:name="com.mediatek.tv.oneworld.tvcenter" />
         <!-- Android TV's own settings app: the remote's gear on some brands pins to it (RemoteKeys), tvSettings falls back to it. -->
         <package android:name="com.android.tv.settings" />
+        <!-- HY300/HY320 projectors: keystone and Miracast (drawer shortcuts), Allwinner's player for HDMI (#57). -->
+        <package android:name="com.htc.htcsettings" />
+        <package android:name="com.softwinner.tcorrection" />
+        <package android:name="com.softwinner.miracastReceiver" />
+        <package android:name="com.softwinner.awlivetv" />
         <!-- Google TV's screensaver: the "Google Photos" choice is offered only when it is there and on. -->
         <package android:name="com.google.android.apps.tv.dreamx" />
         <intent>

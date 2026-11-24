@@ -272,6 +272,8 @@
     <string name="trending_this_week">"Tendances de la semaine"</string>
     <string name="trending_today">"Tendances du jour"</string>
     <string name="tv_settings">"Réglages de la TV"</string>
+    <string name="keystone">"Keystone"</string>
+    <string name="screen_mirroring">"Recopie d\'écran"</string>
     <string name="tv_settings_2">"Réglages de la TV"</string>
     <string name="type_the_citys_name">"Tapez le nom de la ville"</string>
     <string name="waiting_for_approval">"En attente d\'approbation…"</string>

@@ -61,6 +61,8 @@ final class HomeApps {
     static final int NETWORK = 9;
     /** Android's list of apps, in the bottom drawer where TV Settings opens the maker's own menu (#56). */
     static final int APP_SETTINGS = 10;
+    /** A screen of the TV maker's own, in the bottom drawer only where the TV has it: a projector's keystone (#57). */
+    static final int DEVICE = 11;
     /** Image size of each card (16:9; on screen it shows up to ~330 px wide). */
     static final int TILE_W = 384, TILE_H = 216;
 
@@ -68,6 +70,7 @@ final class HomeApps {
         int kind;
         String key, label, pkg, inputId, number;
         String symbol;      // icon for the shortcuts and special cards
+        Intent intent;      // DEVICE: the maker's own screen it opens (a projector's keystone, Miracast)
         Bitmap tile;        // 16:9 card (apps and specials): set with setTile
         BitmapShader tileShader;   // the card's, for its rounded corners; it goes away with the card
         Bitmap logo;        // colored logo with no background (shelf); null = use the card
@@ -242,7 +245,41 @@ final class HomeApps {
         if (appSettings(c) != null) {
             items.add(shortcut(APP_SETTINGS, "app-settings", Strings.get(R.string.apps_settings), "apps"));
         }
+        projectorShortcuts(c, items);
         return items;
+    }
+
+    /**
+     * HY300 and HY320 projectors (#57, Free My TV fb10f1a and 6ab423e): the stock home screen was the only way to their
+     * keystone screen and Miracast receiver. Keystone opens com.softwinner.tcorrection where it is there (the Amlogic
+     * t950s_be311 boards carry the HTC settings too, but its keystone crashes there: SurfaceFlinger refuses request
+     * code 1050), else the HTC settings' projection screen (Allwinner H713). Each shows only where the TV has it, so
+     * other TVs see no change. Opening Miracast moves the Wi-Fi to Wi-Fi Direct: ADB over Wi-Fi drops.
+     */
+    private static void projectorShortcuts(Context c, List<Item> items) {
+        Intent tcorrection = new Intent().setComponent(new ComponentName("com.softwinner.tcorrection",
+                "com.softwinner.tcorrection.projection.ProjectionSettingActivity"));
+        device(c, items, "keystone", Strings.get(R.string.keystone), "keystone",
+                opens(c, tcorrection) ? tcorrection : new Intent("action.htcsettings.prjsettings"));
+        device(c, items, "mirroring", Strings.get(R.string.screen_mirroring), "cast", new Intent().setComponent(
+                new ComponentName("com.softwinner.miracastReceiver", "com.softwinner.miracastReceiver.Miracast")));
+    }
+
+    /** A DEVICE item for the drawer, only when an activity of the TV's answers the intent. */
+    private static void device(Context c, List<Item> items, String key, String label, String symbol, Intent intent) {
+        if (!opens(c, intent)) return;
+        Item it = shortcut(DEVICE, key, label, symbol);
+        it.intent = intent;
+        items.add(it);
+    }
+
+    /**
+     * An enabled, exported activity answers the intent. PackageManager looks for an explicit component too (unlike
+     * Intent.resolveActivity, which hands it back without looking), and a disabled package resolves to nothing.
+     */
+    private static boolean opens(Context c, Intent intent) {
+        ResolveInfo r = c.getPackageManager().resolveActivity(intent, 0);
+        return r != null && r.activityInfo != null && r.activityInfo.exported;
     }
 
     /**
@@ -311,6 +348,8 @@ final class HomeApps {
             return out;
         }
         Collections.sort(list, (a, b) -> a.getId().compareTo(b.getId()));
+        // Allwinner's live TV player (HY300 and HY320 projectors) is the only way to the HDMI input on those boards.
+        boolean allwinner = allwinnerInputs(c);
         Pattern digit = Pattern.compile("(\\d)");
         for (int i = 0; i < list.size(); i++) {
             TvInputInfo info = list.get(i);
@@ -324,7 +363,11 @@ final class HomeApps {
                 state = tim.getInputState(info.getId());
             } catch (RuntimeException ignored) {
             }
-            if (!all && state != TvInputManager.INPUT_STATE_CONNECTED) continue;
+            // An Allwinner projector stays in "connected standby" even with a source on (HY320 Mini), and its single
+            // port always works: standby counts as connected there (Free My TV 6666602).
+            boolean connected = state == TvInputManager.INPUT_STATE_CONNECTED
+                    || (allwinner && state == TvInputManager.INPUT_STATE_CONNECTED_STANDBY);
+            if (!all && !connected) continue;
             CharSequence custom = null;
             try {
                 custom = info.loadCustomLabel(c);
@@ -340,18 +383,41 @@ final class HomeApps {
             }
             String reported = devices.containsKey(info.getId()) ? devices.get(info.getId()) : "";
             String label = custom != null && custom.length() > 0 ? custom.toString()
-                    : !reported.isEmpty() && state == TvInputManager.INPUT_STATE_CONNECTED ? reported : "HDMI " + number;
-            String symbol = state == TvInputManager.INPUT_STATE_CONNECTED || custom != null
-                    ? deviceSymbol(label) : "hdmi";
+                    : !reported.isEmpty() && connected ? reported : "HDMI " + number;
+            String symbol = connected || custom != null ? deviceSymbol(label) : "hdmi";
             if (symbol.equals("hdmi") && !type.isEmpty()) symbol = typeSymbol(type);
             Item it = shortcut(INPUT, "hdmi" + number, label, symbol);
             it.inputId = info.getId();
             it.number = String.valueOf(number);
-            it.connected = state == TvInputManager.INPUT_STATE_CONNECTED;
+            it.connected = connected;
             out.add(it);
         }
         Collections.sort(out, (a, b) -> a.number.compareTo(b.number));
+        // Allwinner's player opens only HDMI 1 (HY300 and HY320: one port, though the board lists three)
+        if (allwinner) out.removeIf(it -> !"1".equals(it.number));
         return out;
+    }
+
+    /** Allwinner's live TV player (HY300 and HY320 projectors), the stock home screen's way to HDMI (#57). */
+    private static final ComponentName ALLWINNER_TV = new ComponentName("com.softwinner.awlivetv", "com.softwinner.awlivetv.MainActivity");
+
+    /**
+     * No app opens a passthrough input, but Allwinner's player is there (Free My TV fb10f1a). Every other TV answers
+     * the passthrough request (or has no such player) and sees no change.
+     */
+    private static boolean allwinnerInputs(Context c) {
+        Intent view = new Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput("x"));
+        return view.resolveActivity(c.getPackageManager()) == null && opens(c, new Intent().setComponent(ALLWINNER_TV));
+    }
+
+    /**
+     * How to open an HDMI input: the standard passthrough request or, on an Allwinner projector, its own player, which
+     * takes the port in "input_source" ("HDMI1") as its source picker does: the HY320 needs it, the HY300 opens its only
+     * port anyway (Free My TV 6666602).
+     */
+    static Intent inputIntent(Context c, Item it) {
+        if (allwinnerInputs(c)) return new Intent().setComponent(ALLWINNER_TV).putExtra("input_source", "HDMI" + it.number);
+        return new Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(it.inputId));
     }
 
     /** Words in a device's name, by the icon they pick: a game console, a streaming box, a sound system, a TV box. */
@@ -443,7 +509,7 @@ final class HomeApps {
                 intent = liveTv(a);
                 break;
             case INPUT:
-                intent = new Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(it.inputId));
+                intent = inputIntent(a, it);
                 RemoteKeys.rememberInput(a, it.inputId);   // the remote's "next input" goes on from here
                 break;
             case SETTINGS:
@@ -460,6 +526,10 @@ final class HomeApps {
                 break;
             case EXPLORE:
                 intent = new Intent().setComponent(new ComponentName(a, ExploreActivity.class));
+                break;
+            case DEVICE:
+                // A fresh task: else Back walks through whatever the maker's settings app had open before
+                intent = it.intent == null ? null : new Intent(it.intent).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
                 break;
             default:
                 return false;

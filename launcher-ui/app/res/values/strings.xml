@@ -328,6 +328,8 @@
     <string name="trending_this_week">"Trending this week"</string>
     <string name="trending_today">"Trending today"</string>
     <string name="tv_settings">"TV Settings"</string>
+    <string name="keystone">"Keystone"</string>
+    <string name="screen_mirroring">"Screen Mirroring"</string>
     <string name="tv_settings_2">"TV settings"</string>
     <string name="type">"Type"</string>
     <string name="type_the_citys_name">"Type the city\'s name"</string>

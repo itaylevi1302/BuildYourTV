@@ -90,6 +90,8 @@
     <string name="to_move_ok_to_drop_back_to_cancel">"← → verschieben · OK ablegen · Zurück abbrechen"</string>
     <string name="tonight">"HEUTE ABEND"</string>
     <string name="tv_settings">"TV-Einstellungen"</string>
+    <string name="keystone">"Trapezkorrektur"</string>
+    <string name="screen_mirroring">"Bildschirmspiegelung"</string>
     <string name="type_the_citys_name">"Namen der Stadt eingeben"</string>
     <string name="weather">"Wetter"</string>
     <string name="weather_widget">"Wetter-Widget"</string>

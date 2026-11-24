@@ -92,6 +92,8 @@
     <string name="to_move_ok_to_drop_back_to_cancel">"← → para mover · OK para soltar · Atrás para cancelar"</string>
     <string name="tonight">"PARA ESTA NOCHE"</string>
     <string name="tv_settings">"Ajustes del TV"</string>
+    <string name="keystone">"Keystone"</string>
+    <string name="screen_mirroring">"Duplicar pantalla"</string>
     <string name="type_the_citys_name">"Escribe el nombre de la ciudad"</string>
     <string name="weather">"Clima"</string>
     <string name="weather_widget">"Widget del clima"</string>
