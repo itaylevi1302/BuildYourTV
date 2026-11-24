@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="remote_key_service">Lets the app buttons on the remote (Netflix, YouTube, Prime Video, TCL Channel) open the apps you picked in CleanYourTV UI, from any app. It only reads those buttons.</string>
+    <string name="remote_key_service">Lets the app buttons on the remote (Netflix, YouTube, Prime Video, TCL Channel) open the apps you picked in CleanYourTV UI, from any app, and lets the sleep timer turn the TV off. It only reads those buttons.</string>
     <string name="a_pngs_url_empty_the_apps_icon">"A PNG\'s URL (empty: the app\'s icon)"</string>
     <string name="account_services_and_the_menus_order">"Account, services and the menu\'s order"</string>
     <string name="acting">"Acting"</string>
@@ -413,4 +413,13 @@
     <string name="forecast_next_5_days">"Next 5 days"</string>
     <string name="duration_minutes">"%1$dm"</string>
     <string name="duration_hours_minutes">"%1$dh %2$dm"</string>
+    <string name="sleep_timer">"Sleep Timer"</string>
+    <string name="sleep_minutes">"%1$d min"</string>
+    <string name="sleep_left">"%1$d min left"</string>
+    <string name="sleep_unavailable">"Needs the key service"</string>
+    <string name="sleep_unavailable_why">"The sleep timer turns the TV off through the remote buttons service, which is off on this TV. Turn it on from a computer: KEY_SERVICE=1 launcher-ui/build-and-install.sh"</string>
+    <string name="sleep_warning">"The TV turns off in %1$d s"</string>
+    <string name="sleep_more">"15 more minutes"</string>
+    <string name="sleep_keep_on">"Keep the TV on"</string>
+    <string name="sleep_now">"Turn off now"</string>
 </resources>

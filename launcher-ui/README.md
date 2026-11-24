@@ -30,7 +30,7 @@ on (Settings → Device Preferences → About → press OK on **Build** seven ti
    adb shell 'content write --uri content://io.cleanyourtv.ui.config/config.json < /data/local/tmp/cyt-ui-config.json && rm /data/local/tmp/cyt-ui-config.json'
    adb shell input keyevent KEYCODE_HOME
    ```
-4. Optional, the screensaver and the remote's app buttons from inside any app:
+4. Optional, the screensaver, and the key service (the remote's app buttons from inside any app, and the sleep timer):
    ```bash
    adb shell settings put secure screensaver_components io.cleanyourtv.ui/.Screensaver   # Android 11 to 12L: .ScreensaverAlone
    adb shell settings put secure enabled_accessibility_services io.cleanyourtv.ui/.RemoteKeyService
@@ -197,6 +197,26 @@ Settings → Home Settings → *Now Playing widget* hides or shows it. Hiding it
 (only `NOW_PLAYING=0` or `disallow_listener` do). The row says *Not allowed* until the permission is there, and stays
 so where the TV refuses it. On Android 11 to 12L the screensaver runs in its own process and picks up that switch
 the next time that process starts.
+
+## Sleep timer
+
+Settings → Sleep Timer turns the TV off after 15, 30, 60, 90 or 120 minutes; Off cancels it. A minute before, a small
+box over whatever is playing counts down with **15 more minutes**, **Keep the TV on** and **Turn off now**; Back closes
+the box and the timer runs on. It needs the key service (`KEY_SERVICE=1`, step 4 above): Android lets no ordinary app
+put the TV to sleep, and the service's "lock screen" action (Android 9 and later) does it the way the remote's power key
+does. Without the service the row says so. It adds no permission (no overlay, no exact alarm, no boot receiver), so:
+
+- The alarms are inexact. While the TV is on Android normally delivers them on time; Android 12 and later may deliver
+  one a few minutes late.
+- The timer survives the home screen being closed, and ends when the TV restarts or is turned off some other way.
+- The box over a playing app pauses most players, as any window on top does.
+- What sleep does is the firmware's: on most TVs the same standby as the power key, and a box behind HDMI sleeps and
+  turns the TV off over HDMI-CEC. A firmware that handles its power key its own way may only turn the screen off (see
+  "Xiaomi HyperOS 3" in [`docs/TROUBLESHOOTING.md`](../docs/TROUBLESHOOTING.md)).
+- Not on TCL's Android 11, where the key service is refused.
+
+To try it, pick 15 min and watch `adb logcat -s CleanYourTV-UI` for "sleep timer: 900 s", then, after the warning box a
+minute before the end, "sleep timer: TV off".
 
 ## Translations
 

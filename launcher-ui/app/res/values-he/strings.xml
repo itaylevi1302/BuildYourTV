@@ -362,4 +362,13 @@
     <string name="forecast_next_5_days">"5 הימים הקרובים"</string>
     <string name="duration_minutes">"%1$d דק\'"</string>
     <string name="duration_hours_minutes">"%1$d שע\' %2$d דק\'"</string>
+    <string name="sleep_timer">"טיימר שינה"</string>
+    <string name="sleep_minutes">"%1$d דק\'"</string>
+    <string name="sleep_left">"נותרו %1$d דק\'"</string>
+    <string name="sleep_unavailable">"דורש את שירות המקשים"</string>
+    <string name="sleep_unavailable_why">"טיימר השינה מכבה את הטלוויזיה דרך שירות מקשי השלט, שכבוי בטלוויזיה הזו. אפשר להפעיל אותו ממחשב: KEY_SERVICE=1 launcher-ui/build-and-install.sh"</string>
+    <string name="sleep_warning">"הטלוויזיה תיכבה בעוד %1$d שנ\'"</string>
+    <string name="sleep_more">"עוד 15 דקות"</string>
+    <string name="sleep_keep_on">"להשאיר את הטלוויזיה דולקת"</string>
+    <string name="sleep_now">"לכבות עכשיו"</string>
 </resources>

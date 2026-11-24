@@ -165,4 +165,13 @@
     <string name="forecast_next_5_days">"Próximos 5 días"</string>
     <string name="duration_minutes">"%1$d min"</string>
     <string name="duration_hours_minutes">"%1$d h %2$d min"</string>
+    <string name="sleep_timer">"Temporizador de apagado"</string>
+    <string name="sleep_minutes">"%1$d min"</string>
+    <string name="sleep_left">"Quedan %1$d min"</string>
+    <string name="sleep_unavailable">"Necesita el servicio de botones"</string>
+    <string name="sleep_unavailable_why">"El temporizador apaga el TV mediante el servicio de los botones del control remoto, que está desactivado en este TV. Actívalo desde una computadora: KEY_SERVICE=1 launcher-ui/build-and-install.sh"</string>
+    <string name="sleep_warning">"El TV se apaga en %1$d s"</string>
+    <string name="sleep_more">"15 minutos más"</string>
+    <string name="sleep_keep_on">"Mantener el TV encendido"</string>
+    <string name="sleep_now">"Apagar ahora"</string>
 </resources>
