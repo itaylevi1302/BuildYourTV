@@ -28,6 +28,7 @@ final class Prefs {
     static void init(Context c) {
         app = c.getApplicationContext();
         Ui.applyLanguage(app);   // the language picked on the TV, now that it can be read
+        fixDreamComponent();
     }
 
     private static SharedPreferences sp() {
@@ -108,11 +109,34 @@ final class Prefs {
         if (app == null) return;
         android.content.ContentResolver cr = app.getContentResolver();
         if (!google && !GOOGLE_SCREENSAVER.equals(android.provider.Settings.Secure.getString(cr, "screensaver_components"))) return;
-        String own = app.getPackageName() + "/." + (app.getResources().getBoolean(R.bool.dream_alone) ? "ScreensaverAlone" : "Screensaver");
+        String own = ownDream();
         try {
             android.provider.Settings.Secure.putString(cr, "screensaver_components", google ? GOOGLE_SCREENSAVER : own);
         } catch (SecurityException e) {
             AppLog.w("screensaver not switched, no WRITE_SECURE_SETTINGS: " + e.getMessage());
+        }
+    }
+
+    /** The screensaver component of this Android version: in the main process on 11 to 12L, in :home otherwise. */
+    private static String ownDream() {
+        return app.getPackageName() + "/." + (app.getResources().getBoolean(R.bool.dream_alone) ? "ScreensaverAlone" : "Screensaver");
+    }
+
+    /**
+     * An in-place update across the Android 12 change (#39) leaves screensaver_components on the copy that is now
+     * disabled: moves our own value to the right one. Google's or another app's screensaver is never touched.
+     */
+    private static void fixDreamComponent() {
+        try {
+            android.content.ContentResolver cr = app.getContentResolver();
+            String now = android.provider.Settings.Secure.getString(cr, "screensaver_components");
+            String pkg = app.getPackageName();
+            String own = ownDream();
+            if (now == null || now.equals(own)) return;
+            if (!now.equals(pkg + "/.Screensaver") && !now.equals(pkg + "/.ScreensaverAlone")) return;
+            android.provider.Settings.Secure.putString(cr, "screensaver_components", own);
+        } catch (SecurityException e) {
+            AppLog.w("screensaver not moved, no WRITE_SECURE_SETTINGS: " + e.getMessage());
         }
     }
 
@@ -125,7 +149,7 @@ final class Prefs {
     static void setClockFormat(String v) { put("clock", v); }
 
     /**
-     * Reads the settings again from disk. On Android 11 the screensaver runs in the main process while the settings
+     * Reads the settings again from disk. On Android 11 to 12L the screensaver runs in the main process while the settings
      * are changed in :home, and each process keeps its own copy in memory; this one would miss the change.
      */
     @SuppressWarnings("deprecation")

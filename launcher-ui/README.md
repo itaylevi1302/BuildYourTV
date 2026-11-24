@@ -32,7 +32,7 @@ on (Settings → Device Preferences → About → press OK on **Build** seven ti
    ```
 4. Optional, the screensaver and the remote's app buttons from inside any app:
    ```bash
-   adb shell settings put secure screensaver_components io.cleanyourtv.ui/.Screensaver   # Android 11: .ScreensaverAlone
+   adb shell settings put secure screensaver_components io.cleanyourtv.ui/.Screensaver   # Android 11 to 12L: .ScreensaverAlone
    adb shell settings put secure enabled_accessibility_services io.cleanyourtv.ui/.RemoteKeyService
    adb shell settings put secure accessibility_enabled 1
    ```
