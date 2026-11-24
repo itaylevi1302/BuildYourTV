@@ -555,8 +555,8 @@ public class SettingsActivity extends Activity {
 
         private static final String[] LANGUAGES = {"auto", "pt", "en", "es", "de", "ru", "uk", "fr", "tr", "he"}, UNITS = {"auto", "C", "F"}, THEMES = {"auto", "light", "dark"};
         private static final String[] CLOCKS = {"auto", "24h", "12h"}, STYLES = {"photos", "aurora", "google"};
-        /** Home Settings: language, temperature, theme, clock, at power-on, weather, city, forecast, quotes, then one row per coin. */
-        private static final int CLOCK_ROW = 3, POWER_ON_ROW = 4, WEATHER_ROW = 5, CITY_ROW = 6, FORECAST_ROW = 7, QUOTES_ROW = 8, COIN_ROWS = 9;
+        /** Home Settings: language, temperature, theme, clock, at power-on, system apps, weather, city, forecast, quotes, then one row per coin. */
+        private static final int CLOCK_ROW = 3, POWER_ON_ROW = 4, SYSTEM_APPS_ROW = 5, WEATHER_ROW = 6, CITY_ROW = 7, FORECAST_ROW = 8, QUOTES_ROW = 9, COIN_ROWS = 10;
 
         private static String styleName(String style) {
             return style.equals("aurora") ? Strings.get(R.string.clock_and_aurora)
@@ -574,6 +574,7 @@ public class SettingsActivity extends Activity {
             l.add(Strings.get(R.string.theme));
             l.add(Strings.get(R.string.clock_format));
             l.add(Strings.get(R.string.at_power_on));
+            l.add(Strings.get(R.string.system_apps_in_all_apps));
             l.add(Strings.get(R.string.weather_widget));
             l.add(Strings.get(R.string.city));
             l.add(Strings.get(R.string.forecast));
@@ -602,6 +603,7 @@ public class SettingsActivity extends Activity {
             String power = Prefs.powerOn();
             v[POWER_ON_ROW] = power.equals("home") ? Strings.get(R.string.home_screen)
                     : power.equals("live") ? Strings.get(R.string.live_tv) : Strings.get(R.string.power_on_tv);
+            v[SYSTEM_APPS_ROW] = onOff(Prefs.systemApps());
             v[WEATHER_ROW] = onOff(Prefs.weather());
             v[CITY_ROW] = !cityStatus.isEmpty() ? cityStatus : Prefs.city().isEmpty() ? "—" : Prefs.city();
             v[FORECAST_ROW] = Prefs.forecast().equals("days") ? Strings.get(R.string.forecast_next_5_days) : Strings.get(R.string.forecast_next_hours);
@@ -693,6 +695,7 @@ public class SettingsActivity extends Activity {
                     Prefs.setPowerOn(Prefs.POWER_ON[(at + dir + Prefs.POWER_ON.length) % Prefs.POWER_ON.length]);
                     return;
                 }
+                case SYSTEM_APPS_ROW: Prefs.setSystemApps(!Prefs.systemApps()); break;   // All Apps re-reads on Prefs.version
                 case WEATHER_ROW: Prefs.setWeather(!Prefs.weather()); break;
                 case CITY_ROW: return;
                 case FORECAST_ROW:   // both are in memory: nothing to fetch

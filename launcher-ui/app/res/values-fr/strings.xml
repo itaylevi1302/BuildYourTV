@@ -8,6 +8,7 @@
     <string name="all">"Tout"</string>
     <string name="all_ages">"Tous publics"</string>
     <string name="all_apps">"Toutes les applis"</string>
+    <string name="system_apps_in_all_apps">"Applis système dans Toutes les applis"</string>
     <string name="apps_settings">"Réglages des applis"</string>
     <string name="anime">"Animés"</string>
     <string name="any_year">"Toutes les années"</string>

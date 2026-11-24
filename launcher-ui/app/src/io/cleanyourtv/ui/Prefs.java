@@ -306,6 +306,15 @@ final class Prefs {
 
     static void setHidden(List<String> packages) { put("hidden", String.join(",", packages)); }
 
+    // MARK: - System apps
+
+    /**
+     * Also list the TV's own system apps that have a launcher entry (the maker's tools, Files...) in All Apps, the shelf
+     * editor and the app pickers. Off (the default) keeps the lists as they were. Factory menus never show (HomeApps).
+     */
+    static boolean systemApps() { return sp().getBoolean("systemApps", false); }
+    static void setSystemApps(boolean on) { put("systemApps", on); }
+
     // MARK: - Custom tiles
 
     /** "logo source|#RRGGBB" for a styled shelf tile, or "" (CustomTiles). */

@@ -13,6 +13,7 @@
     <string name="all">"Все"</string>
     <string name="all_ages">"Для всех возрастов"</string>
     <string name="all_apps">"Приложения"</string>
+    <string name="system_apps_in_all_apps">"Показывать системные приложения"</string>
     <string name="apps_settings">"Настройки приложений"</string>
     <string name="animation">"Анимация"</string>
     <string name="anime">"Аниме"</string>
