@@ -1,0 +1,30 @@
+{
+  "remote": "Google TV Streamer remote",
+  "device": "Google TV Streamer (kirkwood), Google TV 14; remote layout Vendor_18d1_Product_9451.kl",
+  "vendor": "18d1",
+  "product": "9451",
+  "note": "Key codes from Free My TV (Prefs.java, #387). They match this folder's debloat.txt, which read them from the remote's layout file and checked all three with the real remote through the reference launcher's app_keys; not yet tried with this launcher. vendor and product (from the layout file's name) keep a gamepad's or another remote's BUTTON_3 and BUTTON_4 out. With launcherx disabled all three buttons do nothing, so YouTube and Netflix start on their apps; the star button (MACRO_1, launcherx's Google Home panel) starts empty.",
+  "buttons": [
+    {
+      "name": "YouTube",
+      "key": 190,
+      "label": "BUTTON_3",
+      "kind": "configurable",
+      "default": "com.google.android.youtube.tv"
+    },
+    {
+      "name": "Netflix",
+      "key": 191,
+      "label": "BUTTON_4",
+      "kind": "configurable",
+      "default": "com.netflix.ninja"
+    },
+    {
+      "name": "Star",
+      "key": 313,
+      "label": "MACRO_1",
+      "kind": "configurable",
+      "default": ""
+    }
+  ]
+}
