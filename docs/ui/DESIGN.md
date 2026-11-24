@@ -33,7 +33,11 @@ segunda tela inicial, inspirada no [Free My TV](https://github.com/simbasjungles
 
 - Home: "Para você" com 3 sugestões por hora (TMDB, só de serviços instalados ou mapeados), abas Filmes/Séries,
   prateleira de vidro, Entradas, clima, tema dia/noite pelo pôr do sol, screensaver com fotos e relógio.
-- Ajustes na TV: Ajustes do Início, Prateleira, **Botões do Controle**, **Recomendações**, Ajustes da TV.
+- Ajustes na TV: Ajustes do Início, Prateleira, **Entradas**, **Botões do Controle**, **Recomendações**, Ajustes da TV.
+  **Entradas** (#60, Free My TV 9ee0103 e eb2fbfb) é o editor da prateleira sobre a TV ao vivo e as HDMI: OK mostra ou
+  esconde, ← → muda a ordem, e a gaveta segue; até ser usado, nada muda. A primeira linha, quando algum botão do
+  controle roda `live`, escolhe o que ele abre: a TV ao vivo ou uma entrada HDMI (no Free My TV é o botão de cima, que
+  aqui não existe).
 - Sai do Free My TV: a troca Free/Original pelo app, o cliente ADB interno (`Adb.java`), o `HomeMode` e o
   `Watchdog`, que dependem do ADB aberto. A volta ao original é `tools/restore.sh`, como no CleanYourTV.
 

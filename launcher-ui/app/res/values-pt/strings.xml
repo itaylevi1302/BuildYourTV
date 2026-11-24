@@ -188,6 +188,11 @@
     <string name="not_installed">"Não instalado"</string>
     <string name="not_on_any_streaming_service_in_the_region_right_now">"Não está em nenhum serviço de streaming no Brasil agora."</string>
     <string name="not_on_the_shelf">"fora da prateleira"</string>
+    <string name="inputs_edit_hint">"OK mostra ou esconde uma entrada. ← → mudam a ordem."</string>
+    <string name="in_the_inputs_place_prefix">"nas entradas, posição "</string>
+    <string name="not_in_the_inputs">"fora das entradas"</string>
+    <string name="input_hidden">"Oculta"</string>
+    <string name="live_tv_button">"Botão TV ao vivo"</string>
     <string name="nothing_found">"Nada encontrado."</string>
     <string name="nothing_here_yet_open_a_title_to_add_it">"Nada aqui ainda. Abra um título para marcar."</string>
     <string name="nothing_matches_this_filter">"Nada encontrado com esse filtro."</string>

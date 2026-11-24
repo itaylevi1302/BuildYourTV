@@ -209,8 +209,12 @@ final class RemoteKeys {
                     if (own.resolveActivity(c.getPackageManager()) != null) return own;
                 }
                 return HomeApps.tvSettings(c);
-            case "live":
-                return HomeApps.liveTv(c);
+            case "live": {   // Live TV, or the HDMI input picked under Settings > Inputs > Live TV button (#60)
+                HomeApps.Item box = HomeApps.liveButtonInput(c);
+                if (box == null) return HomeApps.liveTv(c);
+                rememberInput(c, box.inputId);   // the remote's "next input" goes on from here
+                return HomeApps.inputIntent(c, box);
+            }
             case INPUTS:   // the TV's inputs panel; with none (Hisense with its stock home off), our drawer on the inputs
                 if (inputsAnswered(c)) return new Intent(VIEW_INPUTS);
                 return new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(c.getPackageName())

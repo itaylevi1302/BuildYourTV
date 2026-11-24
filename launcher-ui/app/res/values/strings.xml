@@ -195,6 +195,11 @@
     <string name="not_installed">"Not installed"</string>
     <string name="not_on_any_streaming_service_in_the_region_right_now">"Not on any streaming service in the region right now."</string>
     <string name="not_on_the_shelf">"not on the shelf"</string>
+    <string name="inputs_edit_hint">"OK shows or hides an input. ← → change the order."</string>
+    <string name="in_the_inputs_place_prefix">"in the inputs, place "</string>
+    <string name="not_in_the_inputs">"not in the inputs"</string>
+    <string name="input_hidden">"Hidden"</string>
+    <string name="live_tv_button">"Live TV button"</string>
     <string name="nothing_found">"Nothing found."</string>
     <string name="nothing_here_yet_open_a_title_to_add_it">"Nothing here yet. Open a title to add it."</string>
     <string name="nothing_matches_this_filter">"Nothing matches this filter."</string>

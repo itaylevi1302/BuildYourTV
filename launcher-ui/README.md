@@ -115,6 +115,11 @@ A button's action is a package, `input:<TV input id>`, `input:next`, `live`, `se
 `tmdb:watchlist`, `inputs` (the TV's inputs panel, or the home screen's drawer on the inputs where nothing answers it),
 or `""` for what the button did before.
 
+`live` opens Live TV, or the HDMI input picked on the TV under Settings → Inputs → Live TV button (that row shows where
+a remote button runs `live`). Settings → Inputs also picks which inputs the drawer shows, and in what order: OK shows or
+hides one, ← → moves it, Live TV included. Until it is used every input shows, in the TV's order; a port the TV lists
+later joins at the end, and one it stops listing keeps its place.
+
 ## remote.json
 
 A model's remote: `examples/<model>/remote.json`, pushed with `config.sh --remote` (or as config.json's `remote`).
