@@ -234,6 +234,10 @@
     <string name="settings_2">"Réglages"</string>
     <string name="shelf">"Barre d\'applis"</string>
     <string name="shelf_edit_hint">"OK ajoute ou retire (jusqu\'à %1$d). ← → changent l\'ordre."</string>
+    <string name="shelf_edit_hint_recent">"OK ajoute ou retire (jusqu\'à %1$d). La dernière appli ouverte passe en premier."</string>
+    <string name="shelf_order">"Ordre de la barre d\'applis"</string>
+    <string name="shelf_order_manual">"Mon ordre"</string>
+    <string name="shelf_order_recent">"Dernière ouverte en premier"</string>
     <string name="shortcuts">"Raccourcis"</string>
     <string name="show">"Série"</string>
     <string name="show_every_service">"Afficher toutes les plateformes"</string>

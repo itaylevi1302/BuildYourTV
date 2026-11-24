@@ -280,6 +280,10 @@
     <string name="settings_2">"Configurações"</string>
     <string name="shelf">"Prateleira"</string>
     <string name="shelf_edit_hint">"OK põe ou tira (até %1$d). ← → mudam a ordem. Menu (≡) ou segurar OK na Home: logo e cor."</string>
+    <string name="shelf_edit_hint_recent">"OK põe ou tira (até %1$d). O último app aberto vem primeiro."</string>
+    <string name="shelf_order">"Ordem da prateleira"</string>
+    <string name="shelf_order_manual">"Minha ordem"</string>
+    <string name="shelf_order_recent">"Último aberto primeiro"</string>
     <string name="shortcuts">"Atalhos"</string>
     <string name="show">"Série"</string>
     <string name="show_every_service">"Mostrar todos os serviços"</string>

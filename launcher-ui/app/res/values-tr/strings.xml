@@ -262,6 +262,10 @@
     <string name="settings_2">"Ayarlar"</string>
     <string name="shelf">"Raf"</string>
     <string name="shelf_edit_hint">"OK ekler veya kaldırır (en fazla %1$d). ← → sırayı değiştirir."</string>
+    <string name="shelf_edit_hint_recent">"OK ekler veya kaldırır (en fazla %1$d). Son açılan uygulama başa gelir."</string>
+    <string name="shelf_order">"Raf sırası"</string>
+    <string name="shelf_order_manual">"Benim sıram"</string>
+    <string name="shelf_order_recent">"Son açılan önce"</string>
     <string name="shortcuts">"Kısayollar"</string>
     <string name="show">"Dizi"</string>
     <string name="show_every_service">"Tüm platformları göster"</string>

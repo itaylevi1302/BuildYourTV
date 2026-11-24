@@ -8,6 +8,7 @@
     "com.hbo.hbonow",
     "com.google.android.youtube.tv"
   ],
+  "shelf_order": "manual",
   "hidden_apps": [
     "com.tcl.browser",
     "com.tcl.gallery"

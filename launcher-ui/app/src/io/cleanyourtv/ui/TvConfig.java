@@ -72,6 +72,11 @@ final class TvConfig {
             // "dock_apps" is the CleanYourTV launcher's name for the shelf: a theme's config.json works as is.
             JSONArray shelf = o.has("shelf") ? o.optJSONArray("shelf") : o.optJSONArray("dock_apps");
             if (shelf != null) Prefs.setShelf(packages(shelf));
+            if (o.has("shelf_order")) {   // "manual" (the default) or "recent": Settings > Shelf > Shelf order (#63)
+                String order = o.optString("shelf_order").trim();
+                if (order.equals("manual") || order.equals("recent")) Prefs.setShelfRecent(order.equals("recent"));
+                else AppLog.w("config.json: shelf_order skipped");
+            }
             JSONArray hidden = o.optJSONArray("hidden_apps");
             if (hidden != null) Prefs.setHidden(packages(hidden));
             JSONObject city = o.optJSONObject("city");

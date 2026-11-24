@@ -136,6 +136,8 @@ public class SettingsActivity extends Activity {
         private boolean editingInputs, liveRow;
         /** The inputs editor's first row, where a remote button runs "live": what that button opens. */
         private static final String LIVE_ROW = "#live-button";
+        /** The shelf editor's first row (not the inputs'): the order set here, or the last app opened first (#63). */
+        private static final String ORDER_ROW = "#order";
         private String liveButtonText;   // that row's value, read again after a change (the TV's inputs are a system call)
         private int liveButtonAt;
         private int pickFor, pickCurrent, pickScroll, keysScroll;   // pickFor: the remote button (index + 1)
@@ -248,6 +250,7 @@ public class SettingsActivity extends Activity {
                     String[] app = shelfRows.get(at);
                     int place = shelfOrder.indexOf(app[0]);
                     if (LIVE_ROW.equals(app[0])) return app[1] + ", " + liveButtonValue();
+                    if (ORDER_ROW.equals(app[0])) return app[1] + ", " + shelfOrderValue();
                     if (editingInputs) {
                         return app[1] + ", " + (place >= 0 ? Strings.get(R.string.in_the_inputs_place_prefix) + (place + 1)
                                 : Strings.get(R.string.not_in_the_inputs));
@@ -500,6 +503,7 @@ public class SettingsActivity extends Activity {
                     } else if (down && screen == SHELF_EDIT) {
                         moveShelfApp(e.getKeyCode() == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
                         invalidate();
+                        spoken.focusMoved();   // TalkBack reads the new value or place (#63)
                     } else if (down && screen == HOME_SETTINGS) {
                         adjust(e.getKeyCode() == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
                         invalidate();
@@ -832,10 +836,22 @@ public class SettingsActivity extends Activity {
         private void rebuildShelfRows(List<String[]> candidates) {
             shelfRows.clear();
             if (editingInputs && liveRow) shelfRows.add(new String[] {LIVE_ROW, Strings.get(R.string.live_tv_button)});
+            if (!editingInputs) shelfRows.add(new String[] {ORDER_ROW, Strings.get(R.string.shelf_order)});
             for (String pkg : shelfOrder) {
                 for (String[] cand : candidates) if (cand[0].equals(pkg)) { shelfRows.add(cand); break; }
             }
-            for (String[] cand : candidates) if (!LIVE_ROW.equals(cand[0]) && !shelfOrder.contains(cand[0])) shelfRows.add(cand);
+            for (String[] cand : candidates) {
+                if (!LIVE_ROW.equals(cand[0]) && !ORDER_ROW.equals(cand[0]) && !shelfOrder.contains(cand[0])) shelfRows.add(cand);
+            }
+        }
+
+        /** "My order" also deletes the list of apps opened (Prefs.setShelfRecent). */
+        private void switchShelfOrder() {
+            Prefs.setShelfRecent(!Prefs.shelfRecent());
+        }
+
+        private String shelfOrderValue() {
+            return Strings.get(Prefs.shelfRecent() ? R.string.shelf_order_recent : R.string.shelf_order_manual);
         }
 
         /** Same rows after a change: keeps the focus on the app that was focused. */
@@ -860,7 +876,7 @@ public class SettingsActivity extends Activity {
             List<String> hidden = new ArrayList<>(Prefs.inputsHidden());
             hidden.removeAll(shelfOrder);
             for (String[] row : shelfRows) {
-                if (!LIVE_ROW.equals(row[0]) && !shelfOrder.contains(row[0]) && !hidden.contains(row[0])) hidden.add(row[0]);
+                if (!LIVE_ROW.equals(row[0]) && !ORDER_ROW.equals(row[0]) && !shelfOrder.contains(row[0]) && !hidden.contains(row[0])) hidden.add(row[0]);
             }
             Prefs.setInputsHidden(hidden);
         }
@@ -871,6 +887,10 @@ public class SettingsActivity extends Activity {
             String pkg = shelfRows.get(pickScroll + focus)[0];
             if (LIVE_ROW.equals(pkg)) {
                 cycleLiveButton(1);
+                return;
+            }
+            if (ORDER_ROW.equals(pkg)) {
+                switchShelfOrder();
                 return;
             }
             if (shelfOrder.contains(pkg)) shelfOrder.remove(pkg);
@@ -887,6 +907,11 @@ public class SettingsActivity extends Activity {
                 cycleLiveButton(dir);
                 return;
             }
+            if (ORDER_ROW.equals(pkg)) {   // two values: either arrow switches
+                switchShelfOrder();
+                return;
+            }
+            if (!editingInputs && Prefs.shelfRecent()) return;   // the places don't apply while the last opened comes first
             int at = shelfOrder.indexOf(pkg), to = at + dir;
             if (at < 0 || to < 0 || to >= shelfOrder.size()) return;
             shelfOrder.remove(at);
@@ -915,6 +940,7 @@ public class SettingsActivity extends Activity {
 
         /** Menu on an app in the shelf editor: its logo (a PNG's URL, or empty for the app's icon) and background color. */
         private void customizeTile(String[] app) {
+            if (ORDER_ROW.equals(app[0])) return;
             CustomTiles.edit(activity, app[0], app[1], null);
         }
 
@@ -922,26 +948,28 @@ public class SettingsActivity extends Activity {
             Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
             c.drawText(Strings.get(editingInputs ? R.string.inputs : R.string.shelf), LIST_X * k + 30 * k, (LIST_TOP - 24) * k, heading);
             int rows = rowCount();
+            boolean locked = !editingInputs && Prefs.shelfRecent();   // the places don't apply (#63)
             for (int i = 0; i < rows; i++) {
                 String[] app = shelfRows.get(pickScroll + i);
-                boolean live = LIVE_ROW.equals(app[0]);
+                boolean live = LIVE_ROW.equals(app[0]), order = ORDER_ROW.equals(app[0]);
                 int place = shelfOrder.indexOf(app[0]);
-                boolean on = live || place >= 0;
+                boolean on = live || order || place >= 0;
                 float y = (LIST_TOP + 20 + i * (LIST_ROW_H + LIST_ROW_GAP)) * k;
                 rowRect.set(LIST_X * k, y, LIST_R * k, y + LIST_ROW_H * k);
                 float f = drawRowBackground(c, i);
                 rowLabel.setColor(blend(on ? 0xF2FFFFFF : 0x80FFFFFF, on ? INK : 0x801C1C1E, f));
-                rowValue.setColor(blend(0xB3FFFFFF, 0xB31C1C1E, f));
+                rowValue.setColor(locked && place >= 0 ? blend(0x4DFFFFFF, 0x4D1C1C1E, f) : blend(0xB3FFFFFF, 0xB31C1C1E, f));
                 float base = rowRect.centerY() + Ui.halfCap(rowLabel);
                 c.drawText(TextUtils.ellipsize(app[1], new TextPaint(rowLabel), 520 * k, TextUtils.TruncateAt.END).toString(), rowRect.left + 30 * k, base, rowLabel);
-                String value = live ? liveButtonValue() : place >= 0 ? "#" + (place + 1)
+                String value = live ? liveButtonValue() : order ? shelfOrderValue() : place >= 0 ? "#" + (place + 1)
                         : Strings.get(editingInputs ? R.string.input_hidden : R.string.off_2);
                 c.drawText(TextUtils.ellipsize(value, new TextPaint(rowValue), 380 * k, TextUtils.TruncateAt.END).toString(),
                         rowRect.right - 30 * k, base, rowValue);
             }
             Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
             float hy = (LIST_TOP + 20 + rows * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
-            c.drawText(editingInputs ? Strings.get(R.string.inputs_edit_hint) : Strings.get(R.string.shelf_edit_hint, HomeApps.MAX_SHELF),
+            c.drawText(editingInputs ? Strings.get(R.string.inputs_edit_hint)
+                            : Strings.get(locked ? R.string.shelf_edit_hint_recent : R.string.shelf_edit_hint, HomeApps.MAX_SHELF),
                     LIST_X * k + 30 * k, hy, hint);
         }
 
@@ -1059,6 +1087,7 @@ public class SettingsActivity extends Activity {
             } else if (screen == SHELF_EDIT) {
                 toggleShelfApp();
                 invalidate();
+                spoken.focusMoved();
                 return;
             } else if (screen == REMOTE_KEYS) {
                 openPicker(keysScroll + focus + 1);

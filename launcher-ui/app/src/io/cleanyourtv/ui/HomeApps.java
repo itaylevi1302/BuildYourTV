@@ -171,7 +171,7 @@ final class HomeApps {
             }
             items.add(it);
         }
-        return items;
+        return Prefs.shelfRecent() ? Recent.order(c, items) : items;   // "Last opened first" (#63)
     }
 
     private static String[] known(String pkg) {
@@ -633,6 +633,7 @@ final class HomeApps {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             a.startActivity(intent, ActivityOptions.makeScaleUpAnimation(from, x, y, Math.max(w, 1), Math.max(h, 1)).toBundle());
+            if (it.kind == APP) Recent.note(a, it.pkg);   // the shelf's "Last opened first" (#63)
             return true;
         } catch (ActivityNotFoundException | SecurityException e) {
             AppLog.w("couldn't open " + it.label + ": " + e.getMessage());
