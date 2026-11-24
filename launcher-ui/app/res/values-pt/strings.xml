@@ -262,6 +262,8 @@
     <string name="saved_to_the_menu">"Salvo no menu"</string>
     <string name="screensaver">"Tela de Descanso"</string>
     <string name="screensaver_preview">"Tela de Descanso, ver agora"</string>
+    <string name="screensaver_ok_hint">"Aperte OK para assistir no %1$s · qualquer outro botão fecha"</string>
+    <string name="screensaver_ok_opens_title">"OK na tela de descanso abre o título"</string>
     <string name="search">"Buscar"</string>
     <string name="side_menu_edit_hint">"Buscar, Início e Minha lista ficam sempre no topo. OK num item: mover, ocultar ou remover."</string>
     <string name="search_movie_via_iptv">"Buscar filme via IPTV"</string>

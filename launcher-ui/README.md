@@ -97,6 +97,7 @@ logged, never guessed. [`config.example.json`](config.example.json) has them all
 | `shelf_order` | `manual`, `recent` | `manual` (default) keeps the order of `shelf` and Settings → Shelf. `recent` puts the app last opened from the home screen (the shelf, All Apps, a pick's app) first; for that the TV keeps a list of the packages opened, newest first and without times, which never leaves the TV and is deleted by going back to `manual`. Also Settings → Shelf → Shelf order. |
 | `hidden_apps` | list of packages | Apps never shown. |
 | `show_system_apps` | `true` / `false` | All Apps (and the shelf editor and app pickers) also lists the TV's system apps that have a launcher entry. Off by default; factory menus, `hidden_apps` and the Live TV apps never show. Also Home Settings, System apps in All Apps. |
+| `screensaver_ok` | `true` / `false` | OK on the screensaver opens the title on screen in its app (straight to the title when its link is known, else the app's home); any other key still wakes it, and the caption says so. Off by default: the screensaver then wakes on any key, shows no hint and looks up no links. Also Home Settings, OK on the screensaver opens the title. |
 | `city` | `{ "name", "latitude", "longitude" }` | The weather and the sunset that turns the theme dark. Without a city there is no weather. |
 | `theme` | `auto`, `light`, `dark` | `auto` is dark from sunset to sunrise. |
 | `temperature` | `auto`, `C`, `F` | |

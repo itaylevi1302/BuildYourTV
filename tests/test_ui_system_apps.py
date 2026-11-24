@@ -74,11 +74,11 @@ class SystemAppsTest(unittest.TestCase):
     def test_settings_row_sits_before_the_weather(self):
         settings = read("SettingsActivity.java")
         rows = {k: int(v) for k, v in re.findall(r"\b([A-Z_]+_ROWS?) = (\d+)", settings)}
-        self.assertEqual(rows["WEATHER_ROW"], rows["SYSTEM_APPS_ROW"] + 1)
+        self.assertLess(rows["SYSTEM_APPS_ROW"], rows["WEATHER_ROW"])
         labels = labels_body(settings)
         adds = re.findall(r"l\.add\(([^;]*)\);", labels)
         at = adds.index("Strings.get(R.string.system_apps_in_all_apps)")
-        self.assertEqual(adds[at + 1], "Strings.get(R.string.weather_widget)")
+        self.assertLess(at, adds.index("Strings.get(R.string.weather_widget)"))
         self.assertEqual(at, rows["SYSTEM_APPS_ROW"])
         self.assertIn("v[SYSTEM_APPS_ROW] = onOff(Prefs.systemApps());", settings)
         self.assertIn("case SYSTEM_APPS_ROW: Prefs.setSystemApps(!Prefs.systemApps()); break;", settings)

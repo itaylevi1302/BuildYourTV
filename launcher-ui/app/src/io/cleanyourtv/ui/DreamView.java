@@ -36,7 +36,9 @@ import java.util.concurrent.Executors;
  *  - top right, like the iPhone lock screen: the date with the weather, the big Liquid Glass clock (the photo shows
  *    through the digits, bent at the edges; Shaders.GLASS_TEXT) and the compact prices;
  *  - bottom left, the photo's caption: the time-of-day label ("TONIGHT"), the title, and genre · runtime · service.
- * Dark scrims only where there is text, stronger where the photo is bright. Any key exits (as on Apple TV).
+ * Dark scrims only where there is text, stronger where the photo is bright. Any key exits (as on Apple TV). With Home
+ * Settings, "OK on the screensaver opens the title" on (Prefs.screensaverOk), OK opens the title on screen in its app
+ * (watch; the caption's last line says so) and the other keys still exit; off, none of that is drawn or looked up.
  * Without photos (no TMDB key, or before the first fetch): the big clock over the night aurora.
  */
 final class DreamView extends View implements Choreographer.FrameCallback, HomeData.Listener, Recs.Listener, Screensaver.Show {
@@ -108,6 +110,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
     private final Paint shadowPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
     private final Paint glassPaint = new Paint();
     private final Set<String> failed = new HashSet<>();     // Recs.key: a movie and a series can have the same ID
+    private final Set<String> asked = new HashSet<>();      // Recs.key of the titles whose link was looked up (OK)
     private RuntimeShader glassShader;
     private boolean running, dirty = true, chromeDirty = true;
     private boolean fallback;       // the aurora with the clock (no photos)
@@ -123,7 +126,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
     private long minute = -1;
     private String clock = "", date = "";
     private Paint datePaint, clockPaint, weatherPaint, weatherDim, quotePaint, stalePaint;
-    private Paint cornerDate, cornerQuote, cornerStale, cornerClock, labelPaint, metaPaint;
+    private Paint cornerDate, cornerQuote, cornerStale, cornerClock, labelPaint, metaPaint, hintPaint;
     private TextPaint titlePaint;
 
     private final Runnable tick = new Runnable() {
@@ -170,6 +173,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
         startedAt = clock();
         lastFrame = 0;
         failed.clear();
+        asked.clear();
         fallback = auroraOnly || recs.showcase().isEmpty();
         data.addListener(this);
         recs.addListener(this);
@@ -249,9 +253,10 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
         titlePaint.setLetterSpacing(0.005f);
         metaPaint = Ui.text(Ui.medium, 29 * k, 0xC7FFFFFF);
         metaPaint.setLetterSpacing(0.014f);
+        hintPaint = Ui.text(Ui.regular, 24 * k, 0x99FFFFFF);
         Symbols.warmWeather(getContext(), 30 * k);   // the corner's
         Symbols.warmWeather(getContext(), 32 * k);   // under the clock
-        for (Paint p : new Paint[] {cornerDate, cornerQuote, cornerStale, cornerClock, labelPaint, titlePaint, metaPaint}) {
+        for (Paint p : new Paint[] {cornerDate, cornerQuote, cornerStale, cornerClock, labelPaint, titlePaint, metaPaint, hintPaint}) {
             p.setShadowLayer(18 * k, 0, 2 * k, 0x66000000);
         }
         glassFor = "";
@@ -342,6 +347,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
             prepared = null;
             current.startedAt = up;
             firstAt = up;
+            shown(current);
             bindPhotos();
             prepareNext();
             return;
@@ -350,6 +356,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
             incoming = prepared;
             prepared = null;
             incoming.startedAt = up;
+            shown(incoming);
             bindPhotos();
             return;
         }
@@ -681,7 +688,9 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
     private void recordCaption(Slide s) {
         Canvas c = s.caption.beginRecording(w, h);
         try {
-            float x = MARGIN * k, metaBase = META_BASE * k, titleBase = metaBase - 58 * k;
+            // With the OK hint, the caption moves up a line: the hint takes the meta's place, clear of overscan.
+            boolean withHint = okOn() && hasApp(s.pick);
+            float x = MARGIN * k, metaBase = (META_BASE - (withHint ? 44 : 0)) * k, titleBase = metaBase - 58 * k;
             String title = s.pick.title == null ? "" : s.pick.title;
             StaticLayout t = StaticLayout.Builder.obtain(title, 0, title.length(), titlePaint, Math.round(TITLE_W * k))
                     .setMaxLines(2).setEllipsize(TextUtils.TruncateAt.END).setAlignment(Layout.Alignment.ALIGN_NORMAL)
@@ -694,10 +703,64 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
             t.draw(c);
             c.restore();
             if (s.pick.meta != null && !s.pick.meta.isEmpty()) c.drawText(s.pick.meta, x, metaBase, metaPaint);
+            if (withHint) c.drawText(hint(s.pick), x, META_BASE * k, hintPaint);
         } finally {
             s.caption.endRecording();
         }
         s.caption.setPosition(0, 0, w, h);
+    }
+
+    // MARK: - OK: watch the title on screen (Home Settings, "OK on the screensaver opens the title")
+
+    private static boolean okOn() {
+        return Prefs.screensaverOk();
+    }
+
+    private static boolean hasApp(Recs.Pick p) {
+        return p != null && p.pkg != null && !p.pkg.isEmpty();
+    }
+
+    /** "Press OK to watch on Netflix · any other button to close". */
+    private String hint(Recs.Pick p) {
+        String service = Recs.serviceName(p);
+        return Strings.get(R.string.screensaver_ok_hint, service.isEmpty() ? Providers.label(getContext(), p.pkg) : service);
+    }
+
+    /** A title comes on screen: its link is looked up ahead of OK, and TalkBack reads its caption. Off, nothing. */
+    private void shown(Slide s) {
+        if (!okOn()) return;
+        prefetchLink(s.pick);
+        String title = s.pick.title == null ? "" : s.pick.title;
+        setContentDescription(hasApp(s.pick) ? title + ". " + hint(s.pick) : title);
+    }
+
+    /** Looks up the title's link in its app (DeepLinks, kept a month), so that OK can open the title itself without
+     *  waiting for the network. Once per title per screensaver, and only for the apps DeepLinks makes links for. */
+    private void prefetchLink(Recs.Pick p) {
+        if (!hasApp(p) || !DeepLinks.covers(p.pkg) || !asked.add(Recs.key(p))) return;
+        final Context app = getContext().getApplicationContext();
+        final String kind = p.kind, name = p.title;
+        final int id = p.id;
+        new Thread(() -> DeepLinks.find(app, kind, id, name), "dream-link").start();
+    }
+
+    /** The title whose caption is on screen, when it has an app on the TV; null for the clock and the aurora. */
+    private Recs.Pick watchable() {
+        if (!running || !okOn()) return null;
+        Slide s = incoming != null && SystemClock.uptimeMillis() - incoming.startedAt > 1300 ? incoming : current;
+        return s == null || !hasApp(s.pick) ? null : s.pick;
+    }
+
+    /** OK: the title opens in its app, as "Watch on" does on its page (DetailActivity.watch): straight to the title
+     *  when DeepLinks already knows the link, else the app's home. Runs at once, never on the network. */
+    @Override public boolean watch() {
+        Recs.Pick p = watchable();
+        if (p == null) return false;
+        java.util.Map<String, String> links = DeepLinks.cached(getContext(), p.kind, p.id);
+        String url = links == null ? null : links.get(p.pkg);
+        AppLog.w("screensaver: OK -> " + p.pkg + (url == null ? " (its home)" : ""));
+        if (!DeepLinks.open(getContext(), p.pkg, url)) RemoteKeys.run(getContext(), p.pkg);
+        return true;
     }
 
     /** The caption fades out fast; the new one rises in once the photo has partly changed (like the home screen). */

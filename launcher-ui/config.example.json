@@ -38,6 +38,7 @@
   },
   "show_all_providers": false,
   "show_system_apps": false,
+  "screensaver_ok": false,
   "app_store_button": false,
   "app_tiles": {
     "com.tomatos.clientapp": {

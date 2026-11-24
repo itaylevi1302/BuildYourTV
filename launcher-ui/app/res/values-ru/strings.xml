@@ -268,6 +268,8 @@
     <string name="saved_to_the_menu">"Сохранено в меню"</string>
     <string name="screensaver">"Заставка"</string>
     <string name="screensaver_preview">"Заставка, предпросмотр"</string>
+    <string name="screensaver_ok_hint">"Нажмите OK, чтобы смотреть в %1$s · любая другая кнопка закрывает"</string>
+    <string name="screensaver_ok_opens_title">"OK на заставке открывает фильм или сериал"</string>
     <string name="search">"Найти"</string>
     <string name="side_menu_edit_hint">"«Найти», «Главная» и «Мой список» всегда вверху. Нажмите OK на пункте, чтобы переместить, скрыть или удалить его."</string>
     <string name="search_movie_via_iptv">"Найти фильм через IPTV"</string>

@@ -76,6 +76,8 @@
     <string name="remote_buttons">"Fernbedienungstasten"</string>
     <string name="screensaver">"Bildschirmschoner"</string>
     <string name="screensaver_preview">"Bildschirmschoner, Vorschau"</string>
+    <string name="screensaver_ok_hint">"OK drücken, um auf %1$s zu schauen · jede andere Taste schließt"</string>
+    <string name="screensaver_ok_opens_title">"OK im Bildschirmschoner öffnet den Titel"</string>
     <string name="search">"Suchen"</string>
     <string name="search_movie_via_iptv">"Film über IPTV suchen"</string>
     <string name="search_show_via_iptv">"Serie über IPTV suchen"</string>
