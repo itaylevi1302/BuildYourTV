@@ -2,10 +2,13 @@ package io.cleanyourtv.ui;
 
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.os.Build;
 
@@ -160,6 +163,60 @@ final class Ui {
 
     static float clamp(float v) {
         return Math.max(0, Math.min(1, v));
+    }
+
+    /** Largest 2w×2h step `downscale` takes (4 MB, freed at once): 1 GB TVs build tiles while Home is open. */
+    private static final long SMOOTH_STEP_PIXELS = 1_000_000;
+
+    /**
+     * Filtered down to w × h without jagged edges: bilinear filtering reads only 2×2 pixels and software Canvas has no
+     * mipmaps, so no step shrinks more than 2×. Halves while it can; when over 1.5× is left, goes to 2w × 2h and halves
+     * exactly, else one last step. Never recycles src; may return it (when it already has the size).
+     */
+    static Bitmap downscale(Bitmap src, int w, int h) {
+        w = Math.max(1, w);
+        h = Math.max(1, h);
+        Bitmap b = src;
+        while (b.getWidth() / 2 >= w && b.getHeight() / 2 >= h) {
+            Bitmap half = Bitmap.createScaledBitmap(b, b.getWidth() / 2, b.getHeight() / 2, true);
+            if (b != src) b.recycle();
+            b = half;
+        }
+        if ((2 * b.getWidth() > 3 * w || 2 * b.getHeight() > 3 * h) && 4L * w * h <= SMOOTH_STEP_PIXELS) {
+            Bitmap twice = Bitmap.createScaledBitmap(b, 2 * w, 2 * h, true);
+            if (b != src) b.recycle();
+            b = twice;
+        }
+        if (b.getWidth() == w && b.getHeight() == h) return b;
+        Bitmap out = Bitmap.createScaledBitmap(b, w, h, true);
+        if (b != src && b != out) b.recycle();
+        return out;
+    }
+
+    /** 4×4 ordered-dither thresholds (0 to 15). */
+    static final int[] BAYER = {0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5};
+
+    /**
+     * A vertical gradient from top to bottom over `height` px without bands: a 4 px wide strip with a Bayer dither,
+     * repeated across (about 4 × height × 4 bytes). Works on every renderer, unlike Paint.setDither on the GPU.
+     */
+    static Shader gradient(int height, int top, int bottom) {
+        int n = Math.max(2, height);
+        int[] px = new int[4 * n];
+        for (int y = 0; y < n; y++) {
+            float t = y / (float) (n - 1);
+            for (int x = 0; x < 4; x++) {
+                float d = (BAYER[(y & 3) * 4 + x] + 0.5f) / 16f;
+                int c = 0;
+                for (int s = 0; s < 32; s += 8) {
+                    float a = (top >>> s) & 255, b = (bottom >>> s) & 255;
+                    c |= Math.min(255, (int) (a + (b - a) * t + d)) << s;
+                }
+                px[y * 4 + x] = c;
+            }
+        }
+        Bitmap b = Bitmap.createBitmap(px, 4, n, Bitmap.Config.ARGB_8888);
+        return new BitmapShader(b, Shader.TileMode.REPEAT, Shader.TileMode.CLAMP);
     }
 
     static Locale locale() {
