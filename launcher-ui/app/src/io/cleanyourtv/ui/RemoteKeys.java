@@ -24,6 +24,11 @@ import java.util.List;
  *
  * Actions: a package, "input:<tv input id>", "input:next" (the next HDMI input, press after press), "live", "settings", "home", "tmdb:explore", "tmdb:watchlist", or ""
  * (the button does what it did before).
+ *
+ * remote.json may also name its remote: "vendor" and "product" (a number as Android gives it, or hex as in the .kl file's
+ * name, "0957"), and then only that remote's buttons are ours (a gamepad's, a keyboard's or another remote's BUTTON_3 go
+ * on as before; Free My TV's Sabrina and onn). "debounce_ms" makes a burst of presses of one button one press: Xiaomi's
+ * remote sends a press as several, and the app opened several times (Free My TV 6fbaba1).
  */
 final class RemoteKeys {
     private RemoteKeys() {}
@@ -47,6 +52,13 @@ final class RemoteKeys {
     private static List<Button> cached;
     private static String cachedRemote = "";
     private static long cachedStamp = Long.MIN_VALUE;
+    /** remote.json's "vendor" and "product" (-1: any device) and "debounce_ms" (0: off), read with the buttons. */
+    private static int cachedVendor = -1, cachedProduct = -1;
+    private static long cachedDebounce;
+    static final long MAX_DEBOUNCE_MS = 5000;
+    /** The button whose press was last seen, and when (KeyEvent.getEventTime()), for debounce_ms. */
+    private static String lastButton;
+    private static long lastDown;
 
     /** The configurable buttons, from remote.json (re-read when it changes) or the built-in TCL/Vestel ones. */
     static List<Button> buttons(Context c) {
@@ -58,10 +70,16 @@ final class RemoteKeys {
             List<Button> out = new ArrayList<>();
             String text = TvConfig.read(f);
             cachedRemote = "";
+            cachedVendor = -1;
+            cachedProduct = -1;
+            cachedDebounce = 0;
             if (text != null) {
                 try {
                     JSONObject o = new JSONObject(text);
                     cachedRemote = o.optString("remote");
+                    cachedVendor = deviceId(o.isNull("vendor") ? null : o.opt("vendor"), "vendor");
+                    cachedProduct = deviceId(o.isNull("product") ? null : o.opt("product"), "product");
+                    cachedDebounce = Math.max(0, Math.min(MAX_DEBOUNCE_MS, o.optLong("debounce_ms", 0)));
                     JSONArray list = o.getJSONArray("buttons");
                     for (int i = 0; i < list.length(); i++) {
                         JSONObject b = list.getJSONObject(i);
@@ -72,6 +90,9 @@ final class RemoteKeys {
                 } catch (Exception e) {
                     AppLog.w("remote.json not read: " + e.getMessage());
                     out.clear();
+                    cachedVendor = -1;
+                    cachedProduct = -1;
+                    cachedDebounce = 0;
                 }
             }
             if (text == null && VESTEL) {
@@ -112,10 +133,54 @@ final class RemoteKeys {
             if (b.id.equals(key) && found == null) found = b;
         }
         if (found == null) return false;
+        if (!fromRemote(e)) return false;
         String action = action(found);
         if (action.isEmpty()) return false;
-        if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) run(c, action);
-        return true;
+        if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) {
+            // Within debounce_ms of this button's last press it is the same press (a burst): consumed, not run again.
+            boolean again = burst(lastButton, lastDown, found.id, e.getEventTime(), cachedDebounce);
+            lastButton = found.id;
+            lastDown = e.getEventTime();
+            if (!again) run(c, action);
+        }
+        return true;   // down, repeats and up alike, debounced or not
+    }
+
+    /** When remote.json names a vendor or product, only keys from that device are ours. */
+    private static boolean fromRemote(KeyEvent e) {
+        if (cachedVendor < 0 && cachedProduct < 0) return true;
+        InputDevice device = e.getDevice();
+        return device != null && matches(cachedVendor, cachedProduct, device.getVendorId(), device.getProductId());
+    }
+
+    /** -1 matches any id. */
+    static boolean matches(int vendor, int product, int deviceVendor, int deviceProduct) {
+        return (vendor < 0 || vendor == deviceVendor) && (product < 0 || product == deviceProduct);
+    }
+
+    /** A press of the same button less than window ms after its last one (window 0: never). */
+    static boolean burst(String last, long lastDown, String id, long now, long window) {
+        return window > 0 && id.equals(last) && now - lastDown < window;
+    }
+
+    /**
+     * A vendor or product id from remote.json: a whole number as Android reports it (2391), or 1 to 4 hex digits as in
+     * the remote's .kl file name ("0957", "0x0957"). Null (absent): -1, any device. Anything else is refused, so a typo
+     * never opens the buttons to every device.
+     */
+    static int deviceId(Object v, String field) {
+        if (v == null) return -1;
+        int id = -1;
+        if (v instanceof Integer || v instanceof Long) {
+            long n = ((Number) v).longValue();
+            if (n >= 0 && n <= 0xFFFF) id = (int) n;
+        } else if (v instanceof String) {
+            String s = ((String) v).trim();
+            if (s.startsWith("0x") || s.startsWith("0X")) s = s.substring(2);
+            if (s.matches("[0-9A-Fa-f]{1,4}")) id = Integer.parseInt(s, 16);
+        }
+        if (id < 0) throw new IllegalArgumentException(field + " is not a device id: " + v);
+        return id;
     }
 
     static void run(Context c, String action) {

@@ -64,7 +64,9 @@ Free My TV. Este projeto é para quem quer os dois e um Explorar completo.
 
 **Controle e configuração**
 - `examples/<modelo>/remote.json` diz quais botões do controle podem ser trocados; na TV, cada um abre um app, uma
-  entrada HDMI, o Explorar ou a sua lista.
+  entrada HDMI, o Explorar ou a sua lista. Ele pode identificar o controle (`vendor`, `product`), para os botões de um
+  gamepad continuarem dele, e juntar uma rajada de toques em um só (`debounce_ms`): veja
+  [launcher-ui/README.md](launcher-ui/README.md#remotejson).
 - `launcher-ui/config.sh` envia um `config.json` (prateleira, apps ocultos, cidade, botões, serviços, logos) pelo
   ADB, sem compilar de novo. Só o shell do ADB pode escrever essa configuração no app.
 - Temas do CleanYourTV: `launcher-ui/config.sh --theme themes/<nome> [meu-config.json]` aproveita o que os dois

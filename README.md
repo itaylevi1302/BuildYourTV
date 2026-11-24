@@ -62,7 +62,8 @@ Free My TV. This project is for people who want both and a full Explore.
 
 **Remote and configuration**
 - `examples/<model>/remote.json` says which remote buttons can be changed; on the TV each one opens an app, an HDMI
-  input, Explore or your list.
+  input, Explore or your list. It can name the remote (`vendor`, `product`), so a gamepad's buttons stay its own, and
+  turn a burst of presses into one (`debounce_ms`): see [launcher-ui/README.md](launcher-ui/README.md#remotejson).
 - `launcher-ui/config.sh` pushes a `config.json` (shelf, hidden apps, city, buttons, services, logos) over ADB, without
   rebuilding. Only the ADB shell can write that configuration into the app.
 - CleanYourTV themes: `launcher-ui/config.sh --theme themes/<name> [my-config.json]` takes what both launchers share

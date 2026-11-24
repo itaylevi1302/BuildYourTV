@@ -113,6 +113,23 @@ logged, never guessed. [`config.example.json`](config.example.json) has them all
 A button's action is a package, `input:<TV input id>`, `live`, `settings`, `home`, `tmdb:explore`, `tmdb:watchlist`,
 or `""` for what the button did before.
 
+## remote.json
+
+A model's remote: `examples/<model>/remote.json`, pushed with `config.sh --remote` (or as config.json's `remote`).
+`buttons` lists each button with its `scan` (scancode) or `key` (keycode), a `name`, and `kind`: `native` is never
+touched, `configurable` shows in Settings > Remote Buttons with its `default` action. A button is matched by scancode
+first, then by keycode. These top-level fields are optional:
+
+| Field | Value | Notes |
+|---|---|---|
+| `remote` | text | The remote's name, shown on the TV. |
+| `vendor` | number (`2391`) or hex string (`"0957"`, `"0x0957"`) | Only keys from the input device with this vendor id are ours; others (a gamepad's or keyboard's `BUTTON_3`, another remote) go on as before. The hex form is the one in the remote's `Vendor_0957_Product_0031.kl`; `tools/tv.py 'getevent -i'` or `dumpsys input` lists it. |
+| `product` | same forms (`"0031"`) | The device's product id, with `vendor` or alone. |
+| `debounce_ms` | 0 to 5000 | A press of the same button within this many milliseconds of its last press is the same press: the action runs once. For remotes that send one press as a burst (Xiaomi: `1000`). Default 0, off. |
+
+A `vendor` or `product` that is not an id (more than four hex digits, a decimal like `9.5`) makes the whole file
+unread, logged as `remote.json not read`, rather than letting every device's keys through.
+
 ## Translations
 
 Edit the English defaults in [`app/res/values/strings.xml`](app/res/values/strings.xml)
