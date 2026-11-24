@@ -18,7 +18,6 @@ import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.RadialGradient;
-import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.Drawable;
@@ -942,12 +941,16 @@ final class HomeApps {
         } catch (PackageManager.NameNotFoundException | RuntimeException ignored) {
         }
         if (d == null) return null;
-        Bitmap b = Bitmap.createBitmap(TILE_W, TILE_H, Bitmap.Config.ARGB_8888);
+        // Drawn near the art's own resolution (at most 2×), then filtered down: one bilinear step from a 1280 px
+        // banner straight to the tile skipped pixels and left jagged edges on 4K TVs.
+        float k = detail(d, TILE_W, TILE_H);
+        int w = Math.round(TILE_W * k), h = Math.round(TILE_H * k);
+        Bitmap b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(b);
         canvas.drawColor(0xFF15161C);   // banners with transparency sit on a dark background
-        d.setBounds(0, 0, TILE_W, TILE_H);
+        d.setBounds(0, 0, w, h);
         d.draw(canvas);
-        return b;
+        return shrink(b, TILE_W, TILE_H);
     }
 
     /** No banner: the app's icon (in its proper shape, with some margin) on a dark card. */
@@ -1014,24 +1017,43 @@ final class HomeApps {
     private static Bitmap logoTile(Bitmap logo, int brand) {
         Bitmap b = darkTile();
         Canvas canvas = new Canvas(b);
-        Paint glow = new Paint();
+        Paint glow = new Paint(Paint.DITHER_FLAG);
         glow.setShader(new RadialGradient(TILE_W / 2f, TILE_H * 1.15f, TILE_W * 0.75f, Ui.alpha(brand, 0.38f), 0x00000000, Shader.TileMode.CLAMP));
         canvas.drawRect(0, 0, TILE_W, TILE_H, glow);
         boolean wide = logo.getWidth() > logo.getHeight() * 1.35f;
         float maxW = TILE_W * (wide ? 0.62f : 0.4f), maxH = TILE_H * (wide ? 0.42f : 0.56f);
         float scale = Math.min(maxW / logo.getWidth(), maxH / logo.getHeight());
-        float w = logo.getWidth() * scale, h = logo.getHeight() * scale;
-        canvas.drawBitmap(logo, null, new RectF((TILE_W - w) / 2, (TILE_H - h) / 2, (TILE_W + w) / 2, (TILE_H + h) / 2),
-                new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
+        // Filtered down to the exact size first (no step over 2×), then drawn pixel for pixel.
+        Bitmap small = Ui.downscale(logo, Math.round(logo.getWidth() * scale), Math.round(logo.getHeight() * scale));
+        canvas.drawBitmap(small, Math.round((TILE_W - small.getWidth()) / 2f), Math.round((TILE_H - small.getHeight()) / 2f),
+                new Paint(Paint.FILTER_BITMAP_FLAG));
+        if (small != logo) small.recycle();
         return b;
     }
 
     private static Bitmap darkTile() {
         Bitmap b = Bitmap.createBitmap(TILE_W, TILE_H, Bitmap.Config.ARGB_8888);
-        Paint bg = new Paint();
+        Paint bg = new Paint(Paint.DITHER_FLAG);
         bg.setShader(new LinearGradient(0, 0, 0, TILE_H, 0xFF2B2E3A, 0xFF17191F, Shader.TileMode.CLAMP));
         new Canvas(b).drawRect(0, 0, TILE_W, TILE_H, bg);
         return b;
+    }
+
+    /**
+     * How much bigger than w × h to draw d so it's near its own resolution (no intrinsic size: 2×), at most 2×: after
+     * an update every tile is made again, and the big bitmap (1.3 MB for a tile) is freed right away.
+     */
+    private static float detail(Drawable d, float w, float h) {
+        int iw = d.getIntrinsicWidth(), ih = d.getIntrinsicHeight();
+        float k = iw > 0 && ih > 0 ? Math.max(iw / w, ih / h) : 2f;
+        return Math.max(1f, Math.min(2f, k));
+    }
+
+    /** Filtered down to w × h (Ui.downscale); the big one is recycled. */
+    private static Bitmap shrink(Bitmap big, int w, int h) {
+        Bitmap out = Ui.downscale(big, w, h);
+        if (out != big) big.recycle();
+        return out;
     }
 
     /** Official logo (tools/logos.py): trims the transparent margins and scales it down to at most 512 px. */
