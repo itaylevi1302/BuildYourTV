@@ -30,6 +30,7 @@
         <package android:name="com.google.android.tv" />
         <package android:name="com.mediatek.wwtv.tvcenter" />
         <package android:name="com.sony.dtv.tvx" />
+        <package android:name="com.mediatek.tv.oneworld.tvcenter" />
         <!-- Android TV's own settings app: the remote's gear on some brands pins to it (RemoteKeys), tvSettings falls back to it. -->
         <package android:name="com.android.tv.settings" />
         <!-- Google TV's screensaver: the "Google Photos" choice is offered only when it is there and on. -->

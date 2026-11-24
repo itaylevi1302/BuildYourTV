@@ -104,7 +104,8 @@ final class HomeApps {
     };
     static final int MAX_SHELF = 8;
     /** Live TV apps of some brands (the antenna's channels open through the standard Android request first). */
-    static final String[] LIVE_TV_APPS = {"com.tcl.tv", "com.google.android.tv", "com.mediatek.wwtv.tvcenter", "com.sony.dtv.tvx"};
+    static final String[] LIVE_TV_APPS = {"com.tcl.tv", "com.google.android.tv", "com.mediatek.wwtv.tvcenter", "com.sony.dtv.tvx",
+            "com.mediatek.tv.oneworld.tvcenter"};
     /** Kept out of "All Apps" (only hidden, still installed). Add the ones your TV shows that you never use. */
     private static final Set<String> HIDDEN = new HashSet<>(java.util.Arrays.asList(
             "com.google.android.play.games",        // Google Play Games
@@ -472,10 +473,18 @@ final class HomeApps {
     /**
      * Live TV: tune the antenna input directly. MediaTek TV Center otherwise restores the last source used, which can
      * be HDMI, so its explicit activity receives the tuner URI. Other TV apps get the standard channel-list request, pinned
-     * to one activity so Android never shows an "Open with" chooser.
+     * to one activity so Android never shows an "Open with" chooser. Sony's and OneWorld's TV apps open as they are.
      */
     static Intent liveTv(Context c) {
         PackageManager pm = c.getPackageManager();
+        // Sony: its TV app (the launcher tile's) knows the last input and channel. A tuner's channel list can be an empty
+        // one: a BRAVIA lists DvbOpv1 (the CI+ operator input) beside the satellite and antenna ones (Free My TV PR 340).
+        Intent sony = launchIntent(pm, "com.sony.dtv.tvx");
+        if (sony != null) return sony;
+        // MediaTek OneWorld TV Center (KTC/NextStar) has one input per tuner mode (antenna, cable, satellite): tuning one
+        // switches the TV to that mode and hides the other channel lists, so it opens as it is, on its own last channel.
+        Intent oneWorld = launchIntent(pm, "com.mediatek.tv.oneworld.tvcenter");
+        if (oneWorld != null) return oneWorld;
         String tuner = tunerInput(c);
         Intent mediaTek = launchIntent(pm, "com.mediatek.wwtv.tvcenter");
         if (mediaTek != null && tuner != null) {
