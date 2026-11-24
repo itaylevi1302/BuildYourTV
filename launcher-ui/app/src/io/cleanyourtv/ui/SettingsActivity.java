@@ -38,6 +38,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * The settings (the app's icon, "All Apps", or the gear on the home screen), in the style of Apple TV's settings: the
@@ -138,9 +140,15 @@ public class SettingsActivity extends Activity {
         private JSONObject recs = new JSONObject();
         private boolean hasKey;
         private int screen = MAIN, focus;
-        private boolean running, okDown, backDown;
+        private boolean running, okDown, backDown, framePending;
         private final Spoken spoken;
-        private long startedAt, lastNanos, lastSky;
+        private long lastNanos, lastSky;
+        // The aurora's own clock, which runs only in the frames drawn: it rests with the screen, and the next key doesn't
+        // jump it ahead.
+        private float skySeconds;
+        private String pollStamp = "";   // what the poll last showed (hasKey and the recommendations' status)
+        // recs-status.json is read here, off the UI thread (the home screen, another process, writes it).
+        private static final ExecutorService IO = Executors.newSingleThreadExecutor();
         private int w, h;
         private float k = 1;
         private Paint title, subtitle, version, rowLabel, rowValue, rowSub, header, cellLabel, cellValue, warn, spinner, white, shadow;
@@ -149,12 +157,26 @@ public class SettingsActivity extends Activity {
         private final Runnable poll = new Runnable() {
             @Override public void run() {
                 if (!running) return;
-                hasKey = Recs.hasKey(getContext());
-                recs = Recs.status(getContext());
-                invalidate();
+                Context c = getContext().getApplicationContext();
+                IO.execute(() -> {
+                    JSONObject next = Recs.status(c);
+                    handler.post(() -> showRecs(next));
+                });
                 handler.postDelayed(this, 2000);
             }
         };
+
+        /** The recommendations' status: redrawn only when it (or the key) changed. */
+        private void showRecs(JSONObject next) {
+            if (!running) return;
+            boolean key = Recs.hasKey(getContext());
+            String stamp = key + ":" + next;
+            if (stamp.equals(pollStamp)) return;
+            pollStamp = stamp;
+            hasKey = key;
+            recs = next;
+            invalidate();
+        }
 
         SettingsView(SettingsActivity a) {
             super(a);
@@ -242,10 +264,11 @@ public class SettingsActivity extends Activity {
         void resume() {
             if (running) return;
             running = true;
-            startedAt = SystemClock.uptimeMillis();
             lastNanos = 0;
-            handler.post(poll);
-            Choreographer.getInstance().postFrameCallback(this);
+            // Once here, so the first frame already shows it (as before); then every 2 s off the UI thread.
+            showRecs(Recs.status(getContext()));
+            handler.postDelayed(poll, 2000);
+            invalidate();
             spoken.readAgain();
         }
 
@@ -253,14 +276,12 @@ public class SettingsActivity extends Activity {
             running = false;
             handler.removeCallbacks(poll);
             Choreographer.getInstance().removeFrameCallback(this);
+            framePending = false;
         }
 
         @Override public void doFrame(long frameTimeNanos) {
-            if (!running) return;
-            boolean moving = false;
-            for (Spring s : pop) moving |= !s.settled();
-            if (moving || SystemClock.uptimeMillis() - lastSky >= 100) invalidate();
-            Choreographer.getInstance().postFrameCallback(this);
+            framePending = false;
+            if (running) invalidate();
         }
 
         @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
@@ -310,15 +331,22 @@ public class SettingsActivity extends Activity {
             long now = System.nanoTime();
             float dt = lastNanos == 0 ? 1 / 60f : Math.min(0.05f, (now - lastNanos) / 1e9f);
             lastNanos = now;
+            boolean moving = false;
             for (int i = 0; i < pop.length; i++) {
                 pop[i].target = i == focus && i < rowCount() ? 1 : 0;
-                pop[i].step(dt);
+                moving |= pop[i].step(dt);
             }
+            // Frames only while a focus spring moves; whatever changes the screen calls invalidate(), which starts them again.
+            if (running && moving && !framePending) {
+                framePending = true;
+                Choreographer.getInstance().postFrameCallback(this);
+            }
+            if (!moving) lastNanos = 0;   // the first frame after a rest steps 1/60 s, not the 50 ms cap
+            skySeconds += dt;
             long up = SystemClock.uptimeMillis();
-            float seconds = (up - startedAt) / 1000f;
             if (up - lastSky >= 100) {
                 lastSky = up;
-                scene.advance(seconds);
+                scene.advance(skySeconds);
             }
             scene.drawBackground(c);
 
