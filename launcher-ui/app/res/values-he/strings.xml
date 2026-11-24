@@ -268,6 +268,12 @@
     <string name="the_link_expired_go_back_and_open_it_again">"תוקף הקישור פג. חוזרים אחורה ופותחים אותו שוב."</string>
     <string name="the_tvs_own">"של הטלוויזיה"</string>
     <string name="theme">"ערכת עיצוב"</string>
+    <string name="top_of_screen">"החלק העליון של המסך"</string>
+    <string name="continue_watching">"המשך צפייה"</string>
+    <string name="watch_nothing">"אין באפליקציות שום דבר שנצפה חלקית."</string>
+    <string name="watch_needs_permission">"יש לאשר ממחשב: %1$s"</string>
+    <string name="watch_time_left">"נותרו %1$s"</string>
+    <string name="watch_episode">"ע%1$s פ%2$s"</string>
     <string name="this_afternoon">"אחר הצהריים"</string>
     <string name="this_morning">"הבוקר"</string>
     <string name="tmdb_attribution">"המוצר משתמש ב־API של TMDB, אך אינו מאושר או מוסמך על ידי TMDB."</string>

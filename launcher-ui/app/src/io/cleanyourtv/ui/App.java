@@ -20,5 +20,6 @@ public class App extends Application {
         Images.trim();
         Tmdb.trimMemory();
         Recs.trimLoaded();
+        WatchArt.trimLoaded();
     }
 }

@@ -314,6 +314,12 @@
     <string name="the_link_expired_go_back_and_open_it_again">"Срок действия ссылки истёк. Вернитесь назад и откройте её снова."</string>
     <string name="the_tvs_own">"Системный"</string>
     <string name="theme">"Тема"</string>
+    <string name="top_of_screen">"Верх экрана"</string>
+    <string name="continue_watching">"Продолжить просмотр"</string>
+    <string name="watch_nothing">"В приложениях нет недосмотренного."</string>
+    <string name="watch_needs_permission">"Разрешите с компьютера: %1$s"</string>
+    <string name="watch_time_left">"осталось %1$s"</string>
+    <string name="watch_episode">"С%1$s Э%2$s"</string>
     <string name="this_afternoon">"СЕГОДНЯ ДНЁМ"</string>
     <string name="this_morning">"ЭТИМ УТРОМ"</string>
     <string name="tmdb_attribution">"Продукт использует API TMDB, но не одобрен и не сертифицирован TMDB."</string>

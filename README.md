@@ -36,6 +36,9 @@ Free My TV. This project is for people who want both and a full Explore.
 
 **Home screen**
 - "For You" with TMDB picks on your services, and Explore, Movies and Shows tabs.
+- Optional Continue Watching in their place (Home Settings → Top of the screen): what your apps left half-way in
+  Android TV's Watch Next list, with progress; OK resumes it. It needs `READ_TV_LISTINGS`, granted from the computer
+  (see [launcher-ui/README.md](launcher-ui/README.md#continue-watching-optional)).
 - An app shelf with official logos; holding OK on an app drops a menu from its card: move, logo and color (a PNG's URL
   and a background color, or through `config.json`), the app's Android settings (force stop, clear cache) and close.
 - Round buttons at the top right (Explore, HDMI Inputs, Settings); holding OK on one drops a menu: move it (← →, OK
@@ -61,7 +64,8 @@ Free My TV. This project is for people who want both and a full Explore.
   copy when offline) and images too (up to 160 MB, a week). When an app or the TV is on, the launcher lets go of what it
   kept in memory: on a 2 GB TCL, about 66 MB in the background, down from ~155 MB.
 - No ads and no telemetry: it only talks to TMDB, Wikidata (the services' ids) and Open-Meteo (weather), plus Binance
-  for the crypto prices when `show_crypto=true` (off by default).
+  for the crypto prices when `show_crypto=true` (off by default), and, with Continue Watching on, the picture addresses
+  your apps left in Android TV's Watch Next list (`https` only, never your home network).
 
 **Remote and configuration**
 - `examples/<model>/remote.json` says which remote buttons can be changed; on the TV each one opens an app, an HDMI

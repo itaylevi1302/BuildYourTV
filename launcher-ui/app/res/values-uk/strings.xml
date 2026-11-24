@@ -315,6 +315,12 @@
     <string name="the_link_expired_go_back_and_open_it_again">"Термін дії посилання минув. Поверніться й відкрийте його знову."</string>
     <string name="the_tvs_own">"Системний"</string>
     <string name="theme">"Тема"</string>
+    <string name="top_of_screen">"Верх екрана"</string>
+    <string name="continue_watching">"Продовжити перегляд"</string>
+    <string name="watch_nothing">"У застосунках немає недодивленого."</string>
+    <string name="watch_needs_permission">"Дозвольте з комп\'ютера: %1$s"</string>
+    <string name="watch_time_left">"залишилося %1$s"</string>
+    <string name="watch_episode">"С%1$s Е%2$s"</string>
     <string name="this_afternoon">"СЬОГОДНІ ВДЕНЬ"</string>
     <string name="this_morning">"СЬОГОДНІ ВРАНЦІ"</string>
     <string name="tmdb_attribution">"Цей продукт використовує API TMDB, але TMDB не схвалила й не сертифікувала його."</string>

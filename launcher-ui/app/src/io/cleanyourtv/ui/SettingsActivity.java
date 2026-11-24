@@ -560,8 +560,8 @@ public class SettingsActivity extends Activity {
 
         private static final String[] LANGUAGES = {"auto", "pt", "en", "es", "de", "ru", "uk", "fr", "tr", "he"}, UNITS = {"auto", "C", "F"}, THEMES = {"auto", "light", "dark"};
         private static final String[] CLOCKS = {"auto", "24h", "12h"}, STYLES = {"photos", "aurora", "google"};
-        /** Home Settings: language, temperature, theme, clock, at power-on, system apps, OK on the screensaver, weather, city, forecast, quotes, then one row per coin. */
-        private static final int CLOCK_ROW = 3, POWER_ON_ROW = 4, SYSTEM_APPS_ROW = 5, SAVER_OK_ROW = 6, WEATHER_ROW = 7, CITY_ROW = 8, FORECAST_ROW = 9, QUOTES_ROW = 10, COIN_ROWS = 11;
+        /** Home Settings: language, temperature, theme, top of the screen, clock, at power-on, system apps, OK on the screensaver, weather, city, forecast, quotes, then one row per coin. */
+        private static final int TOP_ROW = 3, CLOCK_ROW = 4, POWER_ON_ROW = 5, SYSTEM_APPS_ROW = 6, SAVER_OK_ROW = 7, WEATHER_ROW = 8, CITY_ROW = 9, FORECAST_ROW = 10, QUOTES_ROW = 11, COIN_ROWS = 12;
 
         private static String styleName(String style) {
             return style.equals("aurora") ? Strings.get(R.string.clock_and_aurora)
@@ -577,6 +577,7 @@ public class SettingsActivity extends Activity {
             l.add(Strings.get(R.string.language));
             l.add(Strings.get(R.string.temperature));
             l.add(Strings.get(R.string.theme));
+            l.add(Strings.get(R.string.top_of_screen));
             l.add(Strings.get(R.string.clock_format));
             l.add(Strings.get(R.string.at_power_on));
             l.add(Strings.get(R.string.system_apps_in_all_apps));
@@ -603,6 +604,7 @@ public class SettingsActivity extends Activity {
             v[1] = unit.equals("C") ? "°C" : unit.equals("F") ? "°F" : Strings.get(R.string.automatic_2);
             String theme = Prefs.theme();
             v[2] = theme.equals("light") ? Strings.get(R.string.light) : theme.equals("dark") ? Strings.get(R.string.dark) : Strings.get(R.string.automatic);
+            v[TOP_ROW] = Prefs.continueWatching() ? Strings.get(R.string.continue_watching) : Strings.get(R.string.picks);
             String clock = Prefs.clockFormat();
             v[CLOCK_ROW] = clock.equals("24h") ? Strings.get(R.string.label_24_hour) : clock.equals("12h") ? Strings.get(R.string.label_12_hour)
                     : Strings.get(R.string.automatic);
@@ -692,6 +694,9 @@ public class SettingsActivity extends Activity {
                     Prefs.setTheme(THEMES[(at + dir + THEMES.length) % THEMES.length]);
                     break;
                 }
+                case TOP_ROW:   // the home screen reads it when it comes back (HomeView.reload)
+                    Prefs.setTopOfScreen(Prefs.continueWatching() ? Prefs.TOP_PICKS : Prefs.TOP_CONTINUE);
+                    return;
                 case CLOCK_ROW: {
                     int at = java.util.Arrays.asList(CLOCKS).indexOf(Prefs.clockFormat());
                     Prefs.setClockFormat(CLOCKS[(at + dir + CLOCKS.length) % CLOCKS.length]);

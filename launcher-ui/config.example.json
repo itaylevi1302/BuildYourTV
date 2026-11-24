@@ -19,6 +19,7 @@
     "longitude": -46.6333
   },
   "theme": "auto",
+  "top_of_screen": "picks",
   "temperature": "C",
   "clock": "auto",
   "power_on": "tv",

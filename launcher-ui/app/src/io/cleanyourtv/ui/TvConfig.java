@@ -85,6 +85,11 @@ final class TvConfig {
                         String.valueOf(city.getDouble("longitude")));
             }
             if (o.has("theme")) Prefs.setTheme(o.getString("theme"));
+            if (o.has("top_of_screen")) {
+                String top = o.optString("top_of_screen").trim();
+                if (top.equals(Prefs.TOP_PICKS) || top.equals(Prefs.TOP_CONTINUE)) Prefs.setTopOfScreen(top);
+                else AppLog.w("config.json: top_of_screen skipped");
+            }
             if (o.has("temperature")) Prefs.setTemperature(o.getString("temperature"));
             if (o.has("weather")) Prefs.setWeather(o.getBoolean("weather"));
             if (o.has("language")) Prefs.setLanguage(o.getString("language"));

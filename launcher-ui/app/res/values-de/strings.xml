@@ -102,6 +102,12 @@
     <string name="temperature">"Temperatur"</string>
     <string name="iptv_search_unavailable">"Die App hat auf die Suche nicht reagiert. Trotzdem öffnen oder die App unter Einstellungen › Services wechseln?"</string>
     <string name="theme">"Design"</string>
+    <string name="top_of_screen">"Oben auf dem Bildschirm"</string>
+    <string name="continue_watching">"Weiterschauen"</string>
+    <string name="watch_nothing">"Nichts halb Gesehenes in deinen Apps."</string>
+    <string name="watch_needs_permission">"Vom Computer aus erlauben: %1$s"</string>
+    <string name="watch_time_left">"noch %1$s"</string>
+    <string name="watch_episode">"St. %1$s F. %2$s"</string>
     <string name="this_afternoon">"HEUTE NACHMITTAG"</string>
     <string name="this_morning">"HEUTE MORGEN"</string>
     <string name="tmdb_attribution">"Nutzt die TMDB-API, ohne Billigung oder Zertifizierung durch TMDB."</string>

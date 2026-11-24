@@ -104,6 +104,12 @@
     <string name="temperature">"Temperatura"</string>
     <string name="iptv_search_unavailable">"La app no respondió a la búsqueda. ¿Abrirla de todos modos o cambiar la app en Ajustes › Services?"</string>
     <string name="theme">"Tema"</string>
+    <string name="top_of_screen">"Parte superior"</string>
+    <string name="continue_watching">"Seguir viendo"</string>
+    <string name="watch_nothing">"Nada a medias en tus apps."</string>
+    <string name="watch_needs_permission">"Permítelo desde un ordenador: %1$s"</string>
+    <string name="watch_time_left">"quedan %1$s"</string>
+    <string name="watch_episode">"T%1$s E%2$s"</string>
     <string name="this_afternoon">"PARA ESTA TARDE"</string>
     <string name="this_morning">"PARA ESTA MAÑANA"</string>
     <string name="tmdb_attribution">"Este producto usa la API de TMDB, sin respaldo ni certificación de TMDB."</string>
