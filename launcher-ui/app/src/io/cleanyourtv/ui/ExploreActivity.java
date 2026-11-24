@@ -2,8 +2,10 @@ package io.cleanyourtv.ui;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Rect;
@@ -11,6 +13,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -251,7 +254,8 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         page.setPadding(0, 0, 0, Math.round(80 * k));
         scroll.addView(page);
         root.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        root.addView(burger(), burgerParams());
+        burgerView = burger();
+        root.addView(burgerView, burgerParams());
         root.addView(pullHint(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.TOP | Gravity.CENTER_HORIZONTAL));
         shade = new View(this);
@@ -260,10 +264,13 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         shade.setVisibility(View.GONE);
         root.addView(shade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.addView(buildMenu(), new FrameLayout.LayoutParams(Math.round(560 * k), ViewGroup.LayoutParams.MATCH_PARENT));
+        root.addView(buildTheaterBar(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.START));
         setContentView(root);
         scroll.getViewTreeObserver().addOnGlobalFocusChangeListener((was, now) -> {
             followFocus(now);
             tilesNear(now);
+            if (!theater && hero != null && (now == null || !inside(now, hero))) stopTrailer();
         });
         if (!Tmdb.hasKey()) {
             header(Strings.get(R.string.explore), Strings.get(R.string.tmdb_key_missing_build_hint));
@@ -278,6 +285,13 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
 
     @Override protected void onResume() {
         super.onResume();
+        resumed = true;
+        if (screenOff == null) {
+            screenOff = new BroadcastReceiver() {
+                @Override public void onReceive(Context c, Intent i) { releaseTrailer(); }
+            };
+            registerReceiver(screenOff, new IntentFilter(Intent.ACTION_SCREEN_OFF));
+        }
         if (hero != null && !menuOpen) restartHero();
         if (resumedOnce && Tmdb.hasKey()) {   // back from a title page: the list, the picks and what was seen may have changed
             refreshPersonal();
@@ -288,10 +302,31 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
 
     @Override protected void onPause() {
         main.removeCallbacks(heroTick);
+        resumed = false;
+        stopTrailer();
+        if (screenOff != null) {
+            try {
+                unregisterReceiver(screenOff);
+            } catch (RuntimeException ignored) {
+            }
+            screenOff = null;
+        }
         super.onPause();
     }
 
+    @Override public void onWindowFocusChanged(boolean has) {
+        super.onWindowFocusChanged(has);
+        if (!has) stopTrailer();
+        else if (hero != null && hero.hasFocus()) scheduleTrailer();
+    }
+
+    @Override public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (level >= TRIM_MEMORY_RUNNING_LOW) releaseTrailer();
+    }
+
     @Override protected void onDestroy() {
+        releaseTrailer();
         io.shutdownNow();
         super.onDestroy();
     }
@@ -525,6 +560,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         ((View) (here != null ? here : menuItems.get(HOME)).getParent()).requestFocus();
         scroll.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);   // only the menu takes the focus now
         main.removeCallbacks(heroTick);
+        stopTrailer();
     }
 
     /** `restore`: back to what was focused (Right, Back); otherwise the new page takes the focus. */
@@ -548,6 +584,17 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         keyAt = android.os.SystemClock.uptimeMillis();
         int code = e.getKeyCode();
         boolean down = e.getAction() == KeyEvent.ACTION_DOWN;
+        if (theater) {
+            boolean wasHidden = theaterBar.getAlpha() < 0.5f;
+            theaterWake();
+            if (code == KeyEvent.KEYCODE_BACK) {
+                if (!down) exitTheater(false);
+                return true;
+            }
+            if (wasHidden && down) return true;
+            if (code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN) return true;
+            return super.dispatchKeyEvent(e);
+        }
         if (down && code != KeyEvent.KEYCODE_DPAD_UP && pullAt != 0) {
             pullAt = 0;
             hidePullHint();
@@ -571,6 +618,18 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
                 if (next == null || !inside(next, menu)) return true;
             }
             return super.dispatchKeyEvent(e);
+        }
+        if (trailerSound != null && trailerSound.getVisibility() == View.VISIBLE && hero != null) {   // the sound pill above the banner
+            View f = getCurrentFocus();
+            if (f == hero && code == KeyEvent.KEYCODE_DPAD_UP) {
+                if (down) trailerSound.requestFocus();
+                return true;
+            }
+            if (f == trailerSound && (code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT)) return true;
+            if (f == trailerSound && code == KeyEvent.KEYCODE_DPAD_DOWN) {
+                if (down) hero.requestFocus();
+                return true;
+            }
         }
         if (code == KeyEvent.KEYCODE_DPAD_UP && Tmdb.hasKey() && !SETTINGS.equals(current)) {
             View f = getCurrentFocus();
@@ -802,6 +861,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         int gen = ++generation;
         placed.clear();
         placedKeys.clear();
+        releaseTrailer();
         hero = null;
         feed = null;
         catCache.clear();
@@ -2265,7 +2325,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
     private final List<Object[]> heroList = new ArrayList<>();   // {title, tag}
     private int heroAt;
     private final Runnable heroTick = () -> {
-        if (hero == null || menuOpen || heroList.size() < 2) return;
+        if (hero == null || menuOpen || heroList.size() < 2 || (this.trailer != null && this.trailer.playing()) || this.theater) return;
         stepHero(1);
     };
 
@@ -2275,6 +2335,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
     }
 
     private void stepHero(int by) {
+        stopTrailer();
         heroAt = (heroAt + by + heroList.size()) % heroList.size();
         showHero();
         restartHero();
@@ -2292,6 +2353,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         left.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[] {0xF00B0D12, 0x990B0D12, 0x000B0D12}));
         picture.addView(left, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, bleed));
         hero.addView(picture, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, bleed));
+        hero.addView(buildTrailerBox(bleed), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, bleed));
         LinearLayout text = new LinearLayout(this);
         text.setOrientation(LinearLayout.VERTICAL);
         heroTag = TvUi.text(this, k, 24, Ui.semibold, TvUi.ACCENT);
@@ -2339,13 +2401,20 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         tl.leftMargin = Math.round(INSET * k);
         tl.bottomMargin = Math.round((40 + HERO_BLEED) * k);
         hero.addView(text, tl);
+        heroText = text;
+        hero.addView(buildTrailerSound(), soundParams());
         hero.setFocusable(true);
         hero.setFocusableInTouchMode(true);
         hero.setOnFocusChangeListener((v, has) -> {
             heroButton.setBackground(TvUi.round(has ? TvUi.INK : 0x33FFFFFF, 40 * k));
             heroButton.setTextColor(has ? 0xFF14161A : TvUi.INK);
+            if (has) scheduleTrailer();
         });
         hero.setOnClickListener(v -> {
+            if (trailer != null && trailer.playing()) {
+                enterTheater();
+                return;
+            }
             if (!heroList.isEmpty()) open((Tmdb.Title) heroList.get(heroAt)[0]);
         });
         hero.setOnLongClickListener(v -> {   // hold OK: the same menu as a poster's, for the title showing
@@ -2391,6 +2460,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
 
     private void setHero(List<Object[]> list) {
         if (list.isEmpty()) {   // nothing with a backdrop: a plain title instead
+            releaseTrailer();
             page.removeView(hero);
             hero = null;
             ((LinearLayout.LayoutParams) rows.getLayoutParams()).topMargin = 0;
@@ -2427,7 +2497,10 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
         for (int i = 0; i < heroDots.getChildCount(); i++) {
             heroDots.getChildAt(i).setBackground(TvUi.round(i == heroAt ? TvUi.INK : 0x59FFFFFF, 6 * k));
         }
-        if (hero.hasFocus()) followFocus(hero);
+        if (hero.hasFocus()) {
+            followFocus(hero);
+            scheduleTrailer();
+        }
         int at = heroAt;
         FrameLayout shown = hero;
         io.execute(() -> {
@@ -2516,6 +2589,205 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
     private static void addHero(List<Object[]> out, Set<String> seen, Tmdb.Title t, String tag) {
         if (t.backdrop.isEmpty() || "null".equals(t.backdrop) || !seen.add(t.key())) return;
         out.add(new Object[] {t, tag});
+    }
+
+    // MARK: - Banner trailer (#113)
+
+    private static final long TRAILER_REST_MS = 1000;
+    private BannerTrailer trailer;
+    private FrameLayout trailerBox;
+    private View trailerLeft, trailerFade, burgerView;
+    private LinearLayout heroText, theaterBar;
+    private TextView theaterEyebrow, theaterTitle, theaterSound;
+    private TvUi.Action trailerSound;
+    private boolean theater, resumed;
+    private int heroHeight;
+    private BroadcastReceiver screenOff;
+    private final Set<String> noTrailer = new HashSet<>();   // titles with nothing to play, until the activity ends
+    private final Runnable trailerSoon = this::maybeStartTrailer;
+    private final Runnable theaterIdle = () -> {
+        if (theater) theaterBar.animate().alpha(0).setDuration(400).start();
+    };
+
+    /** The layer for the trailer, between the picture and the text; its WebView is made only when one plays. */
+    private View buildTrailerBox(int bleed) {
+        trailerBox = new FrameLayout(this);
+        trailerBox.setAlpha(0);
+        trailerBox.setVisibility(View.GONE);
+        trailerBox.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+        trailerLeft = new View(this);
+        trailerLeft.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[] {0xF00B0D12, 0x990B0D12, 0x000B0D12}));
+        trailerBox.addView(trailerLeft, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        trailerFade = new View(this);
+        trailerFade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] {0x000B0D12, 0xFF0B0D12}));
+        FrameLayout.LayoutParams fl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        fl.topMargin = Math.round(bleed * 0.42f);
+        trailerBox.addView(trailerFade, fl);
+        return trailerBox;
+    }
+
+    private View buildTrailerSound() {
+        trailerSound = TvUi.action(this, k, R.drawable.ic_volume_off, "", v -> {
+            setTrailerMuted(!trailer.muted());
+        });
+        trailerSound.setContentDescription(Strings.get(R.string.trailer_unmute));
+        trailerSound.setVisibility(View.GONE);
+        return trailerSound;
+    }
+
+    private FrameLayout.LayoutParams soundParams() {
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.END);
+        lp.topMargin = Math.round(56 * k);
+        lp.rightMargin = Math.round(INSET * k);
+        return lp;
+    }
+
+    private void setTrailerMuted(boolean m) {
+        if (trailer == null) return;
+        trailer.setMuted(m);
+        if (trailerSound != null) {
+            trailerSound.set(m ? R.drawable.ic_volume_off : R.drawable.ic_volume_up, "", !m);
+            trailerSound.setContentDescription(Strings.get(m ? R.string.trailer_unmute : R.string.trailer_mute));
+        }
+        if (theaterSound != null) theaterSound.setText(Strings.get(m ? R.string.trailer_unmute : R.string.trailer_mute));
+    }
+
+    private void scheduleTrailer() {
+        main.removeCallbacks(trailerSoon);
+        if (Prefs.bannerTrailer() && BannerTrailer.available()) main.postDelayed(trailerSoon, 1000);
+    }
+
+    private void maybeStartTrailer() {
+        if (!Prefs.bannerTrailer()) return;
+        if (hero == null || heroList.isEmpty() || !hero.hasFocus() || menuOpen || overlay != null || !hasWindowFocus() || !resumed) return;
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        if (pm != null && !pm.isInteractive()) return;
+        Tmdb.Title t = (Tmdb.Title) heroList.get(heroAt)[0];
+        if (noTrailer.contains(t.key())) return;
+        if (trailer != null && trailer.playing() && trailer.title() == t) return;
+        if (trailer == null) {
+            trailer = new BannerTrailer(this, trailerBox, main, io, new BannerTrailer.Listener() {
+                @Override public void onTrailerPlaying() {
+                    if (hero == null) return;
+                    trailerSound.set(R.drawable.ic_volume_off, "", false);
+                    trailerSound.setContentDescription(Strings.get(R.string.trailer_unmute));
+                    trailerSound.setVisibility(View.VISIBLE);
+                    heroButton.setText(Strings.get(R.string.trailer));
+                    main.removeCallbacks(heroTick);
+                }
+
+                @Override public void onTrailerStopped(boolean ended) {
+                    if (theater) exitTheater(true);
+                    if (ended && trailer != null && trailer.title() != null) noTrailer.add(trailer.title().key());
+                    if (hero == null) return;
+                    boolean had = trailerSound.hasFocus();
+                    trailerSound.setVisibility(View.GONE);
+                    heroButton.setText(Strings.get(R.string.details));
+                    if (had) hero.requestFocus();
+                    if (!menuOpen) restartHero();
+                }
+            });
+        }
+        trailer.start(t);
+    }
+
+    private void stopTrailer() {
+        main.removeCallbacks(trailerSoon);
+        if (theater) exitTheater(true);
+        if (trailer != null) trailer.stop();
+    }
+
+    private void releaseTrailer() {
+        stopTrailer();
+        if (trailer != null) {
+            trailer.release();
+            trailer = null;
+        }
+    }
+
+    private View buildTheaterBar() {
+        theaterBar = new LinearLayout(this);
+        theaterBar.setOrientation(LinearLayout.VERTICAL);
+        theaterBar.setPadding(Math.round(INSET * k), 0, Math.round(INSET * k), Math.round(60 * k));
+        theaterBar.setVisibility(View.GONE);
+        theaterEyebrow = TvUi.text(this, k, 24, Ui.semibold, TvUi.ACCENT);
+        theaterEyebrow.setLetterSpacing(0.08f);
+        theaterBar.addView(theaterEyebrow);
+        theaterTitle = TvUi.text(this, k, 44, Ui.displaySemibold, TvUi.INK);
+        theaterTitle.setMaxLines(1);
+        theaterTitle.setEllipsize(TextUtils.TruncateAt.END);
+        theaterTitle.setPadding(0, Math.round(8 * k), 0, Math.round(24 * k));
+        theaterBar.addView(theaterTitle);
+        LinearLayout pills = new LinearLayout(this);
+        pills.setOrientation(LinearLayout.HORIZONTAL);
+        theaterSound = TvUi.button(this, k, Strings.get(R.string.trailer_mute), v -> setTrailerMuted(!trailer.muted()));
+        pills.addView(theaterSound);
+        TextView details = TvUi.button(this, k, Strings.get(R.string.details), v -> {
+            Tmdb.Title t = trailer == null ? null : trailer.title();
+            stopTrailer();
+            if (t != null) open(t);
+        });
+        LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        dl.leftMargin = Math.round(20 * k);
+        pills.addView(details, dl);
+        theaterBar.addView(pills);
+        return theaterBar;
+    }
+
+    /** OK while the trailer plays: the banner fills the screen, with sound; Back returns to the page. */
+    private void enterTheater() {
+        if (theater || trailer == null || !trailer.playing() || hero == null) return;
+        Tmdb.Title t = trailer.title();
+        theater = true;
+        scroll.top();
+        heroHeight = hero.getLayoutParams().height;
+        hero.getLayoutParams().height = root.getHeight();
+        trailerBox.getLayoutParams().height = root.getHeight();
+        hero.requestLayout();
+        heroText.setAlpha(0);
+        trailerLeft.setAlpha(0);
+        trailerFade.setAlpha(0);
+        rows.setVisibility(View.INVISIBLE);
+        trailerSound.setVisibility(View.GONE);
+        burgerView.setVisibility(View.INVISIBLE);
+        pullHint.setVisibility(View.GONE);
+        scroll.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+        setTrailerMuted(false);
+        theaterEyebrow.setText((Strings.get(R.string.trailer) + " · " + Strings.get(t != null && t.kind.equals("movie") ? R.string.movie : R.string.show)).toUpperCase(Locale.ROOT));
+        theaterTitle.setText(t == null ? "" : t.name);
+        theaterBar.setVisibility(View.VISIBLE);
+        theaterBar.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
+        theaterSound.requestFocus();
+        theaterWake();
+    }
+
+    private void exitTheater(boolean silent) {
+        if (!theater) return;
+        theater = false;
+        main.removeCallbacks(theaterIdle);
+        hero.getLayoutParams().height = heroHeight;
+        trailerBox.getLayoutParams().height = heroHeight;
+        hero.requestLayout();
+        heroText.setAlpha(1);
+        trailerLeft.setAlpha(1);
+        trailerFade.setAlpha(1);
+        rows.setVisibility(View.VISIBLE);
+        burgerView.setVisibility(View.VISIBLE);
+        if (!menuOpen && overlay == null) scroll.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
+        theaterBar.setVisibility(View.GONE);
+        theaterBar.setAlpha(1);
+        if (silent) return;
+        setTrailerMuted(true);
+        trailerSound.setVisibility(View.VISIBLE);
+        hero.requestFocus();
+    }
+
+    private void theaterWake() {
+        theaterBar.animate().cancel();
+        theaterBar.setAlpha(1);
+        main.removeCallbacks(theaterIdle);
+        main.postDelayed(theaterIdle, 3000);
     }
 
     // MARK: - What the banner pages show
@@ -2698,6 +2970,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
     private boolean stopped;
 
     @Override protected void onStop() {
+        releaseTrailer();
         super.onStop();
         stopped = true;
         TvUi.releaseImages(getWindow().getDecorView());   // covered: its pictures go, the cache and the disk keep them

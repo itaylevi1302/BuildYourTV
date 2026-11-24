@@ -343,6 +343,10 @@
     <string name="top_rated_movies">"Top rated movies"</string>
     <string name="top_rated_shows">"Top rated shows"</string>
     <string name="trailer">"Trailer"</string>
+    <string name="trailer_banner_unavailable">"Not available on this TV"</string>
+    <string name="trailer_in_the_banner">"Trailer in the banner"</string>
+    <string name="trailer_mute">"Mute"</string>
+    <string name="trailer_unmute">"Sound on"</string>
     <string name="trending">"Trending"</string>
     <string name="trending_anime">"Trending anime"</string>
     <string name="trending_movies">"Trending movies"</string>

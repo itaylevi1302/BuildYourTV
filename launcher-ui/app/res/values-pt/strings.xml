@@ -179,6 +179,10 @@
     <string name="no_app_on_the_tv">"sem app na TV"</string>
     <string name="no_app_on_the_tv_2">"Sem app na TV"</string>
     <string name="no_app_to_open_the_trailer">"Nenhum app para abrir o trailer."</string>
+    <string name="trailer_banner_unavailable">"Indisponível nesta TV"</string>
+    <string name="trailer_in_the_banner">"Trailer no destaque"</string>
+    <string name="trailer_mute">"Silenciar"</string>
+    <string name="trailer_unmute">"Ativar som"</string>
     <string name="no_biography_on_tmdb">"Sem biografia no TMDB."</string>
     <string name="no_city_with_that_name">"Nenhuma cidade com esse nome."</string>
     <string name="remote_buttons_config_missing">"Nenhum botão configurável: envie o remote.json do seu modelo (launcher-ui/config.sh --remote)."</string>

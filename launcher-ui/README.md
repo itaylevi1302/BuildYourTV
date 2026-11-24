@@ -229,6 +229,24 @@ provider found, with OK to switch one on or off and ← → to change the order.
 Watch pill asks about one episode. The contract is [`docs/specs/provider.md`](../docs/specs/provider.md) and the short
 version for app authors is [`docs/providers.md`](../docs/providers.md).
 
+## Trailer in Explore's banner (optional)
+
+Off by default. With it off, no web view is ever created and nothing is loaded. To turn it on: Settings → Services →
+**Trailer in the banner** (from Home's Settings, or Explore → Settings → Services and apps).
+
+When it is on and the focus rests on Explore's banner for a second, the title's trailer fades in behind it, muted, and the
+carousel pauses. **Up** from the banner reaches a sound pill, **OK** opens the trailer full screen with sound (Back returns),
+and moving the focus away stops it. If a trailer fails, the next one is tried; a title with none keeps its picture.
+
+What it sends: TMDB is asked for the title's videos, and while a trailer plays YouTube (youtube-nocookie.com, Google) gets
+the TV's IP address and the video id. No account, and no cookies are kept between sessions.
+
+What it costs: the first web view takes roughly 15 to 30 MB of memory and a moment of the main thread, and a playing video
+tens of MB more, on a TV with little RAM possibly inside the launcher's own process (figures are approximate and still to be
+measured on a TV with `dumpsys meminfo io.cleanyourtv.ui:home`). That is why it is opt-in, plays one video at a time and
+destroys the web view as soon as the screen stops being used, the screen turns off or memory gets short. A TV without a
+web view shows "Not available on this TV" on the row and plays nothing. No new permission and no `config.json` key.
+
 ## Translations
 
 Edit the English defaults in [`app/res/values/strings.xml`](app/res/values/strings.xml)

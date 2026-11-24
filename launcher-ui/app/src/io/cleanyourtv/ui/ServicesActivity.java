@@ -80,6 +80,14 @@ public class ServicesActivity extends Activity {
         sub.setPadding(0, Math.round(12 * k), 0, Math.round(26 * k));
         list.addView(sub);
         list.addView(row("trailer", null, Strings.get(R.string.movie_tv_trailers), trailerPlayerValue(), v -> pickTrailerPlayer(providers)));
+        boolean webView = BannerTrailer.available();
+        list.addView(row("bannerTrailer", null, Strings.get(R.string.trailer_in_the_banner),
+                !webView ? Strings.get(R.string.trailer_banner_unavailable) : Prefs.bannerTrailer() ? Strings.get(R.string.on) : Strings.get(R.string.off),
+                v -> {
+                    if (!webView) return;
+                    Prefs.setBannerTrailer(!Prefs.bannerTrailer());
+                    build(providers);
+                }));
         list.addView(row("iptv", null, Strings.get(R.string.iptv_app), iptvPlayerValue(), v -> pickIptvPlayer(providers)));
         list.addView(row("all", null, Strings.get(R.string.show_every_service),
                 Prefs.showAllProviders() ? Strings.get(R.string.on) : Strings.get(R.string.off), v -> {
