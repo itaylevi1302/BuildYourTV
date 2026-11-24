@@ -51,6 +51,13 @@
         <intent>
             <action android:name="com.android.tv.action.VIEW_INPUTS" />
         </intent>
+        <!-- What answers TV Settings and Android's list of apps: the drawer's App Settings shows only where they differ (#56). -->
+        <intent>
+            <action android:name="android.settings.SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.MANAGE_APPLICATIONS_SETTINGS" />
+        </intent>
     </queries>
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
