@@ -985,7 +985,7 @@ public class SettingsActivity extends Activity {
                 // A release APK comes without a key: it is typed here once (or pushed in config.json "tmdb_key").
                 if (Tmdb.hasKey()) activity.startActivity(new Intent(c, TmdbLoginActivity.class)); else askTmdbKey();
             } else {
-                activity.startActivity(new Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                activity.startActivity(HomeApps.tvSettings(c).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             }
             for (Spring s : pop) s.snap(0);
             invalidate();

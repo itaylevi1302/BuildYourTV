@@ -426,7 +426,7 @@ final class HomeApps {
                 intent = new Intent().setComponent(new ComponentName(a, SettingsActivity.class));
                 break;
             case ANDROID_SETTINGS:
-                intent = new Intent(Settings.ACTION_SETTINGS);
+                intent = tvSettings(a);
                 break;
             case NETWORK:
                 intent = networkSettings(a);
@@ -455,7 +455,18 @@ final class HomeApps {
                 "com.android.tv.settings.connectivity.NetworkActivity"));
         if (tv.resolveActivity(pm) != null) return tv;
         Intent wifi = new Intent(Settings.ACTION_WIFI_SETTINGS);
-        return wifi.resolveActivity(pm) != null ? wifi : new Intent(Settings.ACTION_SETTINGS);
+        return wifi.resolveActivity(pm) != null ? wifi : tvSettings(c);
+    }
+
+    /**
+     * The TV's settings (#52): the plain settings request, so a maker's own menu stays; when nothing answers it (an
+     * HY300 Pro+ with its stock home off), Android TV's MainSettings by name (Free My TV 4a8f238).
+     */
+    static Intent tvSettings(Context c) {
+        Intent plain = new Intent(Settings.ACTION_SETTINGS);
+        if (plain.resolveActivity(c.getPackageManager()) != null) return plain;
+        return new Intent().setComponent(new ComponentName("com.android.tv.settings",
+                "com.android.tv.settings.MainSettings"));
     }
 
     /**

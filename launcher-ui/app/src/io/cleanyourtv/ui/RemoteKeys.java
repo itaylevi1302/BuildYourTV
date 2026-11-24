@@ -35,6 +35,10 @@ final class RemoteKeys {
 
     static final boolean TCL = is("TCL"), VESTEL = is("Vestel");
 
+    /** Brands whose maker answers the plain settings request with its own menu, or nothing (Free My TV ed6be1e). */
+    private static final boolean ANDROID_TV_SETTINGS_BRAND = is("TCL") || is("Philips") || is("Sony") || is("JVC")
+            || is("Skyworth");
+
     private static boolean is(String maker) {
         return maker.equalsIgnoreCase(Build.MANUFACTURER) || maker.equalsIgnoreCase(Build.BRAND);
     }
@@ -198,7 +202,11 @@ final class RemoteKeys {
             case "home":
                 return new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(c.getPackageName());
             case "settings":
-                return new Intent(Settings.ACTION_SETTINGS);
+                if (ANDROID_TV_SETTINGS_BRAND) {
+                    Intent own = new Intent(Settings.ACTION_SETTINGS).setPackage("com.android.tv.settings");
+                    if (own.resolveActivity(c.getPackageManager()) != null) return own;
+                }
+                return HomeApps.tvSettings(c);
             case "live":
                 return HomeApps.liveTv(c);
             case "tmdb:explore":    // a fresh Explore: whatever was open in it before is dropped
