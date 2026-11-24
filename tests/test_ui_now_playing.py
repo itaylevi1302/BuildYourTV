@@ -107,7 +107,9 @@ class NowPlayingSource(unittest.TestCase):
         self.assertIn("NOW_PLAYING=1", doc)
         self.assertIn("media session", doc)
         self.assertIn("never reads a notification", doc)
-        self.assertIn("NOW_PLAYING=1", (ROOT / "README.md").read_text(encoding="utf-8"))
+        root = (ROOT / "README.md").read_text(encoding="utf-8")
+        if "CleanYourTV UI" in root:  # under launcher-ui/test-upstream.sh the root README is upstream's
+            self.assertIn("NOW_PLAYING=1", root)
 
 
 # The TV side: tv() runs its command in a bash with fake `settings` and `cmd`.
