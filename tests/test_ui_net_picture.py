@@ -76,7 +76,9 @@ class OnlyThroughNetPicture(unittest.TestCase):
     def test_documented(self):
         readme = (ROOT / "launcher-ui/README.md").read_text(encoding="utf-8")
         self.assertIn("never an address on your home network", readme)
-        self.assertIn("Watch Next", (ROOT / "README.md").read_text(encoding="utf-8"))
+        root = (ROOT / "README.md").read_text(encoding="utf-8")
+        if "CleanYourTV UI" in root:  # under launcher-ui/test-upstream.sh the root README is upstream's
+            self.assertIn("Watch Next", root)
 
 
 if __name__ == "__main__":
