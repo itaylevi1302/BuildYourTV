@@ -123,9 +123,9 @@ case "$HOME_NOW" in
     exit 1 ;;
 esac
 
-# The screensaver, on unless SCREENSAVER=0. Android 11 runs it from the main process (ScreensaverAlone).
+# The screensaver, on unless SCREENSAVER=0. Android 11 to 12L (SDK 30-32) run it from the main process (ScreensaverAlone).
 if [ "${SCREENSAVER:-1}" = 1 ]; then
-  if [ "${TV_SDK:-0}" = 30 ]; then DREAM=$PKG/.ScreensaverAlone; else DREAM=$PKG/.Screensaver; fi
+  case "${TV_SDK:-0}" in 30|31|32) DREAM=$PKG/.ScreensaverAlone ;; *) DREAM=$PKG/.Screensaver ;; esac
   WAS=$(tv 'settings get secure screensaver_components' 2>/dev/null | tr -d '\r' || true)
   tv "settings put secure screensaver_components $DREAM" >/dev/null
   case "$WAS" in

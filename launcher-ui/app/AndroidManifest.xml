@@ -175,7 +175,7 @@
             </intent-filter>
         </service>
 
-        <!-- The same screensaver on Android 11, in the main process (see ScreensaverAlone). -->
+        <!-- The same screensaver on Android 11 to 12L, in the main process (see ScreensaverAlone). -->
         <service
             android:name=".ScreensaverAlone"
             android:enabled="@bool/dream_alone"

@@ -25,7 +25,7 @@ public class Screensaver extends DreamService {
 
     @Override public void onAttachedToWindow() {
         super.onAttachedToWindow();
-        Prefs.reload();     // the style may have changed in another process (Android 11)
+        Prefs.reload();     // the style may have changed in another process (Android 11 to 12L)
         Ui.init(this);
         setInteractive(false);
         setFullscreen(true);
