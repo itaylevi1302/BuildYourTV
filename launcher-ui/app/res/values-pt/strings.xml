@@ -422,4 +422,14 @@
     <string name="watch_providers_hint">"Apps que dizem quais títulos têm. OK liga ou desliga, ← → muda a ordem: Assistir abre o primeiro ligado que tiver o título."</string>
     <string name="watch_episode_button">"Assistir"</string>
     <string name="no_app_has_this_episode">"Nenhum dos seus apps tem este episódio"</string>
+    <string name="continue_episode">"Continuar T%1$d:E%2$d"</string>
+    <string name="lists_synced">"Assistindo e Assistidos sincronizam com a sua conta: %1$d assistindo, %2$d assistidos."</string>
+    <string name="lists_sync_failed">"Não deu para sincronizar Assistindo e Assistidos: %1$s"</string>
+    <string name="lists_need_read_token">"Assistindo e Assistidos ficam só nesta TV. Reconecte com o token de leitura da API (o texto longo que começa com eyJ) para sincronizar com a sua conta."</string>
+    <string name="lists_connection_lost">"O TMDB não aceita mais esta conexão para Assistindo e Assistidos. Reconecte para voltar a sincronizar."</string>
+    <string name="sync_now">"Sincronizar agora"</string>
+    <string name="syncing">"Sincronizando…"</string>
+    <string name="reconnect">"Reconectar"</string>
+    <string name="read_access_token">"Token de leitura da API"</string>
+    <string name="not_a_read_token">"Isso parece a chave v3. Cole o token de leitura da API, o texto longo que começa com eyJ."</string>
 </resources>

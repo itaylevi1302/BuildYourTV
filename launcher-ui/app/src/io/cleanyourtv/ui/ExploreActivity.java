@@ -2006,6 +2006,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
                 out.add(new Section(Strings.get(R.string.top_10_movies_today), () -> top(Tmdb.titles(Tmdb.get("/trending/movie/day"), "movie"))).ranked());
                 return out;
             case HOME: {
+                if (TmdbLists.on(this)) out.add(new Section(Strings.get(R.string.continue_watching), () -> TmdbLists.continueTitles(this)).personal());
                 out.add(new Section(Strings.get(R.string.my_list), () -> Tmdb.watchlist(this)).personal().more(() -> showPage(LIST)));
                 out.add(new Section(Strings.get(R.string.recommended_for_you), this::forYou));
                 List<Tmdb.Title> seen = Tmdb.seen(this);

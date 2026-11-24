@@ -431,4 +431,14 @@
     <string name="watch_providers_hint">"Apps that say which titles they have. OK switches one on or off, ← → changes the order: Watch opens the first one on that has the title."</string>
     <string name="watch_episode_button">"Watch"</string>
     <string name="no_app_has_this_episode">"None of your apps has this episode"</string>
+    <string name="continue_episode">"Continue S%1$d:E%2$d"</string>
+    <string name="lists_synced">"Watching and Watched sync with your account: %1$d watching, %2$d watched."</string>
+    <string name="lists_sync_failed">"Couldn\'t sync Watching and Watched: %1$s"</string>
+    <string name="lists_need_read_token">"Watching and Watched stay on this TV. Reconnect with the API read access token (the long one that starts with eyJ) to sync them with your account."</string>
+    <string name="lists_connection_lost">"TMDB no longer accepts this connection for Watching and Watched. Reconnect to sync them again."</string>
+    <string name="sync_now">"Sync now"</string>
+    <string name="syncing">"Syncing…"</string>
+    <string name="reconnect">"Reconnect"</string>
+    <string name="read_access_token">"API read access token"</string>
+    <string name="not_a_read_token">"That looks like the v3 key. Paste the API read access token, the long text that starts with eyJ."</string>
 </resources>

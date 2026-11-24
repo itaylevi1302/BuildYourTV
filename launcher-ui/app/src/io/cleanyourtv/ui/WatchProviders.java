@@ -1,6 +1,7 @@
 package io.cleanyourtv.ui;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ContentProviderClient;
 import android.content.Context;
 import android.content.Intent;
@@ -13,6 +14,7 @@ import android.content.pm.SigningInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.text.TextUtils;
 import android.widget.Toast;
 
 import org.json.JSONArray;
@@ -462,6 +464,24 @@ final class WatchProviders {
             }
         }
         Toast.makeText(a, Strings.get(R.string.watch_provider_couldnt_open), Toast.LENGTH_LONG).show();
+    }
+
+    /** Several apps have it: a list to pick from, each with what it says (label, detail, where you stopped). Main thread. */
+    static void choose(Activity a, String title, List<Item> items) {
+        String[] labels = new String[items.size()];
+        for (int i = 0; i < labels.length; i++) {
+            Item it = items.get(i);
+            List<String> parts = new ArrayList<>();
+            if (!it.label.isEmpty()) parts.add(it.label);
+            if (!it.detail.isEmpty()) parts.add(it.detail);
+            String resume = resumeText(it);
+            if (resume != null) parts.add(resume);
+            labels[i] = it.provider.label + (parts.isEmpty() ? "" : " · " + TextUtils.join("  ·  ", parts));
+        }
+        new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle(title)
+                .setItems(labels, (d, which) -> open(a, items.get(which)))
+                .show();
     }
 
     /** "Resume from 23:30" when the app says where the person stopped, else null. */

@@ -47,7 +47,7 @@ final class TitleMenu {
         boolean seen = Tmdb.isSeen(a, t.kind, t.id);
         labels.add(seen ? Strings.get(R.string.unmark_as_seen) : "✓  " + Strings.get(R.string.mark_as_seen));
         actions.add(() -> {
-            Tmdb.setSeen(a, t, !seen);
+            TmdbLists.markSeen(a, t, !seen);
             changed(a, seen ? Strings.get(R.string.unmarked) : Strings.get(R.string.marked_as_seen), false);
         });
         labels.add(inList ? Strings.get(R.string.remove_from_my_list) : "+  " + Strings.get(R.string.add_to_my_list));

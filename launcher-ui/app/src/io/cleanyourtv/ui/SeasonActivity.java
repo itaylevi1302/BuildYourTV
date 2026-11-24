@@ -186,20 +186,7 @@ public class SeasonActivity extends Activity {
                 } else if (items.size() == 1) {
                     WatchProviders.open(this, items.get(0));
                 } else {
-                    String[] labels = new String[items.size()];
-                    for (int i = 0; i < labels.length; i++) {
-                        WatchProviders.Item it = items.get(i);
-                        List<String> parts = new ArrayList<>();
-                        if (!it.label.isEmpty()) parts.add(it.label);
-                        if (!it.detail.isEmpty()) parts.add(it.detail);
-                        String resume = WatchProviders.resumeText(it);
-                        if (resume != null) parts.add(resume);
-                        labels[i] = it.provider.label + (parts.isEmpty() ? "" : " · " + TextUtils.join("  ·  ", parts));
-                    }
-                    new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                            .setTitle(Strings.get(R.string.watch_episode, season, number))
-                            .setItems(labels, (d, which) -> WatchProviders.open(this, items.get(which)))
-                            .show();
+                    WatchProviders.choose(this, Strings.get(R.string.watch_episode, season, number), items);
                 }
             });
         }).start();

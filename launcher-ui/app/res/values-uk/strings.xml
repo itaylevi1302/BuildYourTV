@@ -435,4 +435,14 @@
     <string name="watch_providers_hint">"Застосунки, що кажуть, які назви в них є. OK вмикає чи вимикає, ← → змінює порядок: «Дивитися» відкриває перший увімкнений, у якому є назва."</string>
     <string name="watch_episode_button">"Дивитися"</string>
     <string name="no_app_has_this_episode">"У жодному з ваших застосунків немає цієї серії"</string>
+    <string name="continue_episode">"Продовжити С%1$d:Е%2$d"</string>
+    <string name="lists_synced">"«Дивлюся» і «Переглянуто» синхронізуються з вашим обліковим записом: дивлюся — %1$d, переглянуто — %2$d."</string>
+    <string name="lists_sync_failed">"Не вдалося синхронізувати «Дивлюся» і «Переглянуто»: %1$s"</string>
+    <string name="lists_need_read_token">"«Дивлюся» і «Переглянуто» зберігаються лише на цьому телевізорі. Під\'єднайтеся знову з токеном доступу для читання API (довгий текст, що починається з eyJ), щоб синхронізувати їх з обліковим записом."</string>
+    <string name="lists_connection_lost">"TMDB більше не приймає це з\'єднання для «Дивлюся» і «Переглянуто». Під\'єднайтеся знову, щоб відновити синхронізацію."</string>
+    <string name="sync_now">"Синхронізувати зараз"</string>
+    <string name="syncing">"Синхронізація…"</string>
+    <string name="reconnect">"Під\'єднати знову"</string>
+    <string name="read_access_token">"Токен доступу для читання API"</string>
+    <string name="not_a_read_token">"Схоже, це ключ v3. Вставте токен доступу для читання API — довгий текст, що починається з eyJ."</string>
 </resources>

@@ -111,7 +111,7 @@ logged, never guessed. [`config.example.json`](config.example.json) has them all
 
 | Key | Value | Notes |
 |---|---|---|
-| `tmdb_key` | TMDB API key or read access token | Free at themoviedb.org → Settings → API. The picks, Explore and the TMDB sign-in need it. Can also be typed on the TV under TMDB account. |
+| `tmdb_key` | TMDB API key or read access token | Free at themoviedb.org → Settings → API. The picks, Explore and the TMDB sign-in need it. Can also be typed on the TV under TMDB account. A read access token (eyJ…) also lets TMDB account sync Watching and Watched with tk-stream (private lists `tk:watching`, `tk:watched`). |
 | `tmdb_region` | `"auto"` or two letters (`"BR"`, `"US"`) | Which titles are on which streaming app. `auto` is the TV's country. |
 | `language` | `auto`, `pt`, `en`, `es`, `de`, `ru`, `uk`, `fr`, `tr`, `he` | `auto` (default) follows the TV. English is the fallback. Hebrew (`he`) also mirrors the home screen right to left. |
 | `shelf` | list of packages | The apps on the home screen, in order. |

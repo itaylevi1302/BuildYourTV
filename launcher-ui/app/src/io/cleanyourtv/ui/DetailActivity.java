@@ -66,6 +66,11 @@ public class DetailActivity extends Activity {
     private boolean streamingWatch, keyPressed;
     private int providerStamp;
     private int askGeneration;
+    // Continue watching (#110): where tk:watching says the person stopped, the Continue button and what it falls back to.
+    private TmdbLists.Progress progress;
+    private TextView resumeButton;
+    private String[] streamingApp;
+    private WatchProviders.Item firstProviderItem;
     private static final Set<String> askedThisRun = new HashSet<>();   // answered with Back: asked again next launch, not on every page
 
     @Override protected void onCreate(Bundle state) {
@@ -110,12 +115,14 @@ public class DetailActivity extends Activity {
                     try { reviews = Tmdb.get("/" + kind + "/" + id + "/reviews?language=en-US").optJSONArray("results"); } catch (Exception ignored) {}
                 }
                 JSONObject states = Tmdb.states(this, kind, id);
+                TmdbLists.Progress prog = TmdbLists.progress(this, kind, id);
                 boolean saved = Tmdb.signedIn(this) ? states.optBoolean("watchlist") : Tmdb.inWatchlist(this, kind, id);
                 JSONObject col = collection;
                 JSONArray rev = reviews;
                 main.post(() -> {
                     if (isFinishing()) return;
                     inList = saved;
+                    progress = prog;
                     favorite = states.optBoolean("favorite");
                     myRating = Tmdb.ratingOf(states);
                     String b = o.optString("backdrop_path");
@@ -203,9 +210,15 @@ public class DetailActivity extends Activity {
         actions = new TvUi.Flow(this, Math.round(20 * k), Math.round(20 * k));
         providerWatchButton = null;
         streamingWatch = watchApp != null;
+        streamingApp = watchApp;
+        resumeButton = null;
         actions.setPadding(Math.round(14 * k), Math.round(36 * k), Math.round(96 * k), Math.round(16 * k));
         if (watchApp != null) {
             actions.addView((TvUi.button(this, k, "▶  " + Strings.get(R.string.watch_on_prefix) + watchApp[1], v -> watch(watchApp[0]))));
+        }
+        if (progress != null) {
+            resumeButton = TvUi.button(this, k, resumeLabel(), v -> resume());
+            actions.addView(resumeButton, 0);
         }
         listButton = TvUi.button(this, k, "", v -> toggleList());
         actions.addView((listButton));
@@ -610,7 +623,7 @@ public class DetailActivity extends Activity {
 
     private void toggleSeen() {
         if (title == null) return;
-        Tmdb.setSeen(this, title, !Tmdb.isSeen(this, kind, id));
+        TmdbLists.markSeen(this, title, !Tmdb.isSeen(this, kind, id));
         labels();
     }
 
@@ -684,6 +697,51 @@ public class DetailActivity extends Activity {
         return players.isEmpty() ? null : players.get(0);
     }
 
+    // MARK: - Continue watching (#110)
+
+    private String resumeLabel() {
+        boolean tv = "tv".equals(kind);
+        if (tv && progress.season > 0 && progress.episode > 0) return "▶  " + Strings.get(R.string.continue_episode, progress.season, progress.episode);
+        if (progress.t > 0) return "▶  " + Strings.get(R.string.resume_from, WatchProviderLabels.clock(progress.t));
+        return "▶  " + Strings.get(R.string.continue_watching);
+    }
+
+    /** Opens the episode (or the title) where tk:watching says the person stopped: an app that has that episode, else the first app that has the title. */
+    private void resume() {
+        if (progress == null) return;
+        if ("tv".equals(kind) && progress.season > 0 && progress.episode > 0 && baseRequest != null) {
+            int s = progress.season, e = progress.episode;
+            new Thread(() -> {
+                List<WatchProviders.Item> items = new ArrayList<>();
+                try {
+                    JSONObject req = new JSONObject(baseRequest.toString()).put("season", s).put("episode", e);
+                    List<WatchProviders.Provider> on = WatchProviders.allowed(WatchProviders.found(this));
+                    for (List<WatchProviders.Item> got : WatchProviders.ask(this, on, req.toString()).values()) items.addAll(got);
+                } catch (Exception ignored) {
+                }
+                main.post(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (items.size() == 1) openProviderItem(items.get(0));
+                    else if (items.size() > 1) WatchProviders.choose(this, Strings.get(R.string.watch_episode, s, e), items);
+                    else resumeFallback();
+                });
+            }).start();
+            return;
+        }
+        resumeFallback();
+    }
+
+    private void resumeFallback() {
+        if (firstProviderItem != null) {
+            openProviderItem(firstProviderItem);
+        } else if (streamingApp != null) {
+            watch(streamingApp[0]);
+        } else {
+            Toast.makeText(this, Strings.get(R.string.not_on_any_streaming_service_in_the_region_right_now), Toast.LENGTH_LONG).show();
+            if (whereLine != null && whereLine.getChildCount() > 0) whereLine.requestFocus();
+        }
+    }
+
     // MARK: - Watch providers (#106)
 
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
@@ -754,6 +812,7 @@ public class DetailActivity extends Activity {
         providerChips.clear();
         if (providerWatchButton != null) actions.removeView(providerWatchButton);
         providerWatchButton = null;
+        firstProviderItem = null;
         int at = iptvChip != null ? 1 : 0;
         WatchProviders.Item first = null;
         for (Map.Entry<WatchProviders.Provider, List<WatchProviders.Item>> e : res.entrySet()) {
@@ -777,12 +836,13 @@ public class DetailActivity extends Activity {
                 providerChips.add(chip);
             }
         }
+        firstProviderItem = first;
         if (noneText != null) noneText.setVisibility(providerChips.isEmpty() ? View.VISIBLE : View.GONE);
         whereLine.setVisibility(whereLine.getChildCount() == 0 ? View.GONE : View.VISIBLE);
         if (first != null && !streamingWatch && actions != null) {
             WatchProviders.Item item = first;
             providerWatchButton = TvUi.button(this, k, "▶  " + Strings.get(R.string.watch_on_prefix) + item.provider.label, v -> openProviderItem(item));
-            actions.addView(providerWatchButton, 0);
+            actions.addView(providerWatchButton, resumeButton != null ? 1 : 0);
             if (!keyPressed && getCurrentFocus() == listButton) providerWatchButton.requestFocus();
         }
     }
