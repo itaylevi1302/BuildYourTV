@@ -137,8 +137,17 @@ fi
 # The remote's app buttons from inside any app, with KEY_SERVICE=1 (once: a reinstall keeps them on). Replacing the
 # APK unbinds the service while it stays listed, and Android binds it again only when the list changes, so a listed
 # service is cleared and written back, as CleanYourTV's launcher does since its PR #526.
-if [ "${KEY_SERVICE:-0}" = 1 ] || tv "settings get secure enabled_accessibility_services" | grep -q "$PKG/.RemoteKeyService"; then
-  svc=$PKG/.RemoteKeyService
+# Not on TCL's Android 11 (SDK 30): there any key filter makes one volume press move two steps and a held key stick,
+# even one that passes every key on (Free My TV #325). The service is refused, and taken out when a reinstall finds
+# it on; the app buttons still work on CleanYourTV UI's home screen, whose window gets them.
+svc=$PKG/.RemoteKeyService
+if [ "${TV_SDK:-0}" = 30 ] && tv 'getprop ro.product.manufacturer; getprop ro.product.brand' 2>/dev/null | tr -d '\r' | grep -ix tcl >/dev/null; then
+  if [ "${KEY_SERVICE:-0}" = 1 ]; then
+    echo "KEY_SERVICE=1 refused: on TCL's Android 11 any key filter makes one volume press move two steps" >&2
+    echo "and a held key stick (Free My TV #325). Here the app buttons work on CleanYourTV UI's home screen only." >&2
+  fi
+  tv "s=\$(settings get secure enabled_accessibility_services); case \"\$s\" in *$svc*) n=\$(echo \"\$s\" | sed 's#$svc##; s#::#:#; s#^:##; s#:\$##'); if [ -n \"\$n\" ]; then settings put secure enabled_accessibility_services \"\$n\"; else settings put secure enabled_accessibility_services ''; settings put secure accessibility_enabled 0; fi; echo remote buttons switched off: TCL Android 11 ;; esac"
+elif [ "${KEY_SERVICE:-0}" = 1 ] || tv "settings get secure enabled_accessibility_services" | grep -q "$svc"; then
   tv "s=\$(settings get secure enabled_accessibility_services); case \"\$s\" in *$svc*) settings put secure enabled_accessibility_services ''; settings put secure accessibility_enabled 0; sleep 1; settings put secure enabled_accessibility_services \"\$s\" ;; null|'') settings put secure enabled_accessibility_services $svc ;; *) settings put secure enabled_accessibility_services \"\$s:$svc\" ;; esac; settings put secure accessibility_enabled 1; echo remote buttons enabled"
 fi
 if [ -n "${CONFIG:-}" ]; then ./config.sh "$CONFIG"; fi

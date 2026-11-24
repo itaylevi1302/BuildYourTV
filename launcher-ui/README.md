@@ -38,6 +38,8 @@ on (Settings → Device Preferences → About → press OK on **Build** seven ti
    ```
    The second command replaces any accessibility service already on: check
    `adb shell settings get secure enabled_accessibility_services` first and join them with `:`.
+   Skip it on TCL TVs with Android 11: there any key filter makes one volume press move two steps and a held key
+   stick, so the app buttons work on the home screen only (`build-and-install.sh` refuses `KEY_SERVICE=1` there).
    For "Google Photos" under Settings → Screensaver (Google TV's own screensaver, which must stay enabled), let the app
    switch the screensaver: `adb shell pm grant io.cleanyourtv.ui android.permission.WRITE_SECURE_SETTINGS`.
 5. Switch Network debugging off again on the TV when you are done: port 5555 is plaintext.
