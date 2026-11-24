@@ -431,7 +431,13 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         if (!again) reload();
         updatePalette();
         updatePicks();
-        if (sheetOpen) closeSheet();
+        if (allAppsOnResume) {   // the Apps key pressed inside another app: All Apps on the way back (#53)
+            allAppsOnResume = false;
+            reset(false);
+            openSheet();
+        } else if (sheetOpen) {
+            closeSheet();
+        }
         sheet.snap(sheet.target);
         motionDirty = true;
         invalidateAll();
@@ -1813,6 +1819,26 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         sheet.target = 0;
         retarget(false);
     }
+
+    /** All Apps from the remote's Apps key (HomeActivity): opens the sheet, or closes it when it is already open. */
+    void showAllApps() {
+        if (!running) {   // pressed inside another app, or at start: All Apps when the home screen resumes
+            allAppsOnResume = true;
+            return;
+        }
+        long now = SystemClock.uptimeMillis();
+        if (now - allAppsAt < 400) return;   // one press can arrive twice (the Apps key and ACTION_ALL_APPS)
+        allAppsAt = now;
+        if (sheetOpen) {
+            closeSheet();
+            return;
+        }
+        reset(false);
+        openSheet();
+    }
+
+    private boolean allAppsOnResume;
+    private long allAppsAt;
 
     private void retargetGrid(boolean snap) {
         for (int i = 0; i < gridFocus.length; i++) {
