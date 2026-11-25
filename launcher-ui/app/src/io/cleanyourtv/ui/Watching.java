@@ -66,6 +66,10 @@ final class Watching {
                 it.pkg = text(cur, "package_name");
                 it.title = text(cur, "title");
                 it.intent = text(cur, "intent_uri");
+                // The app's own picture (YouTube's thumbnail), for titles TMDB doesn't know; https only.
+                String thumb = text(cur, "thumbnail_uri");
+                it.poster = thumb.startsWith("https://") ? thumb : text(cur, "poster_art_uri");
+                if (!it.poster.startsWith("https://")) it.poster = null;
                 it.season = number(cur, "season_display_number");
                 it.episode = number(cur, "episode_display_number");
                 it.engaged = cur.getLong(Math.max(0, cur.getColumnIndex("last_engagement_time_utc_millis")));

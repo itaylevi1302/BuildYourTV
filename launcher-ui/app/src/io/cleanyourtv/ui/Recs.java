@@ -262,9 +262,12 @@ final class Recs {
                 p.localized = true;
                 try {
                     // Stremio gives the IMDb id: an exact match, with the title in the TV's language.
+                    // A YouTube video isn't a film or a show: its own thumbnail, no TMDB search.
+                    boolean video = it.pkg != null && it.pkg.contains("youtube");
+                    if (video) p.kind = "video";
                     JSONObject byId = it.imdb == null ? null
                             : get("/find/" + it.imdb + "?external_source=imdb_id&language=" + lang());
-                    JSONArray found = byId != null ? concat(byId.optJSONArray("tv_results"), byId.optJSONArray("movie_results"))
+                    JSONArray found = video ? null : byId != null ? concat(byId.optJSONArray("tv_results"), byId.optJSONArray("movie_results"))
                             : get("/search/multi?language=" + lang() + "&query=" + URLEncoder.encode(it.title, "UTF-8"))
                             .optJSONArray("results");
                     for (int i = 0; found != null && i < found.length(); i++) {
@@ -280,6 +283,7 @@ final class Recs {
                             break;
                         }
                     }
+                    if (p.backdrop == null && it.poster != null) p.backdrop = it.poster;
                     if (p.backdrop != null) download(p);
                 } catch (Exception e) {
                     AppLog.w("continue watching, " + it.title + ": " + e.getMessage());

@@ -1754,7 +1754,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
 
     private void setDrawerItems(List<HomeApps.Item> list) {
         int inputs = 0;
-        while (inputs < list.size() && (list.get(inputs).kind == HomeApps.INPUT || list.get(inputs).kind == HomeApps.LIVE_TV)) inputs++;
+        while (inputs < list.size() && (list.get(inputs).kind == HomeApps.INPUT || list.get(inputs).kind == HomeApps.LIVE_TV
+                || "usb".equals(list.get(inputs).key))) inputs++;   // USB sits with the inputs (BuildYourTV)
         boolean same = list.size() == drawerItems.size();
         for (int i = 0; same && i < list.size(); i++) {
             same = list.get(i).key.equals(drawerItems.get(i).key) && list.get(i).connected == drawerItems.get(i).connected;
@@ -1961,7 +1962,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             fill.setColor(Ui.alpha(WHITE, f));
             c.drawRoundRect(cell, r, r, fill);
         }
-        boolean off = it.kind == HomeApps.INPUT && !it.connected;
+        boolean off = (it.kind == HomeApps.INPUT || "usb".equals(it.key)) && !it.connected;
         int ink = blend(tone(off ? 0xFF8E8E93 : L_INK, off ? 0x6BFFFFFF : 0xF2FFFFFF), INK, f);
         Symbols.draw(getContext(), c, it.symbol, cx, cell.top + cell.height() * 0.4f, 34 * k * s, ink);
         drawerLabel.setColor(ink);

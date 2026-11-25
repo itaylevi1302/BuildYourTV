@@ -90,7 +90,9 @@ final class Config {
 EOF
 
 # --- Build
-"$BT/aapt2" compile --dir app/res -o out/res.zip
+# Android before 14 reports Hebrew by its old code "iw" and looks for values-iw: the build copies values-he there.
+rm -rf out/res-src && cp -r app/res out/res-src && cp -r out/res-src/values-he out/res-src/values-iw
+"$BT/aapt2" compile --dir out/res-src -o out/res.zip
 # Fonts uncompressed: Android reads them straight from the APK.
 "$BT/aapt2" link -o out/base.apk -I "$AJ" --manifest app/AndroidManifest.xml --java out/gen out/res.zip \
   --min-sdk-version 28 --target-sdk-version 34 -A app/assets -0 ttf \

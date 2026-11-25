@@ -220,6 +220,8 @@ final class HomeApps {
             items.add(shortcut(LIVE_TV, "live", Strings.get(R.string.live_tv), "tv"));
         }
         items.addAll(inputs(c));
+        Item usb = usb(c);
+        if (usb != null && usb.connected) items.add(usb);
         items.add(shortcut(ALL_APPS, "all", Strings.get(R.string.all_apps), "apps"));
         return items;
     }
@@ -375,7 +377,42 @@ final class HomeApps {
         List<Item> items = new ArrayList<>();
         if (liveTv(c) != null) items.add(shortcut(LIVE_TV, "live", Strings.get(R.string.live_tv), "tv"));
         items.addAll(inputs(c, true));
+        Item usb = usb(c);
+        if (usb != null) items.add(usb);
         return items;
+    }
+
+    /** Apps that browse a USB drive's videos and photos, the TV maker's own first. */
+    private static final String[] USB_APPS = {"com.tcl.ui_mediaCenter", "com.mobisystems.fileman"};
+
+    /**
+     * BuildYourTV: USB beside the HDMI inputs, opening the TV's media centre (or a file manager). Dimmed, like an
+     * empty port, while no USB stick or SD card is mounted; null when the TV has no app for it.
+     */
+    static Item usb(Context c) {
+        PackageManager pm = c.getPackageManager();
+        for (String pkg : USB_APPS) {
+            Intent open = launchIntent(pm, pkg);
+            if (open == null) continue;
+            Item it = shortcut(DEVICE, "usb", "USB", "usb");
+            it.intent = open;
+            it.connected = usbMounted(c);
+            return it;
+        }
+        return null;
+    }
+
+    /** A removable volume (USB stick or SD card) is mounted. */
+    static boolean usbMounted(Context c) {
+        try {
+            android.os.storage.StorageManager sm = (android.os.storage.StorageManager) c.getSystemService(Context.STORAGE_SERVICE);
+            if (sm == null) return false;
+            for (android.os.storage.StorageVolume v : sm.getStorageVolumes()) {
+                if (v.isRemovable() && android.os.Environment.MEDIA_MOUNTED.equals(v.getState())) return true;
+            }
+        } catch (RuntimeException ignored) {
+        }
+        return false;
     }
 
     /**
