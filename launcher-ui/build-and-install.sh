@@ -5,6 +5,8 @@
 #   TV_HOST=192.168.1.50 launcher-ui/build-and-install.sh                                  # build here, then install
 #   TV_HOST=192.168.1.50 APK=~/Downloads/CleanYourTV-UI.apk launcher-ui/build-and-install.sh  # a release APK, no build
 #   ... CONFIG=my-config.json ...                                       # and push this TV's config.json at the end
+#   ... NOW_PLAYING=1 ...                                               # allow Now Playing (0 takes it back; see README)
+#   ... WATCH_NEXT=1 ...                                                # let Continue Watching read Watch Next
 set -euo pipefail
 # APK and CONFIG are paths as the caller typed them: resolve them before moving into launcher-ui/.
 for v in APK CONFIG; do
@@ -123,9 +125,9 @@ case "$HOME_NOW" in
     exit 1 ;;
 esac
 
-# The screensaver, on unless SCREENSAVER=0. Android 11 runs it from the main process (ScreensaverAlone).
+# The screensaver, on unless SCREENSAVER=0. Android 11 to 12L (SDK 30-32) run it from the main process (ScreensaverAlone).
 if [ "${SCREENSAVER:-1}" = 1 ]; then
-  if [ "${TV_SDK:-0}" = 30 ]; then DREAM=$PKG/.ScreensaverAlone; else DREAM=$PKG/.Screensaver; fi
+  case "${TV_SDK:-0}" in 30|31|32) DREAM=$PKG/.ScreensaverAlone ;; *) DREAM=$PKG/.Screensaver ;; esac
   WAS=$(tv 'settings get secure screensaver_components' 2>/dev/null | tr -d '\r' || true)
   tv "settings put secure screensaver_components $DREAM" >/dev/null
   case "$WAS" in
@@ -134,13 +136,50 @@ if [ "${SCREENSAVER:-1}" = 1 ]; then
   esac
 fi
 
+# Continue Watching (Home Settings → Top of the screen) reads Android TV's Watch Next list, which needs READ_TV_LISTINGS.
+# Only with WATCH_NEXT=1 (WATCH_NEXT=0 takes it back; a reinstall keeps either). A TV that refuses only gets a warning:
+# the home screen then says how to grant it.
+case "${WATCH_NEXT:-}" in
+  1)
+    G=$(tv "pm grant $PKG android.permission.READ_TV_LISTINGS 2>&1; echo rc=\$?" 2>&1 | tr -d '\r' || true)
+    case "$G" in
+      *rc=0*) echo "Continue Watching: READ_TV_LISTINGS granted" ;;
+      *) echo "WARNING: the TV did not grant READ_TV_LISTINGS (${G:-no answer}); Continue Watching stays empty." >&2 ;;
+    esac ;;
+  0)
+    tv "pm revoke $PKG android.permission.READ_TV_LISTINGS" >/dev/null 2>&1 || true
+    echo "Continue Watching: READ_TV_LISTINGS revoked" ;;
+esac
+
 # The remote's app buttons from inside any app, with KEY_SERVICE=1 (once: a reinstall keeps them on). Replacing the
 # APK unbinds the service while it stays listed, and Android binds it again only when the list changes, so a listed
 # service is cleared and written back, as CleanYourTV's launcher does since its PR #526.
-if [ "${KEY_SERVICE:-0}" = 1 ] || tv "settings get secure enabled_accessibility_services" | grep -q "$PKG/.RemoteKeyService"; then
-  svc=$PKG/.RemoteKeyService
+# Not on TCL's Android 11 (SDK 30): there any key filter makes one volume press move two steps and a held key stick,
+# even one that passes every key on (Free My TV #325). The service is refused, and taken out when a reinstall finds
+# it on; the app buttons still work on CleanYourTV UI's home screen, whose window gets them.
+svc=$PKG/.RemoteKeyService
+if [ "${TV_SDK:-0}" = 30 ] && tv 'getprop ro.product.manufacturer; getprop ro.product.brand' 2>/dev/null | tr -d '\r' | grep -ix tcl >/dev/null; then
+  if [ "${KEY_SERVICE:-0}" = 1 ]; then
+    echo "KEY_SERVICE=1 refused: on TCL's Android 11 any key filter makes one volume press move two steps" >&2
+    echo "and a held key stick (Free My TV #325). Here the app buttons work on CleanYourTV UI's home screen only." >&2
+  fi
+  tv "s=\$(settings get secure enabled_accessibility_services); case \"\$s\" in *$svc*) n=\$(echo \"\$s\" | sed 's#$svc##; s#::#:#; s#^:##; s#:\$##'); if [ -n \"\$n\" ]; then settings put secure enabled_accessibility_services \"\$n\"; else settings put secure enabled_accessibility_services ''; settings put secure accessibility_enabled 0; fi; echo remote buttons switched off: TCL Android 11 ;; esac"
+elif [ "${KEY_SERVICE:-0}" = 1 ] || tv "settings get secure enabled_accessibility_services" | grep -q "$svc"; then
   tv "s=\$(settings get secure enabled_accessibility_services); case \"\$s\" in *$svc*) settings put secure enabled_accessibility_services ''; settings put secure accessibility_enabled 0; sleep 1; settings put secure enabled_accessibility_services \"\$s\" ;; null|'') settings put secure enabled_accessibility_services $svc ;; *) settings put secure enabled_accessibility_services \"\$s:$svc\" ;; esac; settings put secure accessibility_enabled 1; echo remote buttons enabled"
 fi
+# Now Playing (#67): what apps play (title, artist, the app) on the home screen and the screensaver. Off until
+# NOW_PLAYING=1 allows our notification listener, the only way Android hands out media sessions; NOW_PLAYING=0 takes it
+# back, and without either a reinstall keeps what was there. The listener never reads a notification and unbinds
+# itself as soon as it connects. `cmd notification allow_listener` adds it next to the listeners already allowed (the
+# setting alone grants nothing since Android 8, as Free My TV PR 287 found); where that command answers anything (it is
+# missing on that firmware), the component is appended to enabled_notification_listeners, the others kept.
+np=$PKG/$PKG.NowPlaying
+case "${NOW_PLAYING:-}" in
+  1) tv "out=\$(cmd notification allow_listener $np 2>&1); if [ -n \"\$out\" ]; then s=\$(settings get secure enabled_notification_listeners); case \"\$s\" in *$np*) ;; null|'') settings put secure enabled_notification_listeners $np ;; *) settings put secure enabled_notification_listeners \"\$s:$np\" ;; esac; echo \"now playing allowed through enabled_notification_listeners (\$out)\"; else echo now playing allowed; fi" ;;
+  0) tv "cmd notification disallow_listener $np >/dev/null 2>&1; s=\$(settings get secure enabled_notification_listeners); case \"\$s\" in *$np*) settings put secure enabled_notification_listeners \"\$(echo \"\$s\" | sed 's#$np##; s#::#:#; s#^:##; s#:\$##')\" ;; esac; echo now playing taken back" ;;
+  '') ;;
+  *) echo "NOW_PLAYING=$NOW_PLAYING ignored: 1 allows Now Playing, 0 takes it back." >&2 ;;
+esac
 if [ -n "${CONFIG:-}" ]; then ./config.sh "$CONFIG"; fi
 echo "Installed. Press Home on the remote to see it. Back to CleanYourTV's own launcher:"
 echo "  TV_HOST=$TV_HOST launcher/build-and-install.sh   (or, if it is still installed: tools/tv.py 'cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity')"

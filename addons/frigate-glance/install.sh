@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Build Frigate Glance, install it on the TV, push its config and check it reaches MQTT and Frigate.
 #   TV_HOST=<tv ip> addons/frigate-glance/install.sh <config.json>
+#   TV_HOST=<tv ip> SKIP_BUILD=1 addons/frigate-glance/install.sh <config.json>
+#     installs the APK already built, for instance with tools/docker-build.sh addons/frigate-glance
 # The config holds passwords: keep it outside the repo (backup/ is git-ignored). This script never prints it.
 set -euo pipefail
 CONFIG="${1:?usage: TV_HOST=<tv ip> $0 <config.json>}"
@@ -38,7 +40,12 @@ EOF
 
 [ -f local.properties ] || { [ -n "${ANDROID_HOME:-}" ] && echo "sdk.dir=${ANDROID_HOME//\\//}" > local.properties; } || true
 if [ -n "${JAVA_HOME:-}" ]; then export PATH="$JAVA_HOME/bin:$PATH"; fi
-./gradlew assembleRelease -q --console=plain
+if [ -z "${SKIP_BUILD:-}" ]; then
+  ./gradlew assembleRelease -q --console=plain
+elif [ ! -f app/build/outputs/apk/release/app-release.apk ]; then
+  echo "ERROR: SKIP_BUILD is set but there is no APK; build it first with tools/docker-build.sh addons/frigate-glance" >&2
+  exit 1
+fi
 
 "$PY" -I ../../tools/b64push.py app/build/outputs/apk/release/app-release.apk /data/local/tmp/fg.apk
 OUT=$(tv 'pm install -r /data/local/tmp/fg.apk; rm -f /data/local/tmp/fg.apk')
@@ -48,12 +55,17 @@ case "$OUT" in *Success*) ;; *) echo "ERROR: pm install failed" >&2; exit 1 ;; e
 # Display over other apps (TCL's Settings hide it) and TCL's auto-start, so the service reconnects after a reboot.
 tv "appops set $PKG SYSTEM_ALERT_WINDOW allow; cmd appops set $PKG APP_AUTO_START allow 2>/dev/null; echo permissions granted"
 
-# The config goes into the app's files folder, or through its provider where the shell may not write there.
-# The log is cleared first: through the provider the service picks the config up, and logs its connection, at once.
+# The config goes in through the app's provider, so the file belongs to the app. On Android 14 the shell can cp
+# into Android/data as well, but that file is the shell's (uid 2000) and the app gets EACCES opening it (#3016),
+# as the launcher did with themes (#832). An earlier copy goes first: the provider cannot truncate a file the
+# shell owns. Android 8 and 9 have no `content write`, and a provider exception comes back as text, both with
+# exit status 0, so those messages count as failures, as in tools/theme.sh, and cp is the fallback. Only cp runs
+# mkdir: a folder the shell makes is one the provider then cannot write into.
+# The log is cleared first: through the provider the app imports the config, and logs it, at once.
 tv "logcat -c" >/dev/null
 STAGE=/data/local/tmp/fg-config.json
 tv --push "$CONFIG" "$STAGE" >/dev/null
-OUT=$(tv "d=/sdcard/Android/data/$PKG/files; if { mkdir -p \$d 2>/dev/null && cp $STAGE \$d/config.json 2>/dev/null; } || content write --uri content://$PKG.config/config.json < $STAGE; then echo config pushed; else echo config not written; fi; rm -f $STAGE")
+OUT=$(tv "d=/sdcard/Android/data/$PKG/files; rm -f \$d/config.json 2>/dev/null; if { o=\$(content write --uri content://$PKG.config/config.json < $STAGE 2>&1) && case \"\$o\" in *'Unsupported operation'*|*'Error while accessing provider'*) false ;; esac; } || { mkdir -p \$d 2>/dev/null && cp $STAGE \$d/config.json 2>/dev/null; }; then echo config pushed; else echo config not written; fi; rm -f $STAGE")
 echo "$OUT"
 case "$OUT" in *"config pushed"*) ;; *) echo "ERROR: the config could not be written on the TV" >&2; exit 1 ;; esac
 
@@ -70,10 +82,19 @@ for _ in $(seq 1 10); do
   LOG=$(tv "logcat -d -s FrigateGlance:*" | tr -d '\r')
   case "$LOG" in *"mqtt connected"*|*"mqtt error"*) case "$LOG" in *"frigate ok"*|*"frigate error"*) break ;; esac ;; esac
 done
+# Whether the app read the file: "config pushed" only means the shell wrote it. A rejected config's reason can
+# quote the config, passwords included, so only its first words are printed here.
+config=$(printf '%s\n' "$LOG" | grep -o 'config imported\|pushed config unreadable: .*\|pushed config rejected' | tail -n 1 || true)
 mqtt=$(printf '%s\n' "$LOG" | grep -o 'mqtt connected\|mqtt error: .*' | tail -n 1 || true)
 frigate=$(printf '%s\n' "$LOG" | grep -o 'frigate ok\|frigate error: .*' | tail -n 1 || true)
+case "$config" in
+  "config imported") echo "Config: read by the app" ;;
+  "pushed config rejected") echo "Config: rejected by the app (logcat -s FrigateGlance says why)" ;;
+  "") echo "Config: not read by the app within 20 s" ;;
+  *) echo "Config: ${config#pushed config }" ;;
+esac
 case "$mqtt" in "mqtt connected") echo "MQTT: ok" ;; "") echo "MQTT: no answer within 20 s" ;; *) echo "MQTT: ${mqtt#mqtt error: }" ;; esac
 case "$frigate" in "frigate ok") echo "Frigate: ok" ;; "") echo "Frigate: no answer within 20 s" ;; *) echo "Frigate: ${frigate#frigate error: }" ;; esac
-[ "$mqtt" = "mqtt connected" ] && [ "$frigate" = "frigate ok" ] || exit 1
+[ "$config" = "config imported" ] && [ "$mqtt" = "mqtt connected" ] && [ "$frigate" = "frigate ok" ] || exit 1
 tv "am broadcast -n $PKG/.TestCardReceiver >/dev/null; echo test card shown"
 echo "Installed. A test card is on the TV now; real ones follow Frigate's alerts."

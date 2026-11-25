@@ -1,0 +1,71 @@
+{
+  "remote": "Xiaomi remote (MiTV-M models, Russia)",
+  "device": "Xiaomi TV A43 2025 (MiTV-MOOQ1, tarzan), Google TV 11",
+  "debounce_ms": 1000,
+  "note": "Key codes from Free My TV: the Okko, VK, Rutube, KION, Wink and IVI buttons read on a MiTV-MOOQ1 sold in Russia (6c4b709), the Mi button on a MiTV-MSSP3 (6a0e351), YouTube, PatchWall and the burst on a MiTV-MOOR0 (6fbaba1). This unit ships Okko and VK, so it is taken to have the Russian remote. Not yet tried with this launcher. debounce_ms 1000 makes the remote's burst of presses one press. The Mi button starts on Home (the remote has no Home button); PatchWall and the Russian buttons start empty, left to Xiaomi's hot-key receiver.",
+  "buttons": [
+    {
+      "name": "Mi",
+      "key": 191,
+      "label": "BUTTON_4",
+      "kind": "configurable",
+      "default": "home"
+    },
+    {
+      "name": "YouTube",
+      "key": 190,
+      "label": "BUTTON_3",
+      "kind": "configurable",
+      "default": "com.google.android.youtube.tv"
+    },
+    {
+      "name": "PatchWall",
+      "key": 192,
+      "label": "BUTTON_5",
+      "kind": "configurable",
+      "default": ""
+    },
+    {
+      "name": "Okko",
+      "key": 200,
+      "label": "BUTTON_13",
+      "kind": "configurable",
+      "default": ""
+    },
+    {
+      "name": "VK",
+      "key": 188,
+      "label": "BUTTON_1",
+      "kind": "configurable",
+      "default": ""
+    },
+    {
+      "name": "Rutube",
+      "key": 203,
+      "label": "BUTTON_16",
+      "kind": "configurable",
+      "default": ""
+    },
+    {
+      "name": "KION",
+      "key": 198,
+      "label": "BUTTON_11",
+      "kind": "configurable",
+      "default": ""
+    },
+    {
+      "name": "Wink",
+      "key": 197,
+      "label": "BUTTON_10",
+      "kind": "configurable",
+      "default": ""
+    },
+    {
+      "name": "IVI",
+      "key": 199,
+      "label": "BUTTON_12",
+      "kind": "configurable",
+      "default": ""
+    }
+  ]
+}

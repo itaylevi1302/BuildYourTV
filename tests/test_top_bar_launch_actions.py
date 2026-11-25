@@ -18,9 +18,17 @@ class TopBarLaunchActionsTest(unittest.TestCase):
         self.assertIn('button.setOnClickListener(v -> open(new Intent(target)))', self.method)
 
     def test_action_is_package_scoped_resolved_and_does_not_replace_missing_apps(self):
-        self.assertIn('new Intent(action).setPackage(targetPackage)', self.method)
+        self.assertIn('LaunchActions.intent(targetPackage, action)', self.method)
+        helper = (JAVA / 'LaunchActions.java').read_text()
+        self.assertIn('return i.setPackage(pkg);', helper)
         self.assertIn('pm.resolveActivity(custom, 0) != null ? custom : null', self.method)
         self.assertLess(self.method.index('if (launch == null) continue'),
                         self.method.index('LaunchActions.select'))
         self.assertIn('getLeanbackLaunchIntentForPackage(pkg)', self.method)
         self.assertIn('getLaunchIntentForPackage(pkg)', self.method)
+
+    def test_an_input_action_switches_the_input_as_the_tile_does(self):
+        self.assertIn('LaunchActions.inputId(launchActions.get(pkg))', self.method)
+        self.assertIn('button.setOnClickListener(v -> openInput(inputId))', self.method)
+        adapter = (JAVA / 'AppAdapter.java').read_text()
+        self.assertIn('LaunchActions.inputId(action)', adapter)

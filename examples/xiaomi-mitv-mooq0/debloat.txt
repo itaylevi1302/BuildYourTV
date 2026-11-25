@@ -6,6 +6,17 @@
 # disabled (wfdsinkhelperservice, milinkservice, smartshare, mitvplus, videos, youtube.tvmusic,
 # mediaexplorer, videoplayer) with Netflix/YouTube/VieON still playing afterwards.
 #
+# Also applied on firmware QTG3.200305.006.3487 (Latin American retail unit, Spanish UI), one session on
+# 2026-11-19, not a several-day report. Every active entry here that is installed on this build was disabled
+# in five batches with a screenshot after each (jio, tvqs, aha, handbook and youtube.tvkids are not installed;
+# alexa and tvlock were already off). By the owner's choice katniss, wfdsinkhelperservice and smartshare from
+# the optional block went off too; Netflix, Prime Video, YouTube Music, Play Movies, Chromecast, Mi Cast, the
+# updater and the USB players stayed on. The stock launcher went through launcher/build-and-install.sh. The
+# screensaver was pointed at the launcher's ClockDream before com.mitv.dream went off. All 29 disabled
+# packages were still disabled after two reboots, and the TV powered on into the new launcher, not Live TV.
+# com.google.android.tungsten.setupwraith is installed and owned one saved Wi-Fi network
+# (`dumpsys wifi | grep -o 'cname=[^ ]*'`), so it was left enabled; on this build it does not claim HOME.
+#
 # ---- The remote's Input/Source button (#243, #1368) ----
 # It sends KEYCODE_MEDIA_RECORD (130, kernel KEY_RECORD), not KEYCODE_TV, so after the handover it does
 # nothing until the launcher is told to answer it. Either of these, in config.xml or a theme's config.json:
@@ -19,6 +30,16 @@
 # shows it, `pm enable com.mediatek.hotkey.dispatcher`. Other app buttons (Netflix, Prime Video) are mapped
 # the same way, as "<keycode>:<package>" in app_keys; `getevent -l` shows what a button sends. Test with the
 # real remote: `input keyevent` skips the key helpers.
+#
+# On firmware 3487 the button reads KEY_RECORD in `getevent -lt`, but Android sees it as 178
+# (KEYCODE_TV_INPUT): WindowManager logs `interceptKeyTq keycode=178`. The partnercustomizer's
+# GlobalKeyReceiver then starts VIEW_INPUTS by explicit component,
+# cmp=com.google.android.tvlauncher/.inputs.InputsPanelActivity, and logs `GlobalKey: ActivityNotFound`
+# once the stock launcher is disabled. handle_view_inputs alone did not help, since that intent names the
+# stock launcher. INPUT_KEY_SERVICE=1 (which handles 178 with no input_key_keycodes entry) together with
+# "volume_pauses_filter" true brought the button back, inside apps as well. Checked with the real remote:
+# held volume up and down still repeated, the Netflix and Prime Video buttons still opened their apps, and
+# the service was still bound after a reboot.
 #
 # ---- Android TV 11 variant: Xiaomi Mi TV P1 43" (MiTV-MOOQ0, croods, EU) ----
 # Firmware RTM4.220307.164.8835 (2026-10). The selected subset was applied and the TV remained
@@ -34,6 +55,33 @@
 # Netflix returned after a reboot when disabled (the firmware turns it back on).
 # NetflixObserver is inside the core com.mediatek.tv.service APK; keep that service enabled. Details:
 # ../../docs/devices/xiaomi-mitv-mooq0-android11.md.
+#
+# ---- Android TV 11, third unit: Russian retail P1 43" (MiTV-MOOQ0, croods), same RTM4.220307.164.8313 build ----
+# One session (2026-11), details in ../../docs/devices/xiaomi-mitv-mooq0-android11.md. 29 entries of this
+# list were disabled (28 in five batches with a screenshot after each, plus com.xiaomi.amazon.alexa that
+# was already off), together with Netflix and Prime Video the owner had disabled before and the stock
+# launcher through the launcher/build-and-install script: 32 in all, and every one of them was still disabled
+# after a reboot and a hard power-off. By the owner's choice the voice assistant
+# (com.google.android.katniss) and Chromecast (com.google.android.apps.mediashell) went off on top of the
+# mirroring/media set the 5135 unit above took; the firmware updater, the USB media players and the
+# owner's streaming apps stayed on. Netflix stayed off across the reboot and the hard power-off on this
+# build. With PatchWall and katniss off the PatchWall button and the mic do nothing; the Okko, ivi and
+# KinoPoisk app buttons work, and held volume still repeats with no key helper enabled. After power-on
+# the TV returns to the last source, not Home (#81 below); pressing Home brings the launcher back.
+#
+# ---- Android TV 11, second unit: Xiaomi Mi TV Q1 75" QLED (L75M6-ESG, croods) ----
+# The label on the back reads L75M6-ESG; ADB reports MiTV-MOOQ0 / croods, on the same firmware as
+# the P1 43 above (RTM4.220307.164.8835). One session on 2026-10-24 (#1520), not a several-day
+# report: ten packages from this list (the telemetry, PatchWall and TV Manager groups, the retail
+# demo, com.xiaomi.tvqs.overseas below and tvrecommendations) plus the stock launcher, eleven in
+# all, and all eleven were still disabled after a reboot, with the launcher still Home. Four more
+# entries below (mitvplus, dream, michannel, play_games) were already disabled before that session
+# and were left unchanged, so it adds no evidence for them. Kept enabled by choice: the
+# core TV services, the Bluetooth remote, Gboard, the Play Store and its services, the firmware
+# updater, casting, the assistant and the streaming apps; the dock carried Netflix, YouTube,
+# Disney+ and the owner's fourth app. With the stock launcher still enabled, `cmd package
+# set-home-activity` printed Success and a Home press still opened the stock one (its HOME sits at
+# priority 2, a replacement at 0): the order the NOTE below describes is the one that worked.
 #
 # Apply:   TV_HOST=<tv ip> tools/disable.sh examples/xiaomi-mitv-mooq0/debloat.txt
 # Undo:    TV_HOST=<tv ip> tools/restore.sh examples/xiaomi-mitv-mooq0/debloat.txt
@@ -67,6 +115,7 @@
 # ---- Xiaomi telemetry and analytics ----
 com.miui.tv.analytics
 com.xiaomi.statistic
+com.xiaomi.tvqs.overseas                         # TV quality service (telemetry); from the Q1 75 (#1520)
 com.google.android.tv.bugreportsender           # automatic bug report upload
 com.google.android.feedback                     # crash / feedback reporting
 

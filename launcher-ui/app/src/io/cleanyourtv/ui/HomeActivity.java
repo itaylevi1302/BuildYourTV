@@ -19,7 +19,9 @@ public class HomeActivity extends Activity {
         home = new HomeView(this);
         setContentView(home);
         getWindow().setBackgroundDrawable(null);
+        if (wantsAllApps(getIntent())) home.showAllApps();
         openFrom(getIntent());
+        PowerOn.created(this);   // Home Settings > At power-on (#61)
     }
 
     @Override protected void onResume() {
@@ -32,10 +34,12 @@ public class HomeActivity extends Activity {
             return;
         }
         if (home != null) home.resume();
+        PowerOn.resumed(this);
         Images.trimSoon();   // Explore's caches, if it was open: Home doesn't use them
     }
 
     @Override protected void onPause() {
+        PowerOn.paused(this);
         if (home != null) home.pause();
         super.onPause();
     }
@@ -43,28 +47,56 @@ public class HomeActivity extends Activity {
     /** Home button pressed on the home screen: back to the entry state (focus on the first app, sheet closed). */
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        PowerOn.homeIntent();
+        if (home != null && wantsAllApps(intent)) {   // the Apps key: opens the sheet, or closes it (#53)
+            home.showAllApps();
+            return;
+        }
         if (home != null) home.reset(true);
         openFrom(intent);
     }
 
-    /** `--es open explore|watchlist`: Explore from the computer (adb), as the remote's buttons open it. */
+    /** The remote's Apps key, as the system sends it to the home app. */
+    private static boolean wantsAllApps(Intent intent) {
+        return intent != null && Intent.ACTION_ALL_APPS.equals(intent.getAction());
+    }
+
+    /** `--es open explore|watchlist|inputs`: Explore, or the drawer on the inputs, as the remote's buttons open them. */
     private void openFrom(Intent intent) {
         String what = intent == null ? null : intent.getStringExtra("open");
         if (what == null) return;
         intent.removeExtra("open");
         if (what.equals("explore")) RemoteKeys.run(this, "tmdb:explore");
         else if (what.equals("watchlist")) RemoteKeys.run(this, "tmdb:watchlist");
+        else if (what.equals("inputs") && home != null) home.showInputs();   // the Input key (RemoteKeys, #55)
     }
 
     @Override protected void onDestroy() {
+        PowerOn.destroyed(this);
         if (home != null) home.destroy();
         super.onDestroy();
     }
 
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        PowerOn.key(event);   // a key first: At power-on leaves the screen alone
         if (RemoteKeys.onKey(this, event)) return true;
+        // The Apps key, unless it has a row in Remote Buttons on this TV: there the row decides, and with no action
+        // the key is left to the TV (#53).
+        if (event.getKeyCode() == KeyEvent.KEYCODE_ALL_APPS && !remoteButton(KeyEvent.KEYCODE_ALL_APPS)) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0 && home != null) {
+                home.showAllApps();
+            }
+            return true;
+        }
         if (home != null && home.onKey(event)) return true;
         return super.dispatchKeyEvent(event);
+    }
+
+    /** The key is one of Remote Buttons' rows on this TV (remote.json, or the built-in TCL/Vestel ones). */
+    private boolean remoteButton(int keyCode) {
+        String id = "k" + keyCode;
+        for (RemoteKeys.Button b : RemoteKeys.buttons(this)) if (b.id.equals(id)) return true;
+        return false;
     }
 
 }

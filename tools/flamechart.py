@@ -5,7 +5,8 @@ One panel per trace, one lane per thread, every slice drawn on the same time sca
 visibly shorter. Slices whose name matches --highlight are drawn in magenta, and their time is summed
 (nested slices once), with the change against the first panel.
 
-    tools/flamechart.py traces/before traces/after --highlight '^(activityResume|RV OnBindView)$' \\
+    tools/venv/bin/python -I tools/flamechart.py traces/before traces/after \
+        --highlight '^(activityResume|RV OnBindView)$' \
         --title 'Back to Home: Home press to first frame' --out chart.png
 
 BEFORE and AFTER are .pftrace files or folders; for a folder the median run is drawn, by the first of
@@ -14,16 +15,22 @@ tools/requirements-perf.txt. Read tools/flamechart.md first.
 
 --out is the PNG to write, and it is checked before the traces are opened: a folder, a name with no
 extension, and a folder that is not there are argument errors (exit 2) rather than a traceback after the
-traces have been read.
+traces have been read. A TRACE argument is checked as well, before the trace engine starts: a path that is
+not a file stops the run with `not a file: <path>` (the words tools/trace_report.py uses), and a folder with
+no .pftrace in it names the folder.
 """
 import argparse
 import colorsys
+import errno
 import hashlib
 import os
+from pathlib import Path
 import re
+import stat
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import picture_file  # noqa: E402
 import trace_report  # noqa: E402  the same trace queries the report uses
 
 MAGENTA = (214, 51, 132)
@@ -38,8 +45,12 @@ def window(q, package, spec, nav):
     if main is None:
         raise ValueError(f"no {package} process in the trace")
     if spec == "all" or nav:
+        # lanes() draws only completed, positive-duration slices. An unfinished
+        # slice has dur=-1, so ts+dur is not an end time for the chart's axis.
         row = q(f"select min(s.ts) as t0, max(s.ts + s.dur) as t1 from slice s join thread_track tt on s.track_id = tt.id "
-                f"join thread t using(utid) where t.upid = {upid}")[0]
+                f"join thread t using(utid) where t.upid = {upid} and s.dur > 0")[0]
+        if row["t0"] is None or row["t1"] is None:
+            raise ValueError(f"no completed slices to draw for {package} in the trace")
         return row["t0"], row["t1"]
     anchor, end = trace_report.start_window(q, package)
     if anchor is None:
@@ -54,19 +65,24 @@ def window(q, package, spec, nav):
 def lanes(q, package, names, t0, t1):
     """[(label, slices)] for each lane: main, RenderThread, or any thread name in the launcher's process."""
     upid, main, render = trace_report.threads(q, package)
-    out = []
+    out, seen = [], set()
     for name in names:
         if name == "main":
             utid = main
         elif name == "RenderThread":
             utid = render
         else:
-            rows = q(f"select utid from thread where upid = {upid} and name = '{name}' order by utid limit 1")
+            sql_name = name.replace("'", "''")
+            rows = q(f"select utid from thread where upid = {upid} and name = '{sql_name}' order by utid limit 1")
             utid = rows[0]["utid"] if rows else None
         if utid is None:
             out.append((name, []))
             continue
-        rows = q(f"select s.id, s.ts, s.dur, s.depth, s.name, s.parent_id from slice s join thread_track tt "
+        if utid in seen:
+            continue
+        seen.add(utid)
+        # TrackEvent names are optional; keep unnamed slices, with an empty label for regexes and drawing.
+        rows = q(f"select s.id, s.ts, s.dur, s.depth, coalesce(s.name, '') as name, s.parent_id from slice s join thread_track tt "
                  f"on s.track_id = tt.id where tt.utid = {utid} and s.ts < {t1} and s.ts + s.dur > {t0} "
                  f"and s.dur > 0 order by s.ts")
         out.append(("main thread" if name == "main" else name, rows))
@@ -186,7 +202,10 @@ def draw(panels, rx, title, subtitle, out, width=1600):
                     d.text((x0 + 3, yy + 1), text, fill="white" if s["id"] in hit else "#222", font=small)
             y += h + 26
         y += 10
-    im.save(out)
+    try:
+        picture_file.save(im, out)
+    except OSError as e:
+        sys.exit(f"cannot write {out}: {e.strerror or e}")
     return im.size
 
 
@@ -198,7 +217,9 @@ def output_path(value):
     there with FileNotFoundError - each a traceback with exit 1, thrown after Perfetto's query engine has
     been started and every trace read. 1 is also what a run that drew no chart returns, so the reader
     cannot tell a typo from a chart that failed. Refused here it is an argument error, before anything is
-    read; a suffixless file cannot be saved at all, so it is refused rather than guessed at.
+    read; a suffixless file cannot be saved at all, so it is refused rather than guessed at. A folder the
+    filesystem will not stat is refused with its own reason as well: "create it first" is an instruction
+    nobody can carry out for a folder that is there, or for a name no filesystem will take.
     """
     if not value:
         raise argparse.ArgumentTypeError("--out is empty: name the PNG to write, e.g. --out chart.png")
@@ -208,10 +229,25 @@ def output_path(value):
     if not os.path.splitext(value)[1]:
         raise argparse.ArgumentTypeError(f"{value} has no extension, so the format is unknown: name it {value}.png")
     folder = os.path.dirname(value) or "."
-    if os.path.exists(folder) and not os.path.isdir(folder):
-        raise argparse.ArgumentTypeError(f"{value}: {folder} is a file, not a folder")
-    if not os.path.isdir(folder):
+    # `os.path.exists()` and `os.path.isdir()` answer every OSError with False, so a folder this
+    # filesystem refuses to stat - one this user may not traverse, or a name longer than NAME_MAX -
+    # read as "not there yet", and the reader was told to create it: EACCES on a folder that is there,
+    # and a name nothing can create. One os.stat tells those apart, and the refusal keeps the system's
+    # own words, as tools/trace.py's --out and tools/gen_tables.py's --root already do.
+    try:
+        folder_mode = os.stat(folder).st_mode
+    except OSError as e:
+        if e.errno not in (errno.ENOENT, errno.ENOTDIR, errno.ELOOP, errno.EBADF):
+            raise argparse.ArgumentTypeError(
+                f"{value}: cannot be looked at ({e.strerror or e}), so no PNG could be written there: "
+                f"name the file in a folder this run can open") from e
+        folder_mode = None
+    if folder_mode is None:
         raise argparse.ArgumentTypeError(f"{value}: there is no folder {folder} - create it first")
+    if not stat.S_ISDIR(folder_mode):
+        raise argparse.ArgumentTypeError(f"{value}: {folder} is a file, not a folder")
+    if os.path.splitext(value)[1].lower() != ".png":
+        raise argparse.ArgumentTypeError(f"{value}: name the PNG with a .png extension")
     return value
 
 
@@ -231,6 +267,8 @@ def parse(argv):
     p.add_argument("--engine", metavar="PATH", help="a trace_processor_shell to use instead of downloading one")
     p.add_argument("--width", type=int, default=1600)
     args = p.parse_args(argv)
+    if args.width <= LEFT + 95:
+        p.error(f"--width must be greater than {LEFT + 95} pixels to leave room for the plot")
     if len(args.traces) > 4:
         p.error("at most four traces (panels)")
     if not re.fullmatch(r"first-frame|all|start:\d+(\.\d+)?", args.window):
@@ -242,14 +280,57 @@ def parse(argv):
     except re.error as e:
         p.error(f"--highlight is not a regex: {e}")
     names = [n.strip() for n in args.threads.split(",") if n.strip()]
-    if not names or not all(re.fullmatch(r"[A-Za-z0-9 _.:#-]+", n) for n in names):
+    if not names or not all(n.isprintable() and ";" not in n for n in names):
         p.error("--threads takes thread names such as main,RenderThread")
     args.thread_names = names
     return args
 
 
 def main(argv=None):
+    # The PNG is already written when its path is printed. A limited console must not turn that
+    # success into UnicodeEncodeError for a filename it cannot encode, as in screendiff.py and trace.py.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
     args = parse(sys.argv[1:] if argv is None else argv)
+    # A TRACE argument is a path on this computer, and it is read before Perfetto's engine is started:
+    # trace_report.py, which the same workflow page puts beside this tool, answers `not a file: <path>`
+    # there. Here the path went straight into TraceProcessor, so a typo cost the trace_processor_shell
+    # download and then came back as an uncaught `FileNotFoundError: [Errno 2] ...`, and on a computer
+    # without the perfetto package it was answered with that package's install line instead.
+    sets = [trace_report.expand([item]) for item in args.traces]
+    for item, paths in zip(args.traces, sets):
+        if not paths:
+            sys.exit(f"no .pftrace files in {item}")
+        missing = [path for path in paths if not os.path.isfile(path)]
+        if missing:
+            sys.exit("not a file: " + ", ".join(missing))
+    # A .png name may alias a trace through a symlink or hardlink. Refuse before
+    # starting the engine, including every run a folder could choose as its median.
+    try:
+        target = Path(args.out)
+        for paths in sets:
+            for path in paths:
+                source = Path(path)
+                if target.resolve() == source.resolve() or (target.exists() and target.samefile(source)):
+                    raise ValueError(f"--out {args.out} is the same file as trace {path}")
+    except (OSError, RuntimeError, ValueError) as e:
+        print(f"{e}. No trace was read or written.", file=sys.stderr)
+        return 2
+    try:
+        sets = [trace_report.unique_traces(paths) for paths in sets]
+    except ValueError as e:
+        sys.exit(str(e))
+    # Nav always uses the whole recording; a start uses its first-frame or requested window.
+    # Unlike windows cannot give a meaningful highlighted-time change; --window all makes them alike.
+    families = [{"nav" if trace_report.scenario_of(path) == "nav" else "start" for path in paths}
+                for paths in sets]
+    if any(len(family) > 1 for family in families):
+        sys.exit("cannot mix nav and start traces in one set; draw them separately")
+    if args.window != "all" and any(family != families[0] for family in families[1:]):
+        sys.exit("cannot compare nav and start windows; use --window all or draw them separately")
     try:
         import PIL  # noqa: F401
     except ImportError:
@@ -257,10 +338,7 @@ def main(argv=None):
     open_trace = trace_report.opener(args.engine)
     labels = [l.strip() for l in args.labels.split(",")]
     panels = []
-    for i, item in enumerate(args.traces):
-        paths = trace_report.expand([item])
-        if not paths:
-            sys.exit(f"no .pftrace files in {item}")
+    for i, (item, paths) in enumerate(zip(args.traces, sets)):
         try:
             path, basis = median_run(paths, args.package, open_trace)
         except ValueError as e:
@@ -282,4 +360,4 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

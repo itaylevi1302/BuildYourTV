@@ -75,6 +75,9 @@ class RestoreVenvHintTest(unittest.TestCase):
     def run_script(self, script):
         env = dict(os.environ, TV_HOST="192.168.1.50", HOME=str(self.home),
                    FAKE_TV_STATE=str(self.state_path))
+        # Path.home() reads USERPROFILE on Windows, not HOME: without it the record lands in the real ~.
+        if os.name == "nt":
+            env["USERPROFILE"] = env["HOME"]
         if script.endswith(".sh"):
             if os.name != "posix" or not shutil.which("bash"):
                 raise unittest.SkipTest(f"{script} is a POSIX script; it needs bash")
@@ -107,6 +110,15 @@ class RestoreVenvHintTest(unittest.TestCase):
         self.assertIn(SH_HINT, disable)
         _, restore = self.run_script("restore.sh")
         self.assertIn(SH_HINT, restore)
+
+    def test_disable_sh_without_a_venv_puts_the_hint_on_stderr(self):
+        # disable.sh printed the same hint to stdout, so `tools/disable.sh list 2>err.txt` and a caller
+        # reading stderr for the failure (check.py --fix, an assistant) got exit 1 and an empty error.
+        result, output = self.run_script("disable.sh")
+        self.assertEqual(result.returncode, 1, output)
+        self.assertIn(SH_HINT, result.stderr, "the hint is an error, so it goes to stderr")
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(self.sent(), [])
 
     def test_restore_ps1_without_a_venv_says_how_to_make_one(self):
         for script in ("disable.ps1", "restore.ps1"):

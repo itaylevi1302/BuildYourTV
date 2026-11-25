@@ -1,9 +1,10 @@
-"""tools/gen_tables.py: the README tables, the brand line and the counts come out of examples/*/tv.json.
+"""tools/gen_tables.py: the TV tables, the README's brand grid and the counts come out of examples/*/tv.json.
 
 Every list PR used to add rows to the same two tables, so each merge made the other open list PRs conflict.
 Now a PR adds only its folder and the script writes the rows. These tests run it on this repository (running
-it twice changes nothing, both tables come out in the same alphabetical order) and on small trees written here
-(a new folder gets its rows, the brand line counts right, a bad tv.json is refused, a --font path given from
+it twice changes nothing, the tables come out in the same alphabetical order, the brand grid counts every
+folder once) and on small trees written here (a new folder gets its rows, the brand grid and the brands under
+it come out right, a README without a table is fine, a bad tv.json is refused, a --font path given from
 another folder reaches the card scripts, an old-style PR's rows become a tv.json).
 
 Run from the repository root: python3 -m unittest discover -s tests -v
@@ -19,6 +20,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tests"))
@@ -115,28 +117,77 @@ def section(text, name):
     return [l for l in lines[start + 1:end] if l]
 
 
+GRID_HEAD = ["| | | | | | |", "|---|---|---|---|---|---|"]
+CELL = re.compile(r"^\[([^\]]+)\]\(https://cleanyour\.tv/tvs\?q=([^)]+)\) · (\d+)$")
+
+
+def grid(block):
+    """[(brand, link query, lists)] from the brand block's grid, row by row, empty cells left out."""
+    cells = []
+    for row in block:
+        if not row.startswith("| [") and not row.startswith("|  "):
+            continue
+        for cell in row.strip().strip("|").split(" | "):
+            cell = cell.strip()
+            if cell:
+                cells.append(CELL.match(cell).groups())
+    return [(b, q, int(n)) for b, q, n in cells]
+
+
+def below_grid(block):
+    """The brand lines inside the block's <details>, as one string, and its <summary>."""
+    summary = next((l for l in block if l.startswith("<summary>")), "")
+    inside = block[block.index("<details>") + 2:block.index("</details>")] if "<details>" in block else []
+    return " ".join(inside), summary
+
+
 class ThisRepositoryTest(unittest.TestCase):
     def test_running_it_twice_changes_nothing(self):
         once = gen_tables.render(ROOT)
         self.assertEqual(gen_tables.render(ROOT, texts=once), once)
 
-    def test_the_brand_line_counts_every_folder_once(self):
+    def test_the_brand_grid_counts_every_folder_once(self):
         readme = gen_tables.render(ROOT)["README.md"]
-        line = " ".join(section(readme, "tv-brands"))
-        projectors = re.search(r"·\s*([^·]*) projectors$", line).group(1)
+        block = section(readme, "tv-brands")
+        top = grid(block)
+        line, summary = below_grid(block)
+        projectors = re.search(r"(?:·\s*|^)([^·]*) projectors$", line).group(1)
         names = re.split(r", | and ", projectors)
         bold = [int(n) for n in re.findall(r"\*\*[^*]+\*\* (\d+)", line)]
         plain = [p.strip() for p in line[:line.rindex(projectors)].split("·")
                  if p.strip() and not p.strip().startswith("**")]
         entries = gen_tables.load(ROOT)
         projector_lists = sum(1 for _, d in entries if d["brand"] in names)
-        self.assertEqual(sum(bold) + len(plain) + projector_lists, len(entries))
-        brands = len(bold) + len(plain) + len(names)
+        self.assertEqual(sum(n for _, _, n in top) + sum(bold) + len(plain) + projector_lists, len(entries))
+        brands = len(top) + len(bold) + len(plain) + len(names)
         self.assertIn(f"{len(entries)} TV models · {brands} brands · ", readme)
+        self.assertEqual(summary, f"<summary>+{len(bold) + len(plain)} more brands and "
+                                  f"{len(names)} projector brands</summary>")
+
+    def test_the_grid_is_the_thirty_brands_with_the_most_lists(self):
+        block = section(gen_tables.render(ROOT)["README.md"], "tv-brands")
+        self.assertEqual(block[:2], GRID_HEAD)
+        rows = [r for r in block if r.startswith("| [")]
+        self.assertEqual(len(rows), 5, "30 brands in 6 columns make 5 rows")
+        top = grid(block)
+        self.assertEqual(len(top), gen_tables.TOP)
+        counts = [n for _, _, n in top]
+        self.assertEqual(counts, sorted(counts, reverse=True))
+        line, _ = below_grid(block)
+        below = [int(n) for n in re.findall(r"\*\*[^*]+\*\* (\d+)", line)] or [1]
+        self.assertGreaterEqual(min(counts), max(below), "a brand under the grid has more lists than one in it")
+        for brand, query, _ in top:
+            self.assertEqual(query, gen_tables.quote(brand, safe=""))
+
+    def test_the_readme_has_no_table_and_the_translation_keeps_its_block(self):
+        texts = gen_tables.render(ROOT)
+        self.assertFalse(gen_tables.has_markers(texts["README.md"], "tv-table"))
+        self.assertIn("README.nl.md", texts)
+        self.assertEqual(section(texts["README.nl.md"], "tv-brands"), section(texts["README.md"], "tv-brands"))
 
     def test_both_tables_are_in_the_same_alphabetical_order(self):
         texts = gen_tables.render(ROOT)
-        readme = [r.split(" | ")[0][2:] for r in section(texts["README.md"], "tv-table")[2:]]
+        readme = [r.split(" | ")[0][2:] for r in section(texts["README.nl.md"], "tv-table")[2:]]
         examples = [r.split(" | ")[1] for r in section(texts["examples/README.md"], "tv-table")[2:]]
         self.assertEqual(readme, examples)
         self.assertEqual(readme, sorted(readme, key=str.casefold))
@@ -144,7 +195,7 @@ class ThisRepositoryTest(unittest.TestCase):
     @unittest.skipUnless(os.environ.get("CLEANYOURTV_STRICT"), "tables are generated on merge; strict on main only")
     def test_the_committed_tables_are_sorted(self):
         # What main shows a reader, not only what the script would write.
-        for path, header, cell in (("README.md", "| TV | OS |", 1), ("examples/README.md", "| Folder |", 2)):
+        for path, header, cell in (("README.nl.md", "| TV | OS |", 1), ("examples/README.md", "| Folder |", 2)):
             with self.subTest(path=path):
                 lines = (ROOT / path).read_text(encoding="utf-8").split("\n")
                 start = next(i for i, l in enumerate(lines) if l.startswith(header))
@@ -161,7 +212,7 @@ class ThisRepositoryTest(unittest.TestCase):
         names = sorted(p.name for p in (ROOT / "examples").iterdir() if p.is_dir())
         rows = section(texts["examples/README.md"], "tv-table")[2:]
         self.assertEqual(sorted(re.match(r"\| `([^`]+)/`", r).group(1) for r in rows), names)
-        self.assertEqual(len(section(texts["README.md"], "tv-table")) - 2, len(names))
+        self.assertEqual(len(section(texts["README.nl.md"], "tv-table")) - 2, len(names))
 
 
 class GeneratorTest(unittest.TestCase):
@@ -181,7 +232,9 @@ class GeneratorTest(unittest.TestCase):
                              ["| Sony B | Android TV 11 |", "| TCL A | Android TV 11 |", "| TCL C | Android TV 11 |"])
             self.assertEqual(section(examples, "tv-table")[-1],
                              "| `tcl-c/` | TCL C | Android TV 11 | `com.tcl.ads` disabled |")
-            self.assertEqual(section(readme, "tv-brands"), ["**TCL** 2 ·", "Sony ·"])
+            self.assertEqual(section(readme, "tv-brands"), GRID_HEAD + [
+                "| [TCL](https://cleanyour.tv/tvs?q=TCL) · 2 | [Sony](https://cleanyour.tv/tvs?q=Sony) · 1 "
+                "|  |  |  |  |"])
             self.assertIn('"3 TV models · 2 brands · 3 languages · 1 KB launcher"', readme)
             self.assertIn("| **3 languages** | yes |", readme)
             self.assertIn('("3", "TV MODELS"), ("2", "BRANDS"), ("3", "LANGUAGES")',
@@ -202,14 +255,51 @@ class GeneratorTest(unittest.TestCase):
                  ("sony-2", tv("Sony 2", "Sony")), ("sony-3", tv("Sony 3", "Sony")), ("acer", tv("Acer 1", "Acer")),
                  ("xgimi", tv("XGIMI MoGo projector", "XGIMI")), ("epson", tv("Epson LS800 laser projector", "Epson")),
                  ("benq-tv", tv("BenQ E55", "BenQ")), ("benq-gv", tv("BenQ GV32 portable projector", "BenQ"))]
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(gen_tables, "TOP", 2):
             root = tree(tmp, lists)
             run(root)
             readme = (root / "README.md").read_text(encoding="utf-8")
-            # Most lists first, then single-list brands; BenQ also makes TVs, so it stays off the projector line.
-            self.assertEqual(section(readme, "tv-brands"),
-                             ["**Sony** 3 · **BenQ** 2 · **TCL** 2 ·", "Acer ·", "Epson and XGIMI projectors"])
+            # Most lists first in the grid, alphabetical within a count. Under it, in the <details>: the other
+            # brands with more than one list, then single-list brands, then the projector makers. BenQ also
+            # makes TVs, so it stays off the projector line.
+            self.assertEqual(section(readme, "tv-brands"), GRID_HEAD + [
+                "| [Sony](https://cleanyour.tv/tvs?q=Sony) · 3 | [BenQ](https://cleanyour.tv/tvs?q=BenQ) · 2 "
+                "|  |  |  |  |",
+                "<details>",
+                "<summary>+2 more brands and 2 projector brands</summary>",
+                "**TCL** 2 ·", "Acer ·", "Epson and XGIMI projectors",
+                "</details>"])
             self.assertIn("10 TV models · 6 brands", readme)
+
+    def test_a_grid_cell_links_to_the_search_with_the_brand_quoted(self):
+        lists = [("fire", tv("Fire TV Stick", "Amazon Fire TV")), ("ok", tv("OK. 32", "OK.")),
+                 ("plus", tv("Home+ 40", "Home+"))]
+        cells = grid(gen_tables.brand_lines(lists))
+        self.assertEqual([(b, q) for b, q, _ in cells],
+                         [("Amazon Fire TV", "Amazon%20Fire%20TV"), ("Home+", "Home%2B"), ("OK.", "OK.")])
+
+    def test_only_projectors_left_over_makes_a_short_summary(self):
+        lists = [("tcl", tv("TCL 1", "TCL")), ("xgimi", tv("XGIMI Halo projector", "XGIMI"))]
+        block = gen_tables.brand_lines(lists)
+        self.assertIn("<summary>+1 projector brands</summary>", block)
+        self.assertIn("XGIMI projectors", block)
+
+    def test_a_readme_without_a_table_and_a_translation_are_written(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = tree(tmp, [("tcl-a", tv("TCL A", "TCL"))])
+            no_table = README.replace(README[README.index("<details>"):README.index("</details>") + 10], "")
+            (root / "README.md").write_text(no_table, encoding="utf-8")
+            (root / "README.nl.md").write_text(README, encoding="utf-8")
+            self.assertEqual(run(root)[0], 0)
+            readme = (root / "README.md").read_text(encoding="utf-8")
+            dutch = (root / "README.nl.md").read_text(encoding="utf-8")
+            self.assertNotIn("tv-table", readme)
+            self.assertEqual(section(dutch, "tv-brands"), section(readme, "tv-brands"))
+            self.assertEqual(section(dutch, "tv-table")[2:], ["| TCL A | Android TV 11 |"])
+            self.assertEqual(run(root, "--check")[0], 0)
+            # Without the translation the run is the same for the other files.
+            (root / "README.nl.md").unlink()
+            self.assertEqual(run(root, "--check")[0], 0)
 
     def test_rows_sort_by_tv_in_both_tables_and_readme_os_applies(self):
         lists = [("z", tv("zulu", "Z")), ("b", tv("Beta", "B")), ("a", tv("Alpha", "A")),
@@ -233,7 +323,14 @@ class GeneratorTest(unittest.TestCase):
                  (tv("X", "X", colour="red"), "unknown key"),
                  (tv("X", "X", notes="a | b"), "split the table cell"),
                  (tv("X\n", "X"), "one line"),
+                 # A bare CR is a line ending to a Markdown reader, and the tables are read back with
+                 # universal newlines, so it comes back as the LF a re-run compares against: refused,
+                 # rather than written into a row `--check` never agrees with (the test below).
+                 (tv("X\rGoogle TV", "X"), "one line"),
                  (tv("X", "X", notes="[note](../docs/devices/none.md)"), "leads nowhere"),
+                 # A file that is there on this machine, but not in the checkout the page links into.
+                 (tv("X", "X", notes="[note](/)"), "leads nowhere"),
+                 (tv("X", "X", notes="[note](" + "../" * 40 + "etc)"), "leads nowhere"),
                  # Not a string: refused by name, where the link check used to end in a TypeError (exit 1).
                  (tv("X", "X", notes=["a", "b"]), '"notes" must be'),
                  (tv(["X"], "X"), '"tv" must be')]
@@ -246,10 +343,82 @@ class GeneratorTest(unittest.TestCase):
                 self.assertIn(message, str(caught.exception))
                 self.assertEqual(run(root, "--check")[0], 2)
 
+    def test_a_carriage_return_is_refused_instead_of_written_and_never_agreed_with(self):
+        """A cell with a bare CR is not one line, and a run that wrote it would never agree with itself.
+
+        The tables are read back with universal newlines, so the CR comes back as the LF the re-render
+        compares against: `gen_tables.py` wrote the row, `--check` answered "out of date" from then on,
+        and no run could clear it - the "README tables" job red on a row that looks right. Refusing the
+        value at load means the tables are never written, so a contributor sees the line they can fix.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = tree(tmp, [("x-1", tv("X\rGoogle TV", "X"))])
+            before = (root / "README.md").read_text(encoding="utf-8")
+            self.assertEqual(run(root)[0], 2)
+            self.assertEqual((root / "README.md").read_text(encoding="utf-8"), before)
+
     def test_an_escaped_pipe_and_a_working_link_are_fine(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = tree(tmp, [("x-1", tv("X", "X", notes="a \\| b, [list](x-1/debloat.txt), [web](https://x.y)"))])
             self.assertEqual(len(gen_tables.load(root)), 1)
+
+    def test_encoded_local_links_resolve_without_rewriting_the_destination(self):
+        cases = [("note.md", "note.md"), ("unit notes.md", "unit%20notes.md"),
+                 ("电视.md", "%E7%94%B5%E8%A7%86.md"), ("note#.md", "note%23.md#details"),
+                 ("unit%20notes.md", "unit%2520notes.md"), ("note+.md", "note+.md")]
+        for key in ("tv", "notes"):
+            for filename, destination in cases:
+                with self.subTest(key=key, destination=destination), tempfile.TemporaryDirectory() as tmp:
+                    target = f"x-1/{destination}"
+                    data = tv("X", "X")
+                    data[key] = f"X [note]({target})"
+                    root = tree(tmp, [("x-1", data)])
+                    (root / "examples/x-1" / filename).write_text("# Details\n", encoding="utf-8")
+                    code, output = run(root)
+                    self.assertEqual(code, 0, output)
+                    self.assertIn(f"]({target})", (root / "examples/README.md").read_text(encoding="utf-8"))
+                    self.assertEqual(run(root, "--check")[0], 0)
+                    self.assertEqual(json.loads((root / "examples/x-1/tv.json").read_text()), data)
+
+    def test_an_encoded_link_is_refused_when_only_its_literal_spelling_exists(self):
+        for key in ("tv", "notes"):
+            with self.subTest(key=key), tempfile.TemporaryDirectory() as tmp:
+                target = "x-1/unit%20notes.md"
+                data = tv("X", "X")
+                data[key] = f"X [note]({target})"
+                root = tree(tmp, [("x-1", data)])
+                (root / "examples" / target).write_text("Not the URL's decoded target.\n", encoding="utf-8")
+                pages = [root / "README.md", root / "examples/README.md", root / "tools/readme_stats.py"]
+                before = [p.read_bytes() for p in pages]
+                code, output = run(root)
+                self.assertEqual(code, 2)
+                self.assertIn(target, output)
+                self.assertEqual([p.read_bytes() for p in pages], before)
+
+    def test_external_link_scheme_case_does_not_make_tv_json_invalid(self):
+        for key in ("tv", "notes"):
+            for target in ("http://example.invalid/Model", "HTTP://example.invalid/Model",
+                           "hTtPs://example.invalid/Model", "MAILTO:reader@example.invalid"):
+                with self.subTest(key=key, target=target), tempfile.TemporaryDirectory() as tmp:
+                    data = tv("X", "X")
+                    data[key] = f"X [reference]({target})"
+                    root = tree(tmp, [("x-1", data)])
+                    code, output = run(root)
+                    self.assertEqual(code, 0, output)
+                    self.assertIn(f"]({target})", (root / "examples/README.md").read_text(encoding="utf-8"))
+                    self.assertEqual(run(root, "--check")[0], 0)
+                    self.assertEqual(json.loads((root / "examples/x-1/tv.json").read_text()), data)
+
+    def test_an_external_link_does_not_hide_a_missing_relative_link(self):
+        target = "HTTPS://example.invalid/Model"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = tree(tmp, [("x-1", tv("X", "X", notes=f"[web]({target}), [note](x-1/missing.md)"))])
+            before = (root / "README.md").read_bytes()
+            code, output = run(root)
+            self.assertEqual(code, 2)
+            self.assertIn("x-1/missing.md", output)
+            self.assertNotIn(target, output)
+            self.assertEqual((root / "README.md").read_bytes(), before)
 
     def test_markers_must_be_there_once(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -265,8 +434,10 @@ class FontTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "repo").mkdir()
             root = tree(Path(tmp) / "repo", [("tcl-a", tv("TCL A", "TCL"))])
-            # The real script, whose counts this tree changes, so --font hands it the font.
+            # The real script, whose counts this tree changes, so --font hands it the font. It publishes
+            # through tools/picture_file.py, imported from beside it.
             shutil.copy(ROOT / "tools" / "readme_stats.py", root / "tools" / "readme_stats.py")
+            shutil.copy(ROOT / "tools" / "picture_file.py", root / "tools" / "picture_file.py")
             # A checkout has docs/, where the picture goes: the script names the folder it cannot find.
             (root / "docs").mkdir()
             caller = Path(tmp) / "caller"
@@ -331,11 +502,38 @@ diff --git a/examples/README.md b/examples/README.md
             patch.write_text(self.PATCH, encoding="utf-8")
             code, out = run(root, "--adopt", str(patch))
             self.assertEqual(code, 2)
-            self.assertIn("examples/tcl-a/tv.json: the row this PR edits has changed on main", out)
+            self.assertIn("examples/tcl-a/tv.json: the row this PR edits has changed on main since", out)
             self.assertEqual(json.loads((root / "examples/tcl-a/tv.json").read_text())["notes"],
                              "ads off; promos off, second unit")
             # The new folder in the same PR still gets its tv.json.
             self.assertTrue((root / "examples/tcl-55l8/tv.json").is_file())
+            # And the message says which files that was, above the row it did not apply: the run stops after
+            # writing, so a reader who took the whole block as "nothing happened" would leave them behind.
+            self.assertIn("These tv.json files are written and stay written:", out)
+            self.assertLess(out.index("examples/tcl-55l8/tv.json: new"), out.index("These rows were not applied:"))
+            self.assertLess(out.index("These rows were not applied:"),
+                            out.index("examples/tcl-a/tv.json: the row this PR edits has changed"))
+            # Nothing was regenerated from them: the tables still hold the rows they had, and --check says so.
+            self.assertNotIn("tcl-55l8", (root / "examples/README.md").read_text(encoding="utf-8"))
+            self.assertEqual(run(root, "--check")[0], 1)
+
+    def test_a_patch_it_could_not_apply_at_all_says_so(self):
+        # The patch's only row is one main has moved on, so there is nothing written to name - and the
+        # message says that instead of letting the reader assume a tv.json appeared somewhere.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = tree(tmp, [("tcl-a", tv("TCL A", "TCL", notes="ads off; promos off, second unit"))])
+            patch = root / "pr.diff"
+            patch.write_text("diff --git a/examples/README.md b/examples/README.md\n"
+                             "@@ -10,3 +10,4 @@\n"
+                             " | `tcl-a/` | TCL A | Android TV 11 | ads off |\n"
+                             "+| `tcl-a/` | TCL A | Android TV 11 | ads off; second unit, UK |\n", encoding="utf-8")
+            code, out = run(root, "--adopt", str(patch))
+            self.assertEqual(code, 2)
+            self.assertIn("No tv.json was written.", out)
+            self.assertNotIn("written and stay written", out)
+            self.assertIn("These rows were not applied:", out)
+            self.assertEqual(json.loads((root / "examples/tcl-a/tv.json").read_text())["notes"],
+                             "ads off; promos off, second unit")
 
 
 if __name__ == "__main__":

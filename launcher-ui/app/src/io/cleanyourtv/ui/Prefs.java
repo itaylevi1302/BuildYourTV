@@ -27,7 +27,8 @@ final class Prefs {
 
     static void init(Context c) {
         app = c.getApplicationContext();
-        Ui.applyLanguage();   // the language picked on the TV, now that it can be read
+        Ui.applyLanguage(app);   // the language picked on the TV, now that it can be read
+        fixDreamComponent();
     }
 
     private static SharedPreferences sp() {
@@ -46,15 +47,15 @@ final class Prefs {
 
     // MARK: - Language and units
 
-    /** "auto", "pt", "en", "es", "de", "ru", "fr", "tr" or "he". */
+    /** "auto", "pt", "en", "es", "de", "ru", "uk", "fr", "tr" or "he". */
     static String language() {
         String v = app == null ? Config.LANGUAGE : sp().getString("language", Config.LANGUAGE);
         v = v.trim().toLowerCase(Locale.ROOT);
-        return v.startsWith("ru") ? "ru" : v.startsWith("pt") ? "pt" : v.startsWith("es") ? "es" : v.startsWith("de") ? "de"
+        return v.startsWith("ru") ? "ru" : v.startsWith("uk") ? "uk" : v.startsWith("pt") ? "pt" : v.startsWith("es") ? "es" : v.startsWith("de") ? "de"
                 : v.startsWith("fr") ? "fr" : v.startsWith("tr") ? "tr" : v.startsWith("he") || v.startsWith("iw") ? "he" : v.startsWith("en") ? "en" : "auto";
     }
 
-    static void setLanguage(String v) { put("language", v); Ui.applyLanguage(); }
+    static void setLanguage(String v) { put("language", v); Ui.applyLanguage(app); }
 
     /** "auto", "C" or "F". */
     static String temperature() {
@@ -72,6 +73,21 @@ final class Prefs {
 
     static void setTheme(String v) { put("theme", v); }
 
+    static final String TOP_PICKS = "picks", TOP_CONTINUE = "continue";
+
+    /**
+     * What the top of the home screen shows: "picks" (TMDB's, the default) or "continue" (Continue Watching, from
+     * Android TV's Watch Next list; it needs READ_TV_LISTINGS, granted from ADB).
+     */
+    static String topOfScreen() {
+        return TOP_CONTINUE.equals(sp().getString("topOfScreen", TOP_PICKS)) ? TOP_CONTINUE : TOP_PICKS;
+    }
+
+    static void setTopOfScreen(String v) { put("topOfScreen", TOP_CONTINUE.equals(v) ? TOP_CONTINUE : TOP_PICKS); }
+
+    /** Upstream's Continue Watching mode: the Watch Next row in place of the picks (off by default). */
+    static boolean topContinue() { return TOP_CONTINUE.equals(topOfScreen()); }
+
     /**
      * The screensaver: "photos" (the picks, as before), "aurora" (the clock over the sky, without photos) or "google"
      * (Google TV's own screensaver, which can show a Google Photos album).
@@ -83,16 +99,59 @@ final class Prefs {
 
     static final String GOOGLE_SCREENSAVER = "com.google.android.apps.tv.dreamx/.service.Backdrop";
 
-    /** Also points the system's screensaver at Google's or at ours; that needs WRITE_SECURE_SETTINGS (pm grant). */
+    /** Google TV's screensaver is installed and on: a debloat list may have turned dreamx off, or the TV has none. */
+    static boolean googleScreensaver() {
+        if (app == null) return false;
+        try {
+            app.getPackageManager().getServiceInfo(android.content.ComponentName.unflattenFromString(GOOGLE_SCREENSAVER), 0);
+            return true;
+        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Also points the system's screensaver at Google's, or back at ours when it was Google's; that needs
+     * WRITE_SECURE_SETTINGS (pm grant). Any other screensaver_components (none, or one set by hand) is left alone.
+     */
     static void setScreensaverStyle(String v) {
+        boolean google = "google".equals(v);
+        if (google && !googleScreensaver()) {
+            AppLog.w("screensaver not switched: Google's screensaver (dreamx) isn't installed or is off");
+            return;
+        }
         put("screensaver", v);
         if (app == null) return;
-        String own = app.getPackageName() + "/." + (app.getResources().getBoolean(R.bool.dream_alone) ? "ScreensaverAlone" : "Screensaver");
+        android.content.ContentResolver cr = app.getContentResolver();
+        if (!google && !GOOGLE_SCREENSAVER.equals(android.provider.Settings.Secure.getString(cr, "screensaver_components"))) return;
+        String own = ownDream();
         try {
-            android.provider.Settings.Secure.putString(app.getContentResolver(), "screensaver_components",
-                    "google".equals(v) ? GOOGLE_SCREENSAVER : own);
+            android.provider.Settings.Secure.putString(cr, "screensaver_components", google ? GOOGLE_SCREENSAVER : own);
         } catch (SecurityException e) {
             AppLog.w("screensaver not switched, no WRITE_SECURE_SETTINGS: " + e.getMessage());
+        }
+    }
+
+    /** The screensaver component of this Android version: in the main process on 11 to 12L, in :home otherwise. */
+    private static String ownDream() {
+        return app.getPackageName() + "/." + (app.getResources().getBoolean(R.bool.dream_alone) ? "ScreensaverAlone" : "Screensaver");
+    }
+
+    /**
+     * An in-place update across the Android 12 change (#39) leaves screensaver_components on the copy that is now
+     * disabled: moves our own value to the right one. Google's or another app's screensaver is never touched.
+     */
+    private static void fixDreamComponent() {
+        try {
+            android.content.ContentResolver cr = app.getContentResolver();
+            String now = android.provider.Settings.Secure.getString(cr, "screensaver_components");
+            String pkg = app.getPackageName();
+            String own = ownDream();
+            if (now == null || now.equals(own)) return;
+            if (!now.equals(pkg + "/.Screensaver") && !now.equals(pkg + "/.ScreensaverAlone")) return;
+            android.provider.Settings.Secure.putString(cr, "screensaver_components", own);
+        } catch (SecurityException e) {
+            AppLog.w("screensaver not moved, no WRITE_SECURE_SETTINGS: " + e.getMessage());
         }
     }
 
@@ -105,15 +164,35 @@ final class Prefs {
     static void setClockFormat(String v) { put("clock", v); }
 
     /**
-     * Reads the settings again from disk. On Android 11 the screensaver runs in the main process while the settings
+     * Reads the settings again from disk. On Android 11 to 12L the screensaver runs in the main process while the settings
      * are changed in :home, and each process keeps its own copy in memory; this one would miss the change.
      */
     @SuppressWarnings("deprecation")
     static void reload() {
         if (app == null) return;
         app.getSharedPreferences("settings", Context.MODE_MULTI_PROCESS);
-        Ui.applyLanguage();
+        Ui.applyLanguage(app);
     }
+
+    // MARK: - At power-on
+
+    /**
+     * After the TV starts from off, never from standby (Home Settings > At power-on, #61; PowerOn): "tv" (the TV's
+     * choice, nothing changes), "home" (the home screen, when another app takes the screen right after it came up) or
+     * "live" (Live TV).
+     */
+    static final String[] POWER_ON = {"tv", "home", "live"};
+
+    static String powerOn() {
+        String v = sp().getString("powerOn", "tv");
+        return v.equals("home") || v.equals("live") ? v : "tv";
+    }
+
+    static void setPowerOn(String v) { put("powerOn", v); }
+
+    /** The boot (Settings.Global.BOOT_COUNT) whose first home screen PowerOn saw. Not a setting: no version bump. */
+    static int powerOnBoot() { return sp().getInt("powerOnBoot", -1); }
+    static void setPowerOnBoot(int boot) { sp().edit().putInt("powerOnBoot", boot).apply(); }
 
     // MARK: - City
 
@@ -163,9 +242,22 @@ final class Prefs {
     /** YouTube's recommended videos on the first tab, after Continue watching. */
     static boolean youtubePicks() { return sp().getBoolean("youtubePicks", true); }
     static void setYoutubePicks(boolean on) { put("youtubePicks", on); }
+    /** Wi-Fi or Ethernet and a USB drive, as small icons by the home screen's round buttons. Off unless config.json sets it. */
+    static boolean statusIcons() { return sp().getBoolean("statusIcons", false); }
+    static void setStatusIcons(boolean on) { put("statusIcons", on); }
+    /** The weather card's forecast: "hours" (the next 6 hours, as before) or "days" (the next 5 days). */
+    static String forecast() { return "days".equals(sp().getString("forecast", "hours")) ? "days" : "hours"; }
+    static void setForecast(String v) { put("forecast", v); }
 
     static boolean quotes() { return sp().getBoolean("quotes", Config.SHOW_CRYPTO); }
     static void setQuotes(boolean on) { put("quotes", on); }
+
+    /**
+     * Home Settings' Now Playing widget (#67). On by default because it shows nothing until the listener is allowed
+     * (build-and-install.sh NOW_PLAYING=1, the explicit step); Off hides it and stops watching.
+     */
+    static boolean nowPlaying() { return sp().getBoolean("nowPlaying", true); }
+    static void setNowPlaying(boolean on) { put("nowPlaying", on); }
 
     static boolean coin(int i) { return sp().getBoolean("coin" + i, true); }
     static void setCoin(int i, boolean on) { put("coin" + i, on); }
@@ -187,6 +279,57 @@ final class Prefs {
         put("shelf", sb.toString());
     }
 
+    /** The shelf puts the app last opened from here first (Recent, #63) instead of the order set in Settings > Shelf. */
+    static boolean shelfRecent() { return app != null && sp().getBoolean("shelfRecent", false); }
+
+    /** Off ("My order") also deletes the list of apps opened: nothing is kept while the shelf doesn't use it. */
+    static void setShelfRecent(boolean on) {
+        put("shelfRecent", on);
+        if (!on) Recent.clear(app);
+    }
+
+    // MARK: - Drawer inputs (Settings > Inputs, #60)
+
+    /**
+     * The drawer's inputs in the person's order: their keys ("live", "hdmi1"...), an input the TV no longer lists keeping
+     * its place. null until Settings > Inputs is used: the TV's order then.
+     */
+    static List<String> inputsOrder() {
+        String v = sp().getString("inputsOrder", null);
+        return v == null ? null : keyList(v);
+    }
+
+    static void setInputsOrder(List<String> keys) { put("inputsOrder", String.join(",", keys)); }
+
+    /** The inputs Settings > Inputs hides; none until it is used. */
+    static List<String> inputsHidden() { return keyList(sp().getString("inputsHidden", "")); }
+
+    static void setInputsHidden(List<String> keys) { put("inputsHidden", String.join(",", keys)); }
+
+    private static List<String> keyList(String v) {
+        List<String> out = new ArrayList<>();
+        for (String p : v.split(",")) if (!p.isEmpty()) out.add(p);
+        return out;
+    }
+
+    // MARK: - Top buttons
+
+    /** The round buttons at the top right, in order (HomeApps.TOP_ALL keys); null until one is moved. */
+    static List<String> topButtons() {
+        String v = sp().getString("topButtons", null);
+        if (v == null) return null;
+        List<String> out = new ArrayList<>();
+        for (String key : v.split(",")) if (!key.isEmpty()) out.add(key);
+        return out;
+    }
+
+    static void setTopButtons(List<String> keys) { put("topButtons", String.join(",", keys)); }
+
+    /** The App Store round button (Google Play, or Amazon Appstore on Fire TV): off until added. */
+    static boolean storeButton() { return sp().getBoolean("storeButton", false); }
+
+    static void setStoreButton(boolean on) { put("storeButton", on); }
+
     // MARK: - Hidden apps
 
     /** Packages kept out of All Apps (config.json "hidden_apps"), on top of HomeApps' own list. */
@@ -195,6 +338,24 @@ final class Prefs {
     }
 
     static void setHidden(List<String> packages) { put("hidden", String.join(",", packages)); }
+
+    // MARK: - Screensaver OK
+
+    /**
+     * OK on the screensaver opens the title on screen in its app (Free My TV PR 276). Off (the default): the screensaver
+     * is as it always was, any key wakes it, with no hint and no link lookups.
+     */
+    static boolean screensaverOk() { return sp().getBoolean("screensaverOk", false); }
+    static void setScreensaverOk(boolean on) { put("screensaverOk", on); }
+
+    // MARK: - System apps
+
+    /**
+     * Also list the TV's own system apps that have a launcher entry (the maker's tools, Files...) in All Apps, the shelf
+     * editor and the app pickers. Off (the default) keeps the lists as they were. Factory menus never show (HomeApps).
+     */
+    static boolean systemApps() { return sp().getBoolean("systemApps", false); }
+    static void setSystemApps(boolean on) { put("systemApps", on); }
 
     // MARK: - Custom tiles
 
@@ -224,6 +385,50 @@ final class Prefs {
     /** Picks from every provider in the region, not only the ones with an app on the TV. */
     static boolean showAllProviders() { return sp().getBoolean("showAllProviders", false); }
     static void setShowAllProviders(boolean on) { put("showAllProviders", on); }
+
+    // MARK: - Trailer player
+
+    /** The app the Trailer button opens, or "" for the built-in pick (YouTube, then another YouTube-capable player). */
+    static String trailerPlayer() { return sp().getString("trailerPlayer", ""); }
+    static void setTrailerPlayer(String pkg) { put("trailerPlayer", pkg == null ? "" : pkg); }
+
+    // MARK: - IPTV player
+
+    /** The app the "Onde assistir" row leads with, or "" for no IPTV chip (the default). */
+    static String iptvPlayer() { return sp().getString("iptvPlayer", ""); }
+    static void setIptvPlayer(String pkg) {
+        put("iptvPlayer", pkg == null ? "" : pkg);
+        setIptvFallbackWarnCount(0);
+    }
+
+    /** How often the "didn't answer the search" heads-up was shown for the current pick. Not a setting:
+     *  written without bumping version, so it never makes Home start over. */
+    static final int IPTV_FALLBACK_WARN_LIMIT = 3;
+    static int iptvFallbackWarnCount() { return sp().getInt("iptvFallbackWarnCount", 0); }
+    static void setIptvFallbackWarnCount(int count) { sp().edit().putInt("iptvFallbackWarnCount", count).apply(); }
+
+    // MARK: - Watch providers (#106) - not home-screen settings: never bump version
+
+    /** The answer for an app that offers "Where to watch" results: "on|<signing digest>" or "off|<digest>"; "" before it was asked. */
+    static String watchProvider(String pkg) { return sp().getString("watchProvider." + pkg, ""); }
+    static void setWatchProvider(String pkg, String value) { sp().edit().putString("watchProvider." + pkg, value).apply(); }
+
+    /** The providers' packages in the person's order; null until one is moved or answered. */
+    static List<String> watchProvidersOrder() {
+        String v = sp().getString("watchProvidersOrder", null);
+        return v == null ? null : keyList(v);
+    }
+
+    static void setWatchProvidersOrder(List<String> pkgs) { sp().edit().putString("watchProvidersOrder", String.join(",", pkgs)).apply(); }
+
+    /** Changes whenever an answer or the order does, so a page open behind Settings asks again on return. */
+    static int watchProvidersStamp() {
+        int h = 0;
+        for (java.util.Map.Entry<String, ?> e : sp().getAll().entrySet()) {
+            if (e.getKey().startsWith("watchProvider")) h = h * 31 + (e.getKey() + "=" + e.getValue()).hashCode();
+        }
+        return h;
+    }
 
     // MARK: - Remote buttons
 
@@ -282,5 +487,23 @@ final class Prefs {
         StringBuilder sb = new StringBuilder();
         for (java.util.Map.Entry<String, String> e : all.entrySet()) sb.append(e.getKey()).append('=').append(e.getValue()).append('\n');
         if (writeKeys(sb.toString())) version++;
+    }
+
+    // MARK: - Live TV button (Settings > Inputs, #60)
+
+    /**
+     * Kept in the buttons file under a name no button has (buttons are "s<scancode>" and "k<keycode>"): the key service
+     * (:keys) runs the "live" action too, and it doesn't see this process's SharedPreferences.
+     */
+    private static final String LIVE_BUTTON = "liveButton";
+
+    /** The TV input (its id) the "live" action opens instead of Live TV, or "" for Live TV. */
+    static String liveButton() {
+        String v = button(LIVE_BUTTON);
+        return v == null ? "" : v;
+    }
+
+    static void setLiveButton(String inputId) {
+        setButton(LIVE_BUTTON, inputId == null || inputId.isEmpty() ? null : inputId);
     }
 }

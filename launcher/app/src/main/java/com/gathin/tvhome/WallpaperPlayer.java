@@ -55,6 +55,8 @@ final class WallpaperPlayer {
     /** wallpaper_captions: the shown picture's name from wallpapers/captions.txt; null when off or there are none. */
     private final TextView caption;
     private final Map<String, String> names;
+    /** The grid is scrolled away from the dock, so the caption is faded out (scrolledAway). */
+    private boolean captionAway;
     /** wallpaper_moods: the collection's groups by time of day; empty rotates through all of it. */
     private final Map<String, Set<String>> moods;
     /** config.xml latitude and longitude for the sun's times, and today's {sunrise, sunset} once worked out. */
@@ -204,8 +206,9 @@ final class WallpaperPlayer {
     }
 
     /**
-     * Small light text under the top-right buttons, above everything else and never focusable. It sits where the
-     * top bar ends in every layout, so it does not cover the clock, the stats line or the tiles.
+     * Small light text under the top-right buttons, above everything else and never focusable. It sits a gap
+     * below the buttons' row rather than flush against it; the offset is fixed, so a taller top bar (font scale,
+     * an extra date line) eats into that gap — and it has to stay clear of the clock block and of the tiles.
      */
     private static TextView makeCaption(Context context, FrameLayout root) {
         float dp = context.getResources().getDisplayMetrics().density;
@@ -213,9 +216,14 @@ final class WallpaperPlayer {
         text.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         text.setTextColor(0xD9FFFFFF);
         text.setShadowLayer(6 * dp, 0, dp, 0xCC000000);
+        // Room for the shadow (6 dp of blur, 1 dp down) inside the view: Home's root, and the layer a fade draws
+        // through, cut everything at the view's edges, which left a hard-edged dark box around the text. The
+        // margins below take the padding back, so the text stays where it was.
+        int pad = Math.round(8 * dp);
+        text.setPadding(pad, pad, pad, pad);
         text.setSingleLine(true);
         text.setEllipsize(TextUtils.TruncateAt.END);
-        text.setMaxWidth(Math.round(520 * dp));
+        text.setMaxWidth(Math.round(520 * dp) + 2 * pad);
         text.setFocusable(false);
         text.setAlpha(0f);
         try {
@@ -225,10 +233,26 @@ final class WallpaperPlayer {
         }
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.END);
-        params.topMargin = Math.round(110 * dp);
-        params.setMarginEnd(Math.round(62 * dp));
-        root.addView(text, params);
+        params.topMargin = Math.round(137 * dp) - pad;
+        params.setMarginEnd(Math.round(62 * dp) - pad);
+        // In a holder of its own, so scrolling can fade it (scrolledAway) without fighting the picture-change fade.
+        FrameLayout holder = new FrameLayout(context);
+        holder.addView(text, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(holder, params);
         return text;
+    }
+
+    /**
+     * Home scrolled away from the dock (true) or back to it (false). The caption sits on the screen, not in the
+     * grid, so rows scrolled up under it would put the text over the tiles: it fades out while the grid is scrolled.
+     */
+    void scrolledAway(boolean away) {
+        if (caption == null || away == captionAway) return;
+        captionAway = away;
+        View holder = (View) caption.getParent();
+        holder.animate().cancel();
+        holder.animate().alpha(away ? 0f : 1f).setDuration(away ? 150 : 300).start();
     }
 
     /** The displayed picture's name, faded across a change; a picture without a name hides the caption. */
@@ -287,6 +311,10 @@ final class WallpaperPlayer {
                 options.inTargetDensity = scale[1];
             }
             options.inPreferredConfig = bitmapConfig;
+            // Into sRGB once, here. A photo with an Adobe RGB or Display P3 profile otherwise keeps that colour space
+            // and the GPU converts the full-screen picture on every frame: ~90% late frames on a MiTV-MOOQ1 (Mali,
+            // Android 10) against 0% for the same picture without the profile.
+            options.inPreferredColorSpace = android.graphics.ColorSpace.get(android.graphics.ColorSpace.Named.SRGB);
             options.inMutable = dimColor != 0;
             Bitmap decoded = BitmapFactory.decodeFile(file.getPath(), options);
             if (decoded == null) return null;

@@ -64,7 +64,9 @@ Free My TV. Este projeto é para quem quer os dois e um Explorar completo.
 
 **Controle e configuração**
 - `examples/<modelo>/remote.json` diz quais botões do controle podem ser trocados; na TV, cada um abre um app, uma
-  entrada HDMI, o Explorar ou a sua lista.
+  entrada HDMI, o Explorar ou a sua lista. Ele pode identificar o controle (`vendor`, `product`), para os botões de um
+  gamepad continuarem dele, e juntar uma rajada de toques em um só (`debounce_ms`): veja
+  [launcher-ui/README.md](launcher-ui/README.md#remotejson).
 - `launcher-ui/config.sh` envia um `config.json` (prateleira, apps ocultos, cidade, botões, serviços, logos) pelo
   ADB, sem compilar de novo. Só o shell do ADB pode escrever essa configuração no app.
 - Temas do CleanYourTV: `launcher-ui/config.sh --theme themes/<nome> [meu-config.json]` aproveita o que os dois
@@ -115,8 +117,10 @@ formulário que escreve o `config.json` para você.
    ```bash
    TV_HOST=192.168.1.50 CONFIG=meu-config.json KEY_SERVICE=1 launcher-ui/build-and-install.sh
    ```
-   `KEY_SERVICE=1` liga o serviço dos botões do controle, uma vez: as reinstalações mantêm ligado. `SCREENSAVER=0`
-   mantém o screensaver atual. `APK=<arquivo>` instala um APK de release em vez de compilar.
+   `KEY_SERVICE=1` liga o serviço dos botões do controle, uma vez: as reinstalações mantêm ligado. Em TVs TCL com
+   Android 11 ele é recusado (e desligado se uma reinstalação o encontra ligado): lá qualquer filtro de teclas faz um
+   toque no volume andar dois passos e uma tecla segurada travar, então os botões funcionam só na tela inicial.
+   `SCREENSAVER=0` mantém o screensaver atual. `APK=<arquivo>` instala um APK de release em vez de compilar.
 4. Mudanças depois: `TV_HOST=… launcher-ui/config.sh meu-config.json` e
    `launcher-ui/config.sh --remote examples/<modelo>/remote.json`.
 

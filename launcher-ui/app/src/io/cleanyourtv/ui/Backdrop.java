@@ -1,6 +1,7 @@
 package io.cleanyourtv.ui;
 
 import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
@@ -34,6 +35,7 @@ final class Backdrop {
     final int[] frost;      // heavily blurred (frosted glass, bottom drawer)
     final int[] glass;      // lightly blurred (Liquid Glass: the photo shows through the glass)
     final Bitmap wide, tall;            // the photo on the cards
+    final BitmapShader wideShader, tallShader;   // theirs, for the rounded cards; gone with the backdrop
     final int[] light, lightGlass;      // by day: the frosted and glass versions, lightened
     final Bitmap lightImage;            // by day: the background (the lightened frosted version, scaled up on screen)
     final int[] nightFrost, nightGlass; // at night: frosted (the bottom drawer's frosted glass) and glass, darkened
@@ -46,6 +48,8 @@ final class Backdrop {
         this.glass = glass;
         this.wide = wide;
         this.tall = tall;
+        wideShader = wide == null ? null : new BitmapShader(wide, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+        tallShader = tall == null ? null : new BitmapShader(tall, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
         this.light = light;
         this.lightGlass = lightGlass;
         this.nightFrost = night;

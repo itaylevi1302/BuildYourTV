@@ -16,21 +16,55 @@ with "A positional parameter cannot be found that accepts argument". A package n
 argument a debloat-list invocation never has - the list itself is a path - so a package-shaped token
 that is not a parameter's value is that mistake.
 
+The fourth is the TV the command is for. Every one of these scripts reads `$TvHost` from `$env:TV_HOST`
+and stops at its own guard before it sends anything - `pass -TvHost <tv ip> or set $env:TV_HOST`, the
+line tests/test_powershell_command_quotes.py quotes from the TCL 32L5A page - so a command that hands
+one a list with no TV named sends nothing to the TV at all. examples/acer-ar3-r3's README had one,
+`tools\\disable.ps1 examples\\acer-ar3-r3\\debloat.txt`, and the Apply lines of examples/acer-ar3-r3 and
+examples/tdsystems-ch17f40s-redwood wrote the TV the way a POSIX shell writes it,
+`TV_HOST=<tv ip> tools\\disable.ps1 <list>`: PowerShell reads a bare `NAME=value` word as the name of
+the command to run, so those lines died too. The setting is `$env:TV_HOST = '<tv ip>'` as its own
+statement (or the script's own -TvHost), which is the shape the other pages and headers already use.
+
+The same crossing in the other direction is quieter, and it does not fail at all: a PowerShell parameter
+written after the shell script. `launcher/build-and-install.sh -HomeKeyService` takes no argument - the
+four shell scripts read their settings from the environment, and this one reads no argument whatsoever -
+so the word is dropped, the launcher is installed without the helper, and the page has described a step
+that did not happen. examples/chiq-m75q10s's README carried that line ("The owner declined
+`launcher/build-and-install.sh -HomeKeyService`"); it names the environment variable now, as its siblings
+dexp-65uhg2 and rocktek-gb1 do, with `-HomeKeyService` only in front of the .ps1 twin. A shell script's
+own flag is a double dash (`tools/theme.sh --reset`), so one dash and a capital letter after one of these
+scripts is the crossing, and it is what this file reads.
+
+A page that names a script in passing - "`tools\\disable.ps1` then disabled the wizard" - hands it no
+path and is not read as a command.
+
 Parameters are read out of the scripts themselves (`param( ... )`), so a script that renames a
 parameter fails the pages that still pass the old one instead of letting them go stale.
 Run from the repository root: python3 -m unittest discover -s tests -v
 """
 import re
+import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# Directories the other repository-wide walkers skip: build output, the CI venv, and a person's own
-# backups, screenshots and traces, which are gitignored.
-SKIP_DIRS = {".git", "venv", "node_modules", "build", ".gradle", "__pycache__", "shots", "backup", "traces"}
+# Directories the repository-wide walkers skip: build output, the CI venv, and a person's own backups,
+# screenshots, notes, traces and bench results, plus their ADB key - the folders .gitignore keeps out of
+# a checkout. tests/test_walks_skip_ignored_folders.py holds every walker to that list.
+SKIP_DIRS = {".git", "venv", "node_modules", "build", ".gradle", "__pycache__", "shots", "backup", "work",
+             "traces", "bench-results", "adbkey"}
 
 SCRIPT_RE = re.compile(r"([A-Za-z0-9_.\\/-]+\.ps1)\b")
+# The shell twin, named in a page: `launcher/build-and-install.sh`, `tools\disable.sh`.
+SHELL_SCRIPT_RE = re.compile(r"([A-Za-z0-9_.\\/-]+\.sh)\b")
+# What PowerShell binds and a shell script does not read: one dash and a capital letter. `--reset` and
+# `--fix` are the shell tools' own flags, and a lowercase word is not a parameter.
+SHELL_PS_PARAM = re.compile(r"^[\s`'\"]*(-[A-Z][A-Za-z0-9]*)")
+# The settings these scripts read instead of taking parameters, as their own usage blocks write them.
+SHELL_SETTINGS = ("HOME_KEY_SERVICE=1, INPUT_KEY_SERVICE=1, RESTORE_KEY_SERVICES=1, "
+                  "STOCK_LAUNCHER=<package> and TV_HOST=<tv ip>")
 # `-TvHost`, not the second half of `--fix`: a parameter is written with one dash and a letter.
 PARAM_RE = re.compile(r"(?<![\w-])-([A-Za-z][A-Za-z0-9]*)")
 POSITION_RE = re.compile(r"Position\s*=\s*(\d+)\s*\)")
@@ -40,6 +74,22 @@ PARAM_DECL_RE = re.compile(r"\[([A-Za-z_][\w.\[\]]*)\]\s*\$(\w+)")
 PACKAGE_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+){2,}")
 # Where an invocation stops: the next command in the same line.
 BREAK_RE = re.compile(r"(?:;|&&|\|\||\|)")
+# The TV a command acts on. Every one of these scripts declares `[string]$TvHost = $env:TV_HOST` and
+# stops at its own guard when it is empty, so a command that sends anything has to name one.
+TV_HOST_PARAM = re.compile(r"\$\{?TvHost\}?\s*=", re.IGNORECASE)
+TV_HOST_FALLBACK = re.compile(r"\$env:TV_HOST\b", re.IGNORECASE)
+# The setting the shell the command is typed into accepts. PowerShell has no `NAME=value` prefix: it reads
+# that word as the command to run, so only `$env:TV_HOST = '...'` (its own statement, this line or an
+# earlier one) or the script's -TvHost count. A bare `TV_HOST=` is the shell's shape, read by the rule below.
+TV_HOST_SETTING = re.compile(r"\$env:TV_HOST\s*=(?!=)", re.IGNORECASE)
+# The script's own parameter for it: `-TvHost 192.168.1.50`, `-TvHost <tv ip>`.
+TV_HOST_FLAG = re.compile(r"(?<![\w-])-TvHost\b", re.IGNORECASE)
+# The POSIX shape in front of the script it is meant for: `TV_HOST=<tv ip> tools\disable.ps1 <list>`.
+POSIX_PREFIX = re.compile(
+    r"(?:^|[\s;&|])([A-Za-z_][A-Za-z0-9_]*)=(<[^>]*>|\S*)\s+([A-Za-z0-9_.\\/-]+\.ps1)\b")
+# The argument a command hands a script: a saved list (`examples\x\debloat.txt`, `list.txt`) or a theme
+# folder (`themes\aurora`, `examples\x`). A page that names a script in passing hands it no path.
+TARGET_RE = re.compile(r"(?:^|[\s`'\"(])([^\s`'\"()]*\.txt\b|(?:themes|examples)[\\/][^\s`'\"()]*)")
 
 
 def param_block_of(text):
@@ -70,6 +120,11 @@ def positional_names(block):
         if name:
             found.append((int(match.group(1)), name.group(2)))
     return found
+
+
+def needs_tv(block):
+    """True when the script reads its TV from `$env:TV_HOST` and has no other value to fall back on."""
+    return bool(TV_HOST_PARAM.search(block) and TV_HOST_FALLBACK.search(block))
 
 
 def invocations(text):
@@ -144,8 +199,108 @@ def _stock_flag(declared):
     return "their own flag"
 
 
+def hands_a_target(rest):
+    """True when the script's own argument list starts with a list or a theme folder.
+
+    A command writes its arguments from its first word (`examples\\x\\debloat.txt`, or `-TvHost <tv ip>
+    examples\\x\\debloat.txt`); a page that names a script in passing writes a sentence there instead
+    ("`tools\\disable.ps1` on Windows, or comment out the lines of `debloat.txt`"), so looking at the
+    first few words is what tells the two apart.
+    """
+    return bool(TARGET_RE.search(" ".join(rest.split()[:3])))
+
+
+def host_problems(text, resolve, block_of):
+    """A Windows command that does not tell the script which TV it acts on, as human-readable lines.
+
+    Two shapes, both of which stop one of these scripts at its own guard - `pass -TvHost <tv ip> or set
+    $env:TV_HOST` - before it sends anything:
+
+    - the command hands the script a list or a theme folder and names no TV at all;
+    - it names one the POSIX way, `TV_HOST=<tv ip> tools\\disable.ps1 <list>`, which PowerShell reads as a
+      command named `TV_HOST=<tv` rather than a setting.
+
+    `$env:TV_HOST = '...'` as its own statement, this line or an earlier one, is the setting PowerShell
+    does take, so a page that makes it before the command is quiet.
+    """
+    found = []
+    named = False
+    for line in text.split("\n"):
+        if TV_HOST_SETTING.search(line):
+            named = True
+        prefixed = set()
+        for name, value, token in POSIX_PREFIX.findall(line):
+            if name.upper() != "TV_HOST":
+                continue
+            blocks = [block_of(source) for source in resolve(token)]
+            if not any(needs_tv(block) for block in blocks):
+                continue
+            prefixed.add(token)
+            found.append(
+                f"{token}: `{name}={value}` in front of it is a command name to PowerShell, not a setting, "
+                f"so nothing runs: put `$env:TV_HOST = '<tv ip>'` before it, or pass -TvHost <tv ip>")
+        for token, rest in invocations(line):
+            if named or token in prefixed or TV_HOST_FLAG.search(rest) or not hands_a_target(rest):
+                continue
+            if not any(needs_tv(block_of(source)) for source in resolve(token)):
+                continue
+            found.append(
+                f"{token}: hands it a list and names no TV, so the script stops with \"pass -TvHost <tv ip> "
+                f"or set $env:TV_HOST\" before anything is sent: add -TvHost <tv ip>")
+    return found
+
+
+def shell_invocations(text):
+    """(script token, argument text) for every `.sh` named in a line of text.
+
+    A page names a script in passing as often as it runs one, so only the argument text tells the two
+    apart: the reader below reads a parameter out of it.
+    """
+    for line in text.split("\n"):
+        for match in SHELL_SCRIPT_RE.finditer(line):
+            token = match.group(1)
+            if token == ".sh":
+                continue
+            # A URL path is somebody else's file, and a `<name>` placeholder names nothing.
+            if match.start() and line[match.start() - 1] in "/:<":
+                continue
+            if "<" in token or "*" in token:
+                continue
+            rest = line[match.end():]
+            stop = BREAK_RE.search(rest)
+            yield token, (rest[:stop.start()] if stop else rest)
+
+
+def shell_parameter_problems(text, resolve):
+    """A shell script handed a PowerShell parameter, as human-readable lines.
+
+    `launcher/build-and-install.sh -HomeKeyService` reads as the key helper being enabled, and the run
+    does not fail: the shell script takes no argument at all (it reads `HOME_KEY_SERVICE` from the
+    environment), so the word is dropped and the launcher is installed without the helper. Unlike the
+    reverse crossing, nothing answers - the page simply describes a step that did not happen.
+
+    `--reset` is `tools/theme.sh`'s own flag and a lowercase word is a path, so only one dash and a
+    capital letter is read. The .ps1 twin may take it: it is a parameter there.
+    """
+    found = []
+    for token, rest in shell_invocations(text):
+        if not resolve(token):
+            continue
+        match = SHELL_PS_PARAM.match(rest)
+        if not match:
+            continue
+        found.append(
+            f"{token} {match.group(1)}: a PowerShell parameter after the shell script, which takes none - "
+            f"the shell scripts read their settings from the environment ({SHELL_SETTINGS}), so the word "
+            f"is dropped and the step does not happen. Write the setting in front of it, as `TV_HOST=<tv ip> "
+            f"{token}`, or put `{match.group(1)}` in front of the .ps1 twin")
+    return found
+
+
 def problems(text):
-    return lines_problems(text, resolve_in_repo, param_block_of)
+    return (lines_problems(text, resolve_in_repo, param_block_of)
+            + host_problems(text, resolve_in_repo, param_block_of)
+            + shell_parameter_problems(text, resolve_in_repo))
 
 
 def importable_files():
@@ -157,18 +312,24 @@ def importable_files():
         yield path
 
 
-def resolve_in_repo(token):
+def resolve_in_repo(token, root=None):
     """The script sources a documented path could name, from the repository root.
 
     A path with a directory in it is taken as written (backslashes are Windows). A bare file name is
     looked up by name, since `build-and-install.ps1` is how the pages refer to the launcher's, the
     add-ons' and the tools' own scripts.
+
+    The skip list is read against the path inside the checkout, not against the absolute path: CI
+    checks the repository out under `/home/runner/work/...`, where an ancestor folder is called `work`
+    and every file would otherwise be pruned as a person's own note.
     """
+    root = ROOT if root is None else root
     cleaned = token.replace("\\", "/").lstrip("./")
     if "/" in cleaned:
-        path = ROOT / cleaned
+        path = root / cleaned
         return [path.read_text(encoding="utf-8-sig", errors="replace")] if path.is_file() else []
-    found = [p for p in ROOT.rglob(cleaned) if p.is_file() and not SKIP_DIRS & set(p.parts)]
+    found = [p for p in root.rglob(cleaned)
+             if p.is_file() and not SKIP_DIRS & set(p.relative_to(root).parts)]
     return [p.read_text(encoding="utf-8-sig", errors="replace") for p in found]
 
 
@@ -189,6 +350,17 @@ class WindowsCommandTest(unittest.TestCase):
         self.assertGreaterEqual(read, 30, "the walk found almost no PowerShell commands")
         self.assertGreaterEqual(len(scripts), 5, "the walk resolved almost no scripts")
 
+    def test_the_walk_reads_the_shell_commands_too(self):
+        # The crossing is read from `.sh` tokens, so a walk that saw none of them would answer [] for
+        # the whole tree: the pages run these scripts by name in their hundreds.
+        seen = set()
+        for path in importable_files():
+            for token, _ in shell_invocations(path.read_text(encoding="utf-8-sig", errors="replace")):
+                if resolve_in_repo(token):
+                    seen.add(token.replace("\\", "/"))
+        for name in ("tools/disable.sh", "launcher/build-and-install.sh"):
+            self.assertIn(name, seen, f"the walk read no command naming {name}: {sorted(seen)}")
+
 
 class ProblemReaderTest(unittest.TestCase):
     """The checks themselves, on documents written here."""
@@ -199,12 +371,20 @@ class ProblemReaderTest(unittest.TestCase):
                              "    [string]$TvHost = $env:TV_HOST\n)\n",
         "tools/disable.ps1": "param(\n    [Parameter(Mandatory = $true, Position = 0)][string]$List,\n"
                              "    [string]$TvHost = $env:TV_HOST\n)\n",
+        "tools/docker-build.ps1": "param(\n    [string]$Project = 'launcher'\n)\n",
+        "tools/theme.ps1": "param(\n    [Parameter(Position = 0)][string]$Theme,\n    [switch]$Reset,\n"
+                           "    [string]$TvHost = $env:TV_HOST\n)\n",
     }
 
     def reader(self, text):
         def resolve(token):
             return [self.SCRIPTS[token.replace("\\", "/")]] if token.replace("\\", "/") in self.SCRIPTS else []
         return lines_problems(text, resolve, param_block_of)
+
+    def host_reader(self, text):
+        def resolve(token):
+            return [self.SCRIPTS[token.replace("\\", "/")]] if token.replace("\\", "/") in self.SCRIPTS else []
+        return host_problems(text, resolve, param_block_of)
 
     def test_undeclared_parameter_is_reported(self):
         found = self.reader(r"tools\restore.ps1 -TvHost 1.2.3.4 list.txt -StockLauncher com.foo.bar")
@@ -254,6 +434,99 @@ class ProblemReaderTest(unittest.TestCase):
         block = param_block_of(self.SCRIPTS["tools/restore.ps1"])
         self.assertEqual(["List", "Stock", "TvHost"], parameters(block))
         self.assertEqual([(0, "List")], positional_names(block))
+
+    # The TV the command acts on: a script reads $TvHost from $env:TV_HOST and stops without one.
+
+    def test_a_list_command_that_names_no_tv_is_reported(self):
+        found = self.host_reader(r"tools\disable.ps1 examples\a-b\debloat.txt")
+        self.assertEqual(1, len(found), found)
+        self.assertIn("names no TV", found[0])
+        self.assertIn("-TvHost", found[0])
+
+    def test_a_list_command_that_passes_the_tv_is_quiet(self):
+        self.assertEqual([], self.host_reader(r"tools\disable.ps1 -TvHost <tv ip> examples\a-b\debloat.txt"))
+        self.assertEqual([], self.host_reader(r"tools\restore.ps1 -TvHost 192.168.1.50 list.txt"))
+
+    def test_a_tv_set_as_its_own_statement_is_quiet(self):
+        # The shape examples/skyworth-swtv-24ae-4k-nf and tcl-65c735 use, on the line and above it.
+        self.assertEqual([], self.host_reader('$env:TV_HOST="<tv ip>"; tools\\disable.ps1 examples\\a-b\\debloat.txt'))
+        self.assertEqual([], self.host_reader("$env:TV_HOST = '192.168.1.50'\n"
+                                              "tools\\disable.ps1 examples\\a-b\\debloat.txt"))
+
+    def test_a_posix_prefix_before_a_powershell_script_is_reported(self):
+        # The shape the two list headers had: PowerShell reads `TV_HOST=<tv` as the command to run.
+        found = self.host_reader(r"TV_HOST=<tv ip> tools/disable.ps1 examples/a-b/debloat.txt")
+        self.assertEqual(1, len(found), found)
+        self.assertIn("command name", found[0])
+        self.assertIn("$env:TV_HOST", found[0])
+
+    def test_a_posix_prefix_before_the_shell_twin_is_quiet(self):
+        self.assertEqual([], self.host_reader(r"TV_HOST=<tv ip> tools/disable.sh examples/a-b/debloat.txt"))
+
+    def test_a_theme_folder_with_no_tv_is_reported(self):
+        found = self.host_reader(r"tools\theme.ps1 themes\aurora")
+        self.assertEqual(1, len(found), found)
+        self.assertIn("names no TV", found[0])
+
+    def test_a_prose_mention_is_not_a_command(self):
+        # examples/xiaomi-mitv-mssp3-android9's sentence: a script named, then a list named later on.
+        text = ("The set was applied with `tools\\disable.ps1` on Windows, or comment out the lines of "
+                "`debloat.txt` that are not here.")
+        self.assertEqual([], self.host_reader(text))
+
+    def test_a_script_with_no_tv_parameter_is_quiet(self):
+        self.assertEqual([], self.host_reader(r"tools\docker-build.ps1 -Project launcher"))
+        self.assertFalse(needs_tv(param_block_of(self.SCRIPTS["tools/docker-build.ps1"])))
+
+    # The other crossing: the Windows parameter written after the shell script.
+
+    SHELLS = ("launcher/build-and-install.sh", "tools/disable.sh", "tools/theme.sh")
+
+    def shell_reader(self, text):
+        def resolve(token):
+            return [token] if token.replace("\\", "/") in self.SHELLS else []
+        return shell_parameter_problems(text, resolve)
+
+    def test_a_powershell_parameter_after_the_shell_script_is_reported(self):
+        # The shape examples/chiq-m75q10s's README had: the helper named, the shell script told to take it.
+        found = self.shell_reader("The owner declined `launcher/build-and-install.sh -HomeKeyService` because "
+                                  "of the volume-ramp trade.")
+        self.assertEqual(1, len(found), found)
+        self.assertIn("-HomeKeyService", found[0])
+        self.assertIn("environment", found[0])
+        self.assertIn(".ps1 twin", found[0])
+
+    def test_the_environment_form_is_quiet(self):
+        for text in ("`HOME_KEY_SERVICE=1 launcher/build-and-install.sh`",
+                     "`HOME_KEY_SERVICE=1 STOCK_LAUNCHER=none launcher/build-and-install.sh`",
+                     "`TV_HOST=<tv ip> tools/theme.sh --reset`",
+                     "`TV_HOST=<tv ip> tools/disable.sh examples/acme/debloat.txt`"):
+            self.assertEqual([], self.shell_reader(text), text)
+
+    def test_the_windows_twin_may_take_the_parameter(self):
+        self.assertEqual([], self.shell_reader("`launcher/build-and-install.ps1 -HomeKeyService`"),
+                         "-HomeKeyService is a parameter of the .ps1 twin")
+
+    def test_a_page_that_only_names_the_script_is_quiet(self):
+        self.assertEqual([], self.shell_reader("`launcher/build-and-install.sh` installed it, then "
+                                               "`-HomeKeyService` was enabled by hand."))
+
+    def test_a_bare_name_resolves_below_a_folder_named_like_a_skipped_one(self):
+        """CI checks the repository out under `/home/runner/work/...`, and `work` is a folder we skip.
+
+        The skip is about the checkout's own layout (`AGENTS.md`'s notes folder), so it has to be read
+        against the path inside the root: read against the absolute path, every file under `/home/
+        runner/work/` was pruned and every page naming a script by its bare name was reported as a
+        script the repository does not ship - which is what CI answered before this test existed.
+        """
+        with tempfile.TemporaryDirectory() as parent:
+            root = Path(parent) / "work" / "cleanyourtv"
+            (root / "tools").mkdir(parents=True)
+            (root / "tools" / "disable.ps1").write_text("param([string]$List)\n", encoding="utf-8")
+            (root / "work" / "notes").mkdir(parents=True)
+            (root / "work" / "notes" / "disable.ps1").write_text("# a note, not the script\n", encoding="utf-8")
+            self.assertEqual(1, len(resolve_in_repo("disable.ps1", root=root)))
+            self.assertEqual([], resolve_in_repo("no-such-script.ps1", root=root))
 
 
 if __name__ == "__main__":

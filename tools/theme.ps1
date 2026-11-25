@@ -3,26 +3,85 @@
 #
 # Usage: tools\theme.ps1 -TvHost 192.168.1.50 themes\aurora
 #        tools\theme.ps1 -TvHost 192.168.1.50 -Reset
+#
+# One argument, and -Reset takes none: both together are refused rather than one of them dropped (below).
+# Exit status: 0 the theme is on the TV, or the reset ran; 1 the theme could not be pushed, or Home did not
+# restart after it (a failure of the shared helper stops this script with that status); 2 the run stopped
+# before the theme was up and nothing was sent - the command line is not one theme folder or -Reset, the
+# folder has no config.json or one the launcher would drop (not JSON, not a JSON object, or over its 64 KB
+# read limit), a wallpaper name b64push.py refuses, no TV host
+# was given, or tools\venv is missing. 1 is a run that reached the push, so a theme this script cannot read
+# answers 2, as theme.sh does, instead of stopping with a PowerShell error record.
 param(
     [Parameter(Position = 0)][string]$Theme,
     [switch]$Reset,
-    [string]$TvHost = $env:TV_HOST
+    [string]$TvHost = $env:TV_HOST,
+    # Every word the two parameters above do not take, so the script can refuse it itself: see the judgement
+    # below. Without this, PowerShell's binder refuses the command line before the script runs, and at 1.
+    [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest
 )
+# theme.sh judges its own command line here, and this is the same judgement: -Reset removes the theme from the
+# TV and a folder pushes it, so `-Reset themes\aurora` used to take the reset branch and throw the folder away
+# (the theme the reader named was removed instead of pushed), while `themes\aurora -Reset` pushed the theme and
+# ignored the reset. Nothing is sent for either.
+if ($Theme -and $Reset) {
+    [Console]::Error.WriteLine("theme.ps1 takes one argument, a theme folder or -Reset: $Theme would not have been used, and -Reset removes the theme from the TV while a folder pushes it, so the two cannot share a command line. Nothing was sent to the TV.")
+    exit 2
+}
+# The words neither parameter above takes are refused here too, in the same words theme.sh answers them. Left to
+# PowerShell, the binder answers before the script runs - "A positional parameter cannot be found that accepts
+# argument 'other'", "A parameter cannot be found that matches parameter name 'resett'" - with exit 1, the status
+# this header keeps for a theme that could not be pushed or a Home that did not restart, so a line that never
+# parsed read as a push that reached the TV. `-h` and a switch one letter too long are the same shape, and
+# theme.sh answers a single dash-led word with its usage line. Words past the two named ones are a second theme
+# folder, a stock package pasted from restore.ps1, or a flag typed the theme.sh way (`themes\aurora --reset`
+# binds -Reset above, so that one is the first refusal).
+if ($Rest -and $Rest.Count -gt 0) {
+    $words = $Rest -join ' '
+    if ($Rest.Count -eq 1 -and $Rest[0].StartsWith('-')) {
+        [Console]::Error.WriteLine("theme.ps1 takes a theme folder or -Reset, so $words is not a command line it can read. Nothing was sent to the TV.")
+        [Console]::Error.WriteLine('usage: theme.ps1 <theme folder> | -Reset')
+    } else {
+        [Console]::Error.WriteLine("theme.ps1 takes one argument, a theme folder or -Reset: $words would not have been used, and -Reset removes the theme from the TV while a folder pushes it, so the two cannot share a command line. Nothing was sent to the TV.")
+    }
+    exit 2
+}
 $ErrorActionPreference = 'Stop'
 $OutputEncoding = New-Object System.Text.UTF8Encoding $false
-if (-not $TvHost) { throw 'pass -TvHost <tv ip> or set $env:TV_HOST' }
+if (-not $TvHost) {
+    # The same status theme.sh answers, for the same reason: a missing address is a run that never started, not
+    # a theme that could not be pushed, and 1 is what the header keeps for the push that ran and failed.
+    [Console]::Error.WriteLine('pass -TvHost <tv ip> or set $env:TV_HOST. Nothing was sent to the TV.')
+    exit 2
+}
 $env:TV_HOST = $TvHost
 # Resolve the theme folder against the caller's directory before moving into tools\.
-if ($Theme) { $Theme = (Resolve-Path $Theme).Path }
-Set-Location $PSScriptRoot
-$py = 'venv\Scripts\python.exe'
-if (-not (Test-Path $py)) { throw 'run: python -m venv tools\venv; tools\venv\Scripts\python.exe -m pip install -r tools\requirements.txt' }
+# A folder that is not there keeps the path as typed: Resolve-Path answers a missing path with its own error
+# record and a script line number, where theme.sh stops at "no config.json in <typed path>" - a message about
+# the folder the reader named, not about the cmdlet.
+if ($Theme -and (Test-Path -LiteralPath $Theme)) { $Theme = (Resolve-Path -LiteralPath $Theme).Path }
+Set-Location -LiteralPath $PSScriptRoot
+$py = Join-Path $PSScriptRoot 'venv\Scripts\python.exe'
+if (-not (Test-Path -LiteralPath $py)) {
+    # As in theme.sh: the venv is on this computer, so nothing was sent and this is a run that stopped before the
+    # theme was up, not a push that ran and failed.
+    [Console]::Error.WriteLine('run: python -m venv tools\venv; tools\venv\Scripts\python.exe -m pip install -r tools\requirements.txt. Nothing was sent to the TV.')
+    exit 2
+}
 $pkg = 'com.gathin.tvhome'
 # Runs tools\tv.py or b64push.py and stops on a non-zero exit: 'Stop' only covers cmdlets, so a failed
 # native call would otherwise fall through to "Theme ... is on the TV".
 function Invoke-Tv {
-    $out = & $py -I @args
+    # A shell line goes on stdin: Windows PowerShell 5.1 drops the double quotes from a native argument, and Put's guards need them.
+    if ($args.Count -eq 2 -and $args[0] -eq 'tv.py' -and "$($args[1])" -notlike '--*') {
+        $out = @($args[1] | & $py -I tv.py --batch | Where-Object { "$_" -notlike '$ *' })
+    } else {
+        $out = & $py -I @args
+    }
     if ($LASTEXITCODE -ne 0) { throw "$($args[0]) $($args[1]) failed (exit code $LASTEXITCODE); the theme was not fully applied" }
+    # Put's last line when the TV took neither the provider write nor the copy (theme.sh's NOT_WRITTEN).
+    $missing = @($out | Where-Object { $script:checkPut -and "$_".Trim() -match "^$notWritten (\S+)$" })
+    if ($missing.Count -gt 0) { throw "the TV took neither the provider write nor the copy of $($missing[0].Trim().Split(' ')[1]); the theme was not fully applied" }
     $out
 }
 $dir = "/sdcard/Android/data/$pkg/files"
@@ -41,50 +100,82 @@ $tmp = '/data/local/tmp/cyt-theme'
 # A file's staging path; wallpapers/a.jpg is staged as $tmp-wallpapers-a.jpg.
 function Stage($name) { "$tmp-$($name -replace '/', '-')" }
 # Android 8 and 9 have no `content write`: they print "[ERROR] Unsupported operation: write" but exit 0, so
-# that message counts as a failure and cp runs.
-function Put($name) { $t = Stage $name; "rm -f $dir/$name 2>/dev/null; { o=`$(content write --uri $uri/$name < $t 2>&1) && case `"`$o`" in *'Unsupported operation'*) false ;; esac; } || cp $t $dir/$name 2>/dev/null; rm -f $t" }
+# that message counts as a failure and cp runs. So does "Error while accessing provider", which `content` prints
+# when the launcher has no provider or gets EACCES.
+# A folder the shell makes is the shell's (drwxrws--- shell ext_data_rw), and the provider, which runs as the
+# launcher, then gets EACCES writing into it. Nothing makes wallpapers/ up front: the provider creates it with the
+# first picture, and only the cp fallback, where the shell does the writing, runs mkdir.
+# Both writes can be refused, so the file is looked for afterwards, by the shell or through the provider, as in
+# theme.sh; Invoke-Tv stops the push on the line that says it is not there. It has to be the staged upload's size:
+# an empty file is a file, and an old copy that survived a refused rm is not the new one.
+$notWritten = 'cyt-theme-not-written'
+$checkPut = $false
+function Put($name) { $t = Stage $name; $d = "$dir/$name" -replace '/[^/]*$', ''; "rm -f $dir/$name 2>/dev/null; w=; { o=`$(content write --uri $uri/$name < $t 2>&1) && case `"`$o`" in *'Unsupported operation'*|*'Error while accessing provider'*) false ;; esac && w=1; } || { mkdir -p $d 2>/dev/null; cp $t $dir/$name 2>/dev/null && w=1; }; s=`$(wc -c 2>/dev/null < $t); rm -f $t; [ -n `"`$w`" ] && { { [ -e $dir/$name ] && [ `"`$(wc -c < $dir/$name)`" = `"`$s`" ]; } || [ `"`$(content read --uri $uri/$name 2>/dev/null | wc -c)`" = `"`$s`" ]; } || echo $notWritten $name" }
 function Drop($name) { "rm -f $dir/$name 2>/dev/null; content delete --uri $uri/$name 2>/dev/null" }
 
 # The collection a theme can push. A push empties it before writing the theme's own pictures, and -Reset has to
 # empty it too: the launcher's wallpaper picker lists that folder itself, and an on-TV pick of one of its
 # pictures is read back from it, so a reset that left the pictures behind still shows the theme it just removed.
 # Both paths use this one string (the same one theme.sh has).
-$clearWallpapers = "mkdir -p $dir/wallpapers 2>/dev/null; rm -f $dir/wallpapers/*.[jJ][pP][gG] $dir/wallpapers/*.[jJ][pP][eE][gG] $dir/wallpapers/*.[pP][nN][gG] $dir/wallpapers/*.[wW][eE][bB][pP] 2>/dev/null; content delete --uri $uri/wallpapers 2>/dev/null"
+$clearWallpapers = "rm -f $dir/wallpapers/*.[jJ][pP][gG] $dir/wallpapers/*.[jJ][pP][eE][gG] $dir/wallpapers/*.[pP][nN][gG] $dir/wallpapers/*.[wW][eE][bB][pP] 2>/dev/null; content delete --uri $uri/wallpapers 2>/dev/null"
 
 if ($Reset) {
+    $checkPut = $true
     Invoke-Tv tv.py "mkdir -p $dir 2>/dev/null; $(Drop 'config.json'); $(Drop 'wallpaper.jpg'); $(Drop 'wallpapers/captions.txt'); $clearWallpapers; printf '%s' '$revision' > $tmp-theme_revision; $(Put 'theme_revision')" | Out-Null
     & $py -I theme_restart.py
     if ($LASTEXITCODE) { throw 'Home restart recovery failed' }
     Write-Host 'reset'
     exit 0
 }
-if (-not $Theme) { throw 'usage: theme.ps1 <theme folder> | -Reset' }
+if (-not $Theme) { [Console]::Error.WriteLine('usage: theme.ps1 <theme folder> | -Reset'); exit 2 }
 $config = Join-Path $Theme 'config.json'
-if (-not (Test-Path $config)) { throw "no config.json in $Theme" }
-try { $themeJson = Get-Content $config -Raw | ConvertFrom-Json } catch { throw "$config is not valid JSON" }
+# The three refusals below send nothing, so they answer 2 like theme.sh's - not 1, the status of a push that
+# ran and failed - and in this script's own words instead of a PowerShell error record with a script line.
+if (-not (Test-Path -LiteralPath $config)) {
+    [Console]::Error.WriteLine("no config.json in $Theme. Nothing was sent to the TV.")
+    exit 2
+}
+try { $themeJson = Get-Content -LiteralPath $config -Raw | ConvertFrom-Json }
+catch {
+    [Console]::Error.WriteLine("$config is not valid JSON, so there is no theme to push (themes/README.md says what the file holds). Nothing was sent to the TV.")
+    exit 2
+}
 # Config.read() answers "no overlay" for anything that is not a JSON object, so an array, a number or a
 # string is a theme the launcher drops - and it replaces the theme the set had with the built-in config.
 # Judged here, before anything is pushed, so "is on the TV" cannot mean the opposite.
 if ($themeJson -isnot [System.Management.Automation.PSCustomObject]) {
-    throw "$config is not a JSON object of theme keys, so the launcher would ignore it and the TV would go back to its built-in config (themes/README.md). Nothing was sent to the TV."
+    [Console]::Error.WriteLine("$config is not a JSON object of theme keys, so the launcher would ignore it and the TV would go back to its built-in config (themes/README.md). Nothing was sent to the TV.")
+    exit 2
+}
+# The launcher's other limit on the same file, as in theme.sh: Config.read() answers "no overlay" for a
+# config.json over 64 KB (`file.length() > 64 * 1024`), so a larger one puts the TV back on its built-in config
+# while the push would still end "is on the TV". manage.py set and race_calendar.py refuse to write one.
+$configBytes = (Get-Item -LiteralPath $config).Length
+if ($configBytes -gt 65536) {
+    [Console]::Error.WriteLine("$config is $configBytes bytes, and the launcher ignores a config.json larger than 64 KB (65536 bytes) as a whole, so it would put the TV back on its built-in config instead of this theme (themes/README.md). Nothing was sent to the TV.")
+    exit 2
 }
 # Every collection name is checked before anything changes on the TV, as in theme.sh: a name refused halfway
 # through the push left the new config.json and part of the collection behind. b64push.py refuses '..' in a path.
 $wallpapers = Join-Path $Theme 'wallpapers'
 $images = @()
-if (Test-Path $wallpapers -PathType Container) {
-    $images = @(Get-ChildItem $wallpapers -File | Where-Object { $_.Extension -match '^\.(jpg|jpeg|png|webp)$' })
+if (Test-Path -LiteralPath $wallpapers -PathType Container) {
+    $images = @(Get-ChildItem -LiteralPath $wallpapers -File | Where-Object { $_.Extension -match '^\.(jpg|jpeg|png|webp)$' })
     foreach ($image in $images) {
-        if ($image.Name -notmatch '^[A-Za-z0-9_.-]+$' -or $image.Name.Contains('..')) { throw "unsupported wallpaper filename: $($image.Name)" }
+        if ($image.Name -notmatch '^[A-Za-z0-9_.-]+$' -or $image.Name.Contains('..')) {
+            [Console]::Error.WriteLine("unsupported wallpaper filename: $($image.Name) (b64push.py takes letters, digits, '.', '_' and '-', with no '..' in the name). Nothing was sent to the TV.")
+            exit 2
+        }
     }
 }
 
 # Tolerated, as in theme.sh: a TV that locks Android/data still takes the files through ThemeProvider.
 Invoke-Tv tv.py "mkdir -p $dir 2>/dev/null; true" | Out-Null
 Invoke-Tv tv.py --push $config "$tmp-config.json" | Out-Null
+$checkPut = $true
 Invoke-Tv tv.py (Put 'config.json')
 $wall = Join-Path $Theme 'wallpaper.jpg'
-if (Test-Path $wall) { Invoke-Tv b64push.py $wall "$tmp-wallpaper.jpg"; Invoke-Tv tv.py (Put 'wallpaper.jpg') } else { Invoke-Tv tv.py (Drop 'wallpaper.jpg') | Out-Null }
+if (Test-Path -LiteralPath $wall) { Invoke-Tv b64push.py $wall "$tmp-wallpaper.jpg"; Invoke-Tv tv.py (Put 'wallpaper.jpg') } else { Invoke-Tv tv.py (Drop 'wallpaper.jpg') | Out-Null }
 Invoke-Tv tv.py $clearWallpapers | Out-Null
 foreach ($image in $images) {
     Invoke-Tv b64push.py $image.FullName (Stage "wallpapers/$($image.Name)")
@@ -92,7 +183,7 @@ foreach ($image in $images) {
 }
 # The collection's names (wallpaper_captions); a theme without them leaves no stale names behind.
 $captions = Join-Path $Theme 'wallpapers\captions.txt'
-if (Test-Path $captions -PathType Leaf) {
+if (Test-Path -LiteralPath $captions -PathType Leaf) {
     Invoke-Tv b64push.py $captions (Stage 'wallpapers/captions.txt')
     Invoke-Tv tv.py (Put 'wallpapers/captions.txt') | Out-Null
 } else {

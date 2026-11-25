@@ -6,10 +6,11 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- Continue watching: the Watch Next rows other apps publish to the TV provider (WatchNext). -->
-    <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
     <!-- Granted from ADB (pm grant): lets the screensaver picker switch between this screensaver and Google's. -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <!-- Granted from ADB (pm grant; build-and-install.sh WATCH_NEXT=1) and read only while Home Settings → Top of the
+         screen is Continue Watching: what apps note as half-watched in Android TV's Watch Next list (WatchNext). -->
+    <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
     <!-- The screensaver timer in Settings (screen_off_timeout); granted from ADB with appops. -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
 
@@ -34,6 +35,19 @@
         <package android:name="com.google.android.tv" />
         <package android:name="com.mediatek.wwtv.tvcenter" />
         <package android:name="com.sony.dtv.tvx" />
+        <package android:name="com.mediatek.tv.oneworld.tvcenter" />
+        <!-- Android TV's own settings app: the remote's gear on some brands pins to it (RemoteKeys), tvSettings falls back to it. -->
+        <package android:name="com.android.tv.settings" />
+        <!-- HY300/HY320 projectors: keystone and Miracast (drawer shortcuts), Allwinner's player for HDMI (#57). -->
+        <package android:name="com.htc.htcsettings" />
+        <package android:name="com.softwinner.tcorrection" />
+        <package android:name="com.softwinner.miracastReceiver" />
+        <package android:name="com.softwinner.awlivetv" />
+        <!-- Google TV's screensaver: the "Google Photos" choice is offered only when it is there and on. -->
+        <package android:name="com.google.android.apps.tv.dreamx" />
+        <!-- The optional App Store round button: Google Play, or Amazon Appstore on Fire TV (HomeApps.storePackage). -->
+        <package android:name="com.android.vending" />
+        <package android:name="com.amazon.venezia" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
@@ -45,6 +59,23 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="content" android:host="android.media.tv" />
+        </intent>
+        <!-- Android TV's own lists (TvProvider), for Continue Watching's Watch Next (WatchNext). -->
+        <provider android:authorities="android.media.tv" />
+        <!-- The TV's inputs panel (RemoteKeys.inputsAnswered): unseen, the Input key would open our drawer over it. -->
+        <intent>
+            <action android:name="com.android.tv.action.VIEW_INPUTS" />
+        </intent>
+        <!-- What answers TV Settings and Android's list of apps: the drawer's App Settings shows only where they differ (#56). -->
+        <intent>
+            <action android:name="android.settings.SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.MANAGE_APPLICATIONS_SETTINGS" />
+        </intent>
+        <!-- Watch providers (docs/specs/provider.md, #106): apps whose ContentProvider answers "do you have this title?" for Where to watch. -->
+        <intent>
+            <action android:name="io.cleanyourtv.action.WATCH_PROVIDER" />
         </intent>
     </queries>
 
@@ -99,6 +130,11 @@
                 <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- The remote's Apps button: the system sends ACTION_ALL_APPS to the home app (#53). -->
+            <intent-filter>
+                <action android:name="android.intent.action.ALL_APPS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <activity
@@ -128,14 +164,6 @@
 
         <activity
             android:name=".GridActivity"
-            android:process=":home"
-            android:exported="false"
-            android:screenOrientation="landscape"
-            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
-            android:theme="@style/CleanYourTV.Home" />
-
-        <activity
-            android:name=".SeasonActivity"
             android:process=":home"
             android:exported="false"
             android:screenOrientation="landscape"
@@ -178,7 +206,7 @@
             </intent-filter>
         </service>
 
-        <!-- The same screensaver on Android 11, in the main process (see ScreensaverAlone). -->
+        <!-- The same screensaver on Android 11 to 12L, in the main process (see ScreensaverAlone). -->
         <service
             android:name=".ScreensaverAlone"
             android:enabled="@bool/dream_alone"
@@ -206,6 +234,40 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/remote_key_service" />
+        </service>
+
+        <!-- The sleep timer's alarms (Settings > Sleep Timer), in the key service's process: its "lock screen" action puts
+             the TV to sleep. Not exported: the app's own alarms reach it by component name. -->
+        <receiver
+            android:name=".SleepReceiver"
+            android:process=":keys"
+            android:exported="false" />
+
+        <!-- The sleep timer's last minute over whatever plays: our own window, started by the key service's process,
+             so no overlay permission. -->
+        <activity
+            android:name=".SleepWarningActivity"
+            android:process=":keys"
+            android:exported="false"
+            android:taskAffinity="io.cleanyourtv.ui.sleep"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/CleanYourTV.Warning" />
+
+        <!-- Now Playing (#67): Android hands the apps' media sessions (what plays: title, artist, the app) only to an allowed
+             notification listener. Off until launcher-ui/build-and-install.sh NOW_PLAYING=1 allows it. It never reads a
+             notification and unbinds itself as soon as it connects. In :home, so binding it starts no other process.
+             The permission below lets only the system bind it; the app asks for no permission for it. -->
+        <service
+            android:name=".NowPlaying"
+            android:process=":home"
+            android:exported="true"
+            android:label="BuildYourTV"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
         </service>
 
     </application>

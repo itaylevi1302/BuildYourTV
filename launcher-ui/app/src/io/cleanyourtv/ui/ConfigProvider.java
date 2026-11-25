@@ -44,7 +44,7 @@ public class ConfigProvider extends ContentProvider {
             return ParcelFileDescriptor.open(prefs, ParcelFileDescriptor.MODE_READ_ONLY);
         }
         // Read-only: what the TV's apps publish to Continue watching and their preview channels, one row per line.
-        if ("watchnext.txt".equals(uri.getLastPathSegment()) && !mode.contains("w")) return WatchNext.dump(getContext());
+        if ("watchnext.txt".equals(uri.getLastPathSegment()) && !mode.contains("w")) return Watching.dump(getContext());
         File f = file(uri);
         int flags = mode.contains("w")
                 ? ParcelFileDescriptor.MODE_WRITE_ONLY | ParcelFileDescriptor.MODE_CREATE | ParcelFileDescriptor.MODE_TRUNCATE

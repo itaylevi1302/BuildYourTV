@@ -2,13 +2,18 @@ package io.cleanyourtv.ui;
 
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.os.Build;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
@@ -25,18 +30,30 @@ import java.util.function.Supplier;
 final class Ui {
     private Ui() {}
 
-    /** Android 9 to 11: older TVs and boxes, whose GPUs need the cheaper drawing paths (Shadows, rounded images). */
-    static final boolean LEGACY = Build.VERSION.SDK_INT < 31;
+    /** Cheaper drawing paths for older Android versions and TVs with less than 3 GiB of usable RAM. */
+    static final boolean LEGACY = Build.VERSION.SDK_INT < 31 || smallMemory();
+
+    private static boolean smallMemory() {
+        // LEGACY is initialized before Ui.init provides a Context.
+        try (BufferedReader reader = new BufferedReader(new FileReader("/proc/meminfo"))) {
+            String line = reader.readLine();
+            if (line != null && line.startsWith("MemTotal:")) {
+                return Long.parseLong(line.replaceAll("\\D+", "")) < 3L * 1024 * 1024;
+            }
+        } catch (IOException | NumberFormatException | SecurityException ignored) {
+        }
+        return false;
+    }
+
     static final Locale RU = new Locale("ru", "RU");
     static final Locale PT = new Locale("pt", "BR");
     static final Locale TR = new Locale("tr", "TR");
     static final Locale HE = new Locale("he", "IL");
-    /** English, Portuguese, Spanish, German, Russian, French, Turkish or Hebrew, from the settings or, with "auto", the TV's own language. */
+    /** The launcher language, or the TV's language when the setting is "auto". */
     static volatile String language = language();
-    /** Turkish is `tur` (ISO 639-2): `tr` is already the name of the translation methods below. */
     static volatile boolean en = "en".equals(language), es = "es".equals(language), de = "de".equals(language),
             ru = "ru".equals(language), fr = "fr".equals(language), tur = "tr".equals(language),
-            he = "he".equals(language);
+            he = "he".equals(language), uk = "uk".equals(language);
     static Typeface thin, light, displayMedium, displaySemibold, regular, medium, semibold;
     private static boolean loaded;
     private static final Rect BOUNDS = new Rect();
@@ -70,18 +87,18 @@ final class Ui {
 
     private static final String FONT = "fonts/InterVariable.ttf";
 
-    /** "pt", "es", "de", "ru", "fr", "tr", "he" or "en": the one picked (TV settings or config.properties), or with "auto" the TV's own, else English. */
+    /** "pt", "es", "de", "ru", "uk", "fr", "tr", "he" or "en": the one picked (TV settings or config.properties), or with "auto" the TV's own, else English. */
     private static String language() {
         String lang = Prefs.language();
         if (!lang.equals("auto")) return lang;
         lang = Locale.getDefault().getLanguage();
         if ("iw".equals(lang)) lang = "he";   // Android reports Hebrew by its old ISO code
-        return "pt".equals(lang) || "es".equals(lang) || "de".equals(lang) || "ru".equals(lang) || "fr".equals(lang)
+        return "pt".equals(lang) || "es".equals(lang) || "de".equals(lang) || "ru".equals(lang) || "uk".equals(lang) || "fr".equals(lang)
                 || "tr".equals(lang) || "he".equals(lang) ? lang : "en";
     }
 
     /** After the language changes in the settings (and once Prefs can read them). */
-    static void applyLanguage() {
+    static void applyLanguage(Context app) {
         language = language();
         en = "en".equals(language);
         es = "es".equals(language);
@@ -90,6 +107,8 @@ final class Ui {
         fr = "fr".equals(language);
         tur = "tr".equals(language);
         he = "he".equals(language);
+        uk = "uk".equals(language);
+        Strings.select(app, locale());
     }
 
     private static boolean has(AssetManager a, String path) {
@@ -146,19 +165,74 @@ final class Ui {
         return Math.max(0, Math.min(1, v));
     }
 
-    static String tr(String pt, String english) {
-        return he ? Hebrew.text(english) : tur ? Turkish.text(english) : fr ? French.text(english) : de ? German.text(english) : ru ? Russian.text(english)
-                : es ? Spanish.text(english) : en ? english : pt;
+    /** Largest 2w×2h step `downscale` takes (4 MB, freed at once): 1 GB TVs build tiles while Home is open. */
+    private static final long SMOOTH_STEP_PIXELS = 1_000_000;
+
+    /**
+     * Filtered down to w × h without jagged edges: bilinear filtering reads only 2×2 pixels and software Canvas has no
+     * mipmaps, so no step shrinks more than 2×. Halves while it can; when over 1.5× is left, goes to 2w × 2h and halves
+     * exactly, else one last step. Never recycles src; may return it (when it already has the size).
+     */
+    static Bitmap downscale(Bitmap src, int w, int h) {
+        w = Math.max(1, w);
+        h = Math.max(1, h);
+        Bitmap b = src;
+        while (b.getWidth() / 2 >= w && b.getHeight() / 2 >= h) {
+            Bitmap half = Bitmap.createScaledBitmap(b, b.getWidth() / 2, b.getHeight() / 2, true);
+            if (b != src) b.recycle();
+            b = half;
+        }
+        if ((2 * b.getWidth() > 3 * w || 2 * b.getHeight() > 3 * h) && 4L * w * h <= SMOOTH_STEP_PIXELS) {
+            Bitmap twice = Bitmap.createScaledBitmap(b, 2 * w, 2 * h, true);
+            if (b != src) b.recycle();
+            b = twice;
+        }
+        if (b.getWidth() == w && b.getHeight() == h) return b;
+        Bitmap out = Bitmap.createScaledBitmap(b, w, h, true);
+        if (b != src && b != out) b.recycle();
+        return out;
     }
 
-    /** German, French and Turkish come from their own files here too (keyed by the English, with patterns). */
+    /** 4×4 ordered-dither thresholds (0 to 15). */
+    static final int[] BAYER = {0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5};
+
+    /**
+     * A vertical gradient from top to bottom over `height` px without bands: a 4 px wide strip with a Bayer dither,
+     * repeated across (about 4 × height × 4 bytes). Works on every renderer, unlike Paint.setDither on the GPU.
+     */
+    static Shader gradient(int height, int top, int bottom) {
+        int n = Math.max(2, height);
+        int[] px = new int[4 * n];
+        for (int y = 0; y < n; y++) {
+            float t = y / (float) (n - 1);
+            for (int x = 0; x < 4; x++) {
+                float d = (BAYER[(y & 3) * 4 + x] + 0.5f) / 16f;
+                int c = 0;
+                for (int s = 0; s < 32; s += 8) {
+                    float a = (top >>> s) & 255, b = (bottom >>> s) & 255;
+                    c |= Math.min(255, (int) (a + (b - a) * t + d)) << s;
+                }
+                px[y * 4 + x] = c;
+            }
+        }
+        Bitmap b = Bitmap.createBitmap(px, 4, n, Bitmap.Config.ARGB_8888);
+        return new BitmapShader(b, Shader.TileMode.REPEAT, Shader.TileMode.CLAMP);
+    }
+
+    /**
+     * BuildYourTV's own screens (Settings, Continue watching) still pass their text here: Hebrew from Hebrew.java
+     * (keyed by the English), Portuguese as given, English for every other language.
+     */
+    static String tr(String pt, String english) {
+        return he ? Hebrew.text(english) : "pt".equals(language) ? pt : english;
+    }
+
     static String tr(String pt, String english, String spanish) {
-        return he ? Hebrew.text(english) : tur ? Turkish.text(english) : fr ? French.text(english) : de ? German.text(english) : ru ? Russian.text(english)
-                : es ? spanish : en ? english : pt;
+        return he ? Hebrew.text(english) : es ? spanish : "pt".equals(language) ? pt : english;
     }
 
     static Locale locale() {
-        return he ? HE : ru ? RU : es ? spanish() : de ? german() : fr ? french() : tur ? TR : en ? Locale.US : PT;
+        return he ? HE : ru ? RU : uk ? Locale.forLanguageTag("uk-UA") : es ? spanish() : de ? german() : fr ? french() : tur ? TR : en ? Locale.US : PT;
     }
 
     /** The TV's own French (fr-BE, fr-CA…) when it is in French, France's otherwise. */

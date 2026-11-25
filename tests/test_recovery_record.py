@@ -7,6 +7,7 @@ only the ADB transport is simulated.
 
 Run from the repository root: python3 -m unittest discover -s tests -v
 """
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -67,6 +68,11 @@ def connect():
     if state.get("unreachable"):
         raise ConnectionError("could not connect to 192.168.1.50:5555")
     return Device()
+
+
+def connect_error(error):
+    # tools/tv.py words the failures it knows; the fake says the same for the one it raises.
+    return "192.168.1.50:5555 refused the connection: nothing listens for ADB there."
 
 
 def main():
@@ -184,7 +190,10 @@ class RecoveryRecordTest(unittest.TestCase):
     def test_failed_save_disables_nothing(self):
         self.tv(unreachable=True)
         result = self.run_script("disable.sh", str(self.list_path))
-        self.assertNotEqual(result.returncode, 0)
+        # 2, not 1: nothing was asked of the TV, so this is not a save that ran and failed (tools/
+        # recovery.py's reach(), and tests/test_recovery_unreached_tv.py).
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("Nothing was recorded and nothing was sent to the TV.", result.stderr)
         self.assertEqual(self.sent(), [], "a failed record must not be followed by a mutation")
         self.assertIsNone(self.record())
 
@@ -245,6 +254,87 @@ class RecoveryRecordTest(unittest.TestCase):
         ])
         self.assertIn("pm enable com.google.android.tvlauncher", sent)
         self.assertIn("settings put global window_animation_scale 1.0", sent)
+
+    def other_path_to_the_list(self, how):
+        """The list reached by another path: a hard link stands in for another spelling (macOS letter
+        case), a copy is another file."""
+        other = self.base / "elsewhere" / "debloat.txt"
+        other.parent.mkdir()
+        how(self.list_path, other)
+        return other
+
+    def test_record_is_found_through_another_path_to_the_same_file(self):
+        self.tv(settings={"window_animation_scale": "0.5",
+                          "transition_animation_scale": "null",
+                          "animator_duration_scale": "0.6"})
+        self.assertEqual(self.run_script("disable.sh", str(self.list_path)).returncode, 0)
+        other = self.other_path_to_the_list(os.link)
+        self.clear_sent()
+
+        result = self.run_script("restore.sh", str(other))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("no recovery record", result.stderr)
+        self.assertIn("another spelling of its path", result.stderr)
+        self.assertIn("settings put global animator_duration_scale 0.6", self.sent())
+
+    def test_save_through_another_path_to_the_same_file_writes_no_second_record(self):
+        self.tv()
+        self.assertEqual(self.run_script("disable.sh", str(self.list_path)).returncode, 0)
+        first = self.record()
+        other = self.other_path_to_the_list(os.link)
+        # The TV now shows the applied list; recording it again would make it "the original".
+        self.tv(installed=["com.example.already_off", "com.google.android.tvlauncher"],
+                disabled=["com.example.enabled", "com.example.already_off"])
+
+        result = self.run_script("disable.sh", str(other))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("keeping the recovery record", result.stdout)
+        self.assertEqual(self.record(), first)  # record() fails if a second file appeared
+
+    def test_a_copy_of_the_list_still_gets_its_own_record(self):
+        self.tv()
+        self.assertEqual(self.run_script("disable.sh", str(self.list_path)).returncode, 0)
+        copy = self.other_path_to_the_list(shutil.copy)
+
+        result = self.run_script("restore.sh", str(copy))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("no recovery record", result.stderr)
+
+    def spelling_record_name(self, list_path):
+        """The record file one spelling of the list is given: recovery.py's list_digest hashes the path
+        as typed, so the fixture can write the record a second spelling wrote before the same-file
+        lookup existed. 192.168.1.50 is the address the harness runs at."""
+        digest = hashlib.sha1(str(Path(list_path).resolve()).encode()).hexdigest()[:8]
+        return self.home / ".cleanyourtv" / f"recovery-192.168.1.50-{digest}.json"
+
+    def test_two_records_for_one_file_under_two_spellings_stop_before_the_tv(self):
+        """A list reached by two paths wrote a record under each digest before the same-file lookup
+        existed, and the two can disagree about what was on before cleanup. Reading the first sorted
+        match printed a batch from whichever record that happened to be, with no mention of the other."""
+        self.tv()
+        self.assertEqual(self.run_script("disable.sh", str(self.list_path)).returncode, 0)
+        taken = next((self.home / ".cleanyourtv").glob("recovery-*.json"))
+        second_read = json.loads(taken.read_text())
+        # The same file at two other spellings: a hard link stands in for the case-insensitive disk,
+        # and the run below comes from a third path so no exact-name record answers for it.
+        second = self.other_path_to_the_list(os.link)
+        third = self.base / "third" / "debloat.txt"
+        third.parent.mkdir()
+        os.link(self.list_path, third)
+        second_read["list"] = str(second.resolve())
+        second_read["packages"]["com.example.enabled"] = "disabled"
+        also_taken = self.spelling_record_name(second)
+        also_taken.write_text(json.dumps(second_read))
+
+        for script in ("restore.sh", "disable.sh"):
+            with self.subTest(script=script):
+                self.clear_sent()
+                result = self.run_script(script, str(third))
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("two recovery records", result.stderr)
+                for path in (taken, also_taken):
+                    self.assertIn(str(path), result.stderr, "both records are named, neither is chosen")
+                self.assertEqual(self.sent(), [], "nothing is changed on the TV")
 
     def test_edited_list_leaves_new_names_alone(self):
         self.tv()
@@ -408,6 +498,9 @@ class RecoveryRecordTest(unittest.TestCase):
     def run_recovery(self, *args):
         env = dict(os.environ, TV_HOST="192.168.1.50", HOME=str(self.home),
                    FAKE_TV_STATE=str(self.state_path))
+        # Path.home() reads USERPROFILE on Windows, not HOME: without it the record lands in the real ~.
+        if os.name == "nt":
+            env["USERPROFILE"] = env["HOME"]
         return subprocess.run(
             [sys.executable, str(ROOT / "tools" / "recovery.py"), *args],
             cwd=self.repo, env=env, capture_output=True, text=True, timeout=120,
@@ -480,6 +573,21 @@ class RecoveryRecordTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("no package names in this list", result.stderr)
         self.assertNotIn("could not read", result.stderr)
+
+
+class RecordShapeTest(unittest.TestCase):
+    def test_a_record_that_is_json_but_not_an_object_is_named_not_a_traceback(self):
+        sys.path.insert(0, str(ROOT / "tools"))
+        self.addCleanup(sys.path.remove, str(ROOT / "tools"))
+        import recovery
+        for text in ("[]", "null", '"x"', "7"):
+            with self.subTest(record=text), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "recovery-192.168.1.50-cafab3f3.json"
+                path.write_text(text)
+                with self.assertRaises(SystemExit) as caught:
+                    recovery.load_record(str(path))
+                self.assertIn("unknown recovery record format", str(caught.exception))
+                self.assertEqual(path.read_text(), text, "the file is left for inspection")
 
 
 if __name__ == "__main__":

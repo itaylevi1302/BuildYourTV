@@ -12,18 +12,29 @@ folder given in place of a file name, a file in the middle of the path and a nam
 all exit 2 with the path named. A write that fails once it has started - Pillow answers that with OSError,
 and an extension it does not know with ValueError - is also named, not left as a traceback with exit 1.
 
+The same rule covers the screenshots themselves: `Image.open()` reads the header only, so a picture cut
+short - a `tv.py --screenshot` interrupted, a file pulled before the write finished - opened fine and
+failed at the first pixel, inside the comparison: an OSError traceback with exit 1, the status the page
+reads as "N pixels differ, find out why". Both files are decoded in full before anything is compared now,
+and one that cannot be read is named as the before or the after screenshot, exit 2, nothing compared.
+
 Run from the repository root: python3 -m unittest discover -s tests -v
 """
 import argparse
+import base64
 import contextlib
 import importlib.util
 import io
 import os
 from pathlib import Path
 import subprocess
+import struct
 import sys
 import tempfile
 import unittest
+from unittest import mock
+import warnings
+import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("cyt_screendiff", ROOT / "tools" / "screendiff.py")
@@ -124,6 +135,22 @@ class CompareTest(unittest.TestCase):
         self.assertEqual(screendiff.compare(before, after, [(0, 0, 4, 4)], 8), (1, (5, 1, 6, 2), 9))
         self.assertEqual((before.tobytes(), after.tobytes()), original)
 
+    def test_the_largest_difference_is_read_without_reading_every_pixel(self):
+        # Pillow 13 - the version tools/requirements-photos.txt pins - deprecates Image.getdata and Pillow 14
+        # removes it, and this number was read with max(...getdata()): a DeprecationWarning on every run
+        # under that pin, and an AttributeError after the comparison was done once Pillow removes it.
+        before = self.Image.new("RGB", (8, 4), "black")
+        after = before.copy()
+        after.putpixel((5, 1), (0, 40, 0))
+        with warnings.catch_warnings(record=True) as seen:
+            warnings.simplefilter("always")
+            result = screendiff.compare(before, after, [(0, 0, 4, 4)], 8)
+        self.assertEqual(result, (1, (5, 1, 6, 2), 40),
+                         "the largest difference is still the largest channel difference")
+        self.assertEqual([str(w.message) for w in seen if "getdata" in str(w.message)], [],
+                         "the largest difference is read with Image.getdata, which Pillow 13 deprecates and "
+                         "Pillow 14 removes: read the peak with getextrema()")
+
     def test_compression_noise_under_the_threshold_is_ignored(self):
         a, b = self.shot("a.png"), self.shot("b.png", noise=3)
         self.assertEqual(self.run_tool([a, b])[0], 0)
@@ -156,7 +183,69 @@ class CompareTest(unittest.TestCase):
         self.assertIn(f"{out}: written", text)
         self.assertTrue(os.path.isfile(out) and os.path.isfile(diff))
 
-    def test_a_write_that_cannot_start_is_named_not_a_difference(self):
+    def test_positive_scales_keep_each_pair_dimension_at_least_one_pixel(self):
+        cases = (((200, 100), "0.001", (32, 61)),
+                 ((1, 1), None, (32, 61)),
+                 ((1, 8), None, (32, 64)),
+                 ((8, 1), None, (38, 61)),
+                 ((201, 101), None, (230, 110)))
+        for size, scale, expected in cases:
+            for different in (False, True):
+                with self.subTest(size=size, scale=scale, different=different):
+                    before = self.Image.new("RGB", size, "black")
+                    after = before.copy()
+                    if different:
+                        after.putpixel((0, 0), (255, 0, 0))
+                    a, b, out, diff = [os.path.join(self.tmp.name, name) for name in
+                                       ("a.png", "b.png", "pair.png", "diff.png")]
+                    before.save(a)
+                    after.save(b)
+                    args = [a, b, "--out", out, "--diff", diff]
+                    if scale is not None:
+                        args += ["--scale", scale]
+                    code, _ = self.run_tool(args)
+                    self.assertEqual(code, int(different))
+                    with self.Image.open(out) as pair:
+                        self.assertEqual(pair.size, expected)
+                    with self.Image.open(diff) as mask:
+                        self.assertEqual(mask.size, size)
+                        self.assertEqual(mask.getbbox() is not None, different)
+
+    def test_output_control_distinct_files_can_be_created_or_overwritten(self):
+        for different in (False, True):
+            for existing in (False, True):
+                with self.subTest(different=different, existing=existing):
+                    a, b = self.shot("a.png"), self.shot("b.png", noise=20 if different else 0)
+                    originals = {p: Path(p).read_bytes() for p in (a, b)}
+                    out, diff = [Path(self.tmp.name) / name for name in ("pair.png", "diff.png")]
+                    for path in (out, diff):
+                        path.unlink(missing_ok=True)
+                        if existing:
+                            self.Image.new("RGB", (3, 3), "red").save(path)
+                    code, _ = self.run_tool([a, b, "--out", str(out), "--diff", str(diff)])
+                    self.assertEqual(code, int(different))
+                    self.assertEqual({p: Path(p).read_bytes() for p in originals}, originals)
+                    with self.Image.open(out) as pair:
+                        self.assertEqual(pair.size, (230, 110))
+                    with self.Image.open(diff) as mask:
+                        self.assertEqual(mask.size, (200, 100))
+                        self.assertEqual(mask.mode, "L")
+                        self.assertEqual(mask.getbbox() is not None, different)
+
+    def test_output_control_the_same_input_can_be_compared_with_itself(self):
+        a = self.shot("a.png")
+        original = Path(a).read_bytes()
+        out, diff = [os.path.join(self.tmp.name, name) for name in ("pair.png", "diff.png")]
+        code, text = self.run_tool([a, a, "--out", out, "--diff", diff])
+        self.assertEqual(code, 0)
+        self.assertIn("identical", text)
+        self.assertEqual(Path(a).read_bytes(), original)
+        with self.Image.open(out) as pair:
+            self.assertEqual(pair.size, (230, 110))
+        with self.Image.open(diff) as mask:
+            self.assertIsNone(mask.getbbox())
+
+    def test_a_special_output_is_named_not_a_difference(self):
         if not os.path.exists("/dev/full"):
             self.skipTest("needs /dev/full, a file whose writes fail with ENOSPC")
         a, b = self.shot("a.png"), self.shot("b.png")
@@ -165,7 +254,8 @@ class CompareTest(unittest.TestCase):
         code, text = self.run_tool([a, b, "--out", out])
         self.assertEqual(code, 2, "a failed write must not read as 'the screenshots differ'")
         self.assertIn(f"cannot write {out}", text)
-        self.assertIn("No space left on device", text)
+        self.assertIn("not a regular file", text)
+        self.assertTrue(os.path.islink(out))
         self.assertNotIn("Traceback", text)
         self.assertNotIn("identical", text)
         self.assertNotIn("pixels differ", text)
@@ -179,6 +269,104 @@ class CompareTest(unittest.TestCase):
         self.assertIn("unknown file extension", text)
         self.assertNotIn("Traceback", text)
         self.assertFalse(os.path.exists(out))
+
+    def cut_short(self, name, part=3):
+        """A real screenshot with its bytes cut off: the header opens, the pixels cannot be read."""
+        full = self.shot(name)
+        return self.cut_short_bytes(full, "cut-" + name, part)
+
+    def cut_short_bytes(self, full, name, part=3):
+        data = Path(full).read_bytes()
+        short = os.path.join(self.tmp.name, name)
+        Path(short).write_bytes(data[:max(32, len(data) // part)])
+        return short
+
+    def test_a_cut_short_screenshot_is_unreadable_not_a_difference(self):
+        """A --screenshot interrupted, or a file pulled before the write finished, is not a finding."""
+        good = self.shot("good.png")
+        jpeg = os.path.join(self.tmp.name, "sound.jpg")
+        self.Image.new("RGB", (200, 100), (10, 10, 10)).save(jpeg, quality=80)
+        pairs = ((self.cut_short("cut.png"), good, "before"),
+                 (self.cut_short("cut2.png"), good, "after"),
+                 (self.cut_short_bytes(jpeg, "cut-sound.jpg", 2), good, "after"))
+        for bad, other, which in pairs:
+            with self.subTest(file=bad, which=which):
+                before, after = (bad, other) if which == "before" else (other, bad)
+                with contextlib.redirect_stdout(io.StringIO()) as out, \
+                        contextlib.redirect_stderr(io.StringIO()) as err:
+                    code = screendiff.main([before, after])
+                self.assertEqual(code, 2, f"exit 1 reads as 'the screenshots differ': {err.getvalue()}")
+                self.assertIn(f"cannot read the {which} screenshot {bad}", err.getvalue())
+                self.assertIn("Nothing was compared", err.getvalue())
+                self.assertNotIn("Traceback", err.getvalue())
+                self.assertEqual(out.getvalue(), "")
+
+    def test_a_broken_png_chunk_is_unreadable_and_preserves_reports(self):
+        good = Path(self.shot("good.png"))
+        data = good.read_bytes()
+        start = data.index(b"IDAT")
+        length = struct.unpack(">I", data[start - 4:start])[0]
+        pixels = data[start + 4:start + 4 + length]
+
+        def chunk(kind, body):
+            checksum = zlib.crc32(body, zlib.crc32(kind))
+            return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", checksum)
+
+        # Keep the image header and compressed pixels, but break the second IDAT's identifier.
+        middle = len(pixels) // 2
+        bad = Path(self.tmp.name) / "broken.png"
+        bad.write_bytes(data[:start - 4] + chunk(b"IDAT", pixels[:middle]) +
+                        chunk(b"!DAT", pixels[middle:]) + data[start + length + 8:])
+        originals = {p: p.read_bytes() for p in (good, bad)}
+        with self.Image.open(bad) as image:
+            self.assertEqual(image.size, (200, 100))
+            with self.assertRaises(SyntaxError):
+                image.load()
+        for which in ("before", "after"):
+            for existing in (False, True):
+                with self.subTest(which=which, existing=existing):
+                    outputs = [Path(self.tmp.name) / name for name in ("pair.png", "diff.png")]
+                    for path in outputs:
+                        path.unlink(missing_ok=True)
+                        if existing:
+                            path.write_bytes(b"previous report")
+                    before, after = (bad, good) if which == "before" else (good, bad)
+                    with contextlib.redirect_stdout(io.StringIO()) as out, \
+                            contextlib.redirect_stderr(io.StringIO()) as err, \
+                            mock.patch.object(screendiff, "_compare") as compare:
+                        code = screendiff.main([str(before), str(after), "--out", str(outputs[0]),
+                                               "--diff", str(outputs[1])])
+                    self.assertEqual(code, 2, err.getvalue())
+                    self.assertIn(f"cannot read the {which} screenshot {bad}", err.getvalue())
+                    self.assertEqual(out.getvalue(), "")
+                    compare.assert_not_called()
+                    self.assertEqual({p: p.read_bytes() for p in originals}, originals)
+                    for path in outputs:
+                        if existing:
+                            self.assertEqual(path.read_bytes(), b"previous report")
+                        else:
+                            self.assertFalse(path.exists())
+
+    def test_an_out_name_the_console_cannot_encode_is_printed_with_replacement_characters(self):
+        a, b = self.shot("a.png"), self.shot("b.png")
+        out = Path(self.tmp.name) / ("sd_" + chr(0x5199) + ".png")
+        raw = io.BytesIO()
+        console = io.TextIOWrapper(raw, encoding="cp1252", newline="")
+        real_stdout = sys.stdout
+        self.addCleanup(setattr, sys, "stdout", real_stdout)
+        sys.stdout = console
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            code = screendiff.main([a, b, "--out", str(out)])
+        console.flush()
+        self.assertEqual(code, 0, err.getvalue())
+        self.assertTrue(out.is_file())
+        self.assertIn("sd_?.png: written", raw.getvalue().decode("cp1252"))
+
+    def test_a_pair_that_reads_is_still_compared(self):
+        """The decode is not allowed to swallow the comparison it guards."""
+        a, b = self.shot("a.png", "12:00"), self.shot("b.png", "12:01")
+        self.assertEqual(self.run_tool([a, b])[0], 1)
+        self.assertEqual(self.run_tool([a, b, "--mask", "0,0,60,20"])[0], 0)
 
 
 class OutputPathTest(unittest.TestCase):
@@ -231,6 +419,38 @@ class OutputPathTest(unittest.TestCase):
         self.assertIn(f"--out {out} has no extension", stderr)
         self.assertIn(f"name it {out}.png", stderr)
 
+    def test_an_empty_out_is_refused_rather_than_read_as_no_pair(self):
+        """`--out "$OUT"` with OUT unset asked for a pair: it used to compare and write none, with 0."""
+        code, stdout, stderr = self.run_tool(["before.png", "after.png", "--out", ""])
+        self.assertEqual(code, 2, "an empty --out must not read as 'no pair was asked for'")
+        self.assertEqual(stdout, "")
+        self.assertIn("--out was given as '', an empty name", stderr)
+        self.assertIn("--out shots/before-after.png", stderr)
+        self.assertIn("that variable was empty", stderr)
+        self.assertIn("Nothing was read or written", stderr)
+        self.assertNotIn("identical", stderr)
+        self.assertNotIn("Traceback", stderr)
+
+    def test_an_empty_diff_is_refused_the_same_way(self):
+        code, stdout, stderr = self.run_tool(["before.png", "after.png", "--diff", ""])
+        self.assertEqual(code, 2)
+        self.assertEqual(stdout, "")
+        self.assertIn("--diff was given as '', an empty name", stderr)
+        self.assertIn("Nothing was read or written", stderr)
+
+    def test_a_blank_out_is_refused_too(self):
+        # `--out "$SPACE"` reads as no name at all once the shell has split it away.
+        code, _, stderr = self.run_tool(["before.png", "after.png", "--out", "   "])
+        self.assertEqual(code, 2)
+        self.assertIn("--out was given as '   ', an empty name", stderr)
+
+    def test_the_option_left_out_is_still_no_pair(self):
+        """Only an empty value is refused: leaving --out or --diff out is how a run writes neither."""
+        self.assertIsNone(screendiff.output_path("--out", None))
+        self.assertIsNone(screendiff.output_path("--diff", None))
+        self.assertEqual(screendiff.output_path("--out", str(self.dir / "pair.png")),
+                         self.dir / "pair.png")
+
     def test_the_paths_are_judged_before_the_screenshots_are_opened(self):
         # Neither argument exists, so anything that opened them would say so first.
         code, _, stderr = self.run_tool(["missing-before.png", "missing-after.png",
@@ -256,6 +476,180 @@ class OutputPathTest(unittest.TestCase):
         self.assertNotIn("requirements-perf.txt", run.stderr, "Pillow was reported first")
         self.assertNotIn("Traceback", run.stderr)
         self.assertEqual(run.stdout, "")
+
+
+class CollisionTest(unittest.TestCase):
+    """Unsafe destinations are refused without Pillow, and cannot change even one fixture byte."""
+
+    # Two generated 8x8 RGB PNGs. Keeping the bytes here lets preflight run without optional Pillow.
+    PNGS = tuple(base64.b64decode(data) for data in (
+        "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAFElEQVR4nGPkEpFjwAaYsIoOWgkANVwATIkpP+sAAAAASUVORK5CYII=",
+        "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAFElEQVR4nGM8ISLHgA0wYRUdtBIAyQ4BCkxcDfgAAAAASUVORK5CYII=",
+    ))
+
+    def files(self, different, existing):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        directory = Path(tmp.name)
+        (directory / "before.png").write_bytes(self.PNGS[0])
+        (directory / "after.png").write_bytes(self.PNGS[int(different)])
+        (directory / "sub").mkdir()
+        if existing:
+            (directory / "other.png").write_bytes(self.PNGS[0])
+        return directory
+
+    def assert_collision(self, directory, argv, *needles):
+        names = set(directory.rglob("*"))
+        originals = {p: p.read_bytes() for p in names if p.is_file()}
+        real_import = __import__
+
+        def no_pillow(name, *args, **kwargs):
+            if name == "PIL" or name.startswith("PIL."):
+                self.fail("Pillow was imported before refusing the collision")
+            return real_import(name, *args, **kwargs)
+
+        for mode in (("preflight", "images") if HAVE_PIL else ("preflight",)):
+            with self.subTest(mode=mode):
+                try:
+                    with contextlib.ExitStack() as stack:
+                        if mode == "preflight":
+                            stack.enter_context(mock.patch("builtins.__import__", side_effect=no_pillow))
+                            read = stack.enter_context(mock.patch.object(
+                                screendiff, "screenshot", side_effect=AssertionError("a screenshot was opened")))
+                        out = stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+                        err = stack.enter_context(contextlib.redirect_stderr(io.StringIO()))
+                        code = screendiff.main(argv)
+                        if mode == "preflight":
+                            read.assert_not_called()
+                    self.assertEqual(code, 2, err.getvalue())
+                    for needle in needles:
+                        self.assertIn(needle, err.getvalue())
+                    self.assertIn("same file", err.getvalue())
+                    self.assertIn("Nothing was read or written", err.getvalue())
+                    self.assertNotIn("Traceback", err.getvalue())
+                    self.assertEqual(out.getvalue(), "")
+                finally:
+                    self.assertEqual(set(directory.rglob("*")), names, "the run created an output")
+                    self.assertEqual({p: p.read_bytes() for p in originals}, originals)
+
+    def input_collisions(self, alias):
+        for different in (False, True):
+            for existing in (False, True):
+                for option in ("--out", "--diff"):
+                    for which in ("before", "after"):
+                        with self.subTest(different=different, existing=existing, option=option, which=which):
+                            directory = self.files(different, existing)
+                            target = alias(directory, directory / (which + ".png"))
+                            other = "--diff" if option == "--out" else "--out"
+                            argv = [str(directory / "before.png"), str(directory / "after.png"),
+                                    option, str(target), other, str(directory / "other.png")]
+                            self.assert_collision(directory, argv, option, which)
+
+    def output_collisions(self, alias, existing_values=(False, True)):
+        for different in (False, True):
+            for existing in existing_values:
+                with self.subTest(different=different, existing=existing):
+                    directory = self.files(different, existing)
+                    target = directory / "other.png"
+                    argv = [str(directory / "before.png"), str(directory / "after.png"),
+                            "--out", str(target), "--diff", str(alias(directory, target))]
+                    self.assert_collision(directory, argv, "--out", "--diff")
+
+    def test_direct_collisions(self):
+        self.input_collisions(lambda directory, path: path)
+        self.output_collisions(lambda directory, path: path)
+
+    def test_relative_and_absolute_collisions(self):
+        previous = Path.cwd()
+        try:
+            os.chdir(tempfile.gettempdir())  # The checkout and temporary files may be on different drives.
+            self.input_collisions(lambda directory, path: os.path.relpath(path))
+            self.output_collisions(lambda directory, path: os.path.relpath(path))
+        finally:
+            os.chdir(previous)
+
+    def test_dot_collisions(self):
+        alias = lambda directory, path: str(directory) + os.sep + "." + os.sep + path.name
+        self.input_collisions(alias)
+        self.output_collisions(alias)
+
+    def test_dotdot_collisions(self):
+        alias = lambda directory, path: directory / "sub" / ".." / path.name
+        self.input_collisions(alias)
+        self.output_collisions(alias)
+
+    def test_symlink_collisions(self):
+        def alias(directory, path):
+            link = directory / "alias.png"
+            try:
+                link.symlink_to(path.name)
+            except (OSError, NotImplementedError) as e:
+                self.skipTest(f"this filesystem cannot create a symlink: {e}")
+            return link
+        self.input_collisions(alias)
+        self.output_collisions(alias)  # Includes two aliases for a destination not yet created.
+
+    def test_hardlink_collisions(self):
+        def alias(directory, path):
+            link = directory / "alias.png"
+            try:
+                os.link(path, link)
+            except (OSError, NotImplementedError) as e:
+                self.skipTest(f"this filesystem cannot create a hardlink: {e}")
+            return link
+        self.input_collisions(alias)
+        self.output_collisions(alias, existing_values=(True,))
+
+    @unittest.skipUnless(os.name == "nt", "Windows case-insensitive path spelling")
+    def test_windows_case_collisions(self):
+        directory = self.files(False, False)
+        if not (directory / "BEFORE.PNG").exists():
+            self.skipTest("this directory is case-sensitive")
+        alias = lambda directory, path: path.with_name(path.name.upper())
+        self.input_collisions(alias)
+        self.output_collisions(alias)
+
+
+class DecodeBeforeCompareTest(unittest.TestCase):
+    """The pixels are read before the comparison, so an unreadable screenshot is exit 2, not 'different'.
+
+    Pillow is optional (`tools/requirements-perf.txt`) and CI does not install it, so the run that needs a
+    cut-short picture is above; this reads the same ordering out of the source.
+    """
+
+    SOURCE = (ROOT / "tools" / "screendiff.py").read_text(encoding="utf-8")
+
+    def test_both_screenshots_are_read_before_the_comparison(self):
+        read = self.SOURCE.split("count, bbox, worst, diff = _compare(", 1)[0]
+        self.assertIn('screenshot("before", args.before), screenshot("after", args.after)', read,
+                      "the two screenshots are no longer read before the comparison")
+
+    def test_the_read_is_a_full_decode_inside_the_guard(self):
+        body = self.SOURCE.split("def screenshot(", 1)[1].split("\ndef ", 1)[0]
+        self.assertIn("image = Image.open(path)", body)
+        self.assertIn("image.load()", body,
+                      "Image.open() reads the header only; a cut-short file fails at the first pixel")
+        self.assertIn("Nothing was compared", body)
+
+    def test_decoder_failures_close_the_image_and_name_the_input(self):
+        # Exercise refusal even without the optional Pillow installation CI omits.
+        for error in (OSError("cut short"), SyntaxError("broken PNG chunk")):
+            with self.subTest(error=type(error).__name__):
+                image = mock.Mock()
+                image.load.side_effect = error
+                pil = mock.Mock()
+                pil.Image.open.return_value = image
+                with mock.patch.dict(sys.modules, {"PIL": pil}), \
+                        self.assertRaisesRegex(ValueError, "cannot read the before screenshot"):
+                    screendiff.screenshot("before", "broken.png")
+                image.close.assert_called_once_with()
+
+    def test_a_file_it_cannot_read_stops_before_the_comparison(self):
+        after_read = self.SOURCE.split("        a, b = screenshot(", 1)[1]
+        refusal = after_read.split("\n    if a.size", 1)[0]
+        self.assertIn("return 2", refusal,
+                      "an unreadable screenshot falls through to the comparison, whose exit 1 reads as "
+                      "'the screenshots differ'")
 
 
 if __name__ == "__main__":

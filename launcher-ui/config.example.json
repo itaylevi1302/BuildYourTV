@@ -8,6 +8,7 @@
     "com.hbo.hbonow",
     "com.google.android.youtube.tv"
   ],
+  "shelf_order": "manual",
   "hidden_apps": [
     "com.tcl.browser",
     "com.tcl.gallery"
@@ -18,11 +19,15 @@
     "longitude": -46.6333
   },
   "theme": "auto",
+  "top_of_screen": "picks",
   "temperature": "C",
   "clock": "auto",
+  "power_on": "tv",
+  "forecast": "hours",
   "screensaver": "photos",
   "weather": true,
   "show_crypto": false,
+  "status_icons": false,
   "currency": "BRL",
   "buttons": {
     "s395": "tmdb:watchlist",
@@ -34,6 +39,9 @@
     "283": "com.crunchyroll.crunchyroid"
   },
   "show_all_providers": false,
+  "show_system_apps": false,
+  "screensaver_ok": false,
+  "app_store_button": false,
   "app_tiles": {
     "com.tomatos.clientapp": {
       "logo": "https://example.com/tomato-logo.png",

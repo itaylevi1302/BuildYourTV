@@ -63,26 +63,27 @@ TV_HOST=<player-ip> tools/theme.sh --reset   # back to plain black
 ## Ad-blocking DNS (off, on purpose)
 
 AdGuard's public DNS blocks `pixel.spotify.com`, which the Spotify TV app needs to start, and that broke
-the Spotify login. Android's Private DNS takes one server for the whole box, with no per-app exceptions.
-For ad blocking with Spotify, create a free personal profile at NextDNS or AdGuard DNS, allowlist
-`pixel.spotify.com`, then:
+the Spotify login. Android's Private DNS takes one server for the whole box, with no per-app exceptions,
+so the ad blocking that keeps Spotify working is a personal profile at NextDNS or AdGuard DNS with
+`pixel.spotify.com` allowlisted - the notes in `debloat.txt` record how that went on this set, which was
+left on automatic DNS.
 
-```bash
-TV_HOST=<player-ip> tools/venv/bin/python -I tools/tv.py 'settings put global private_dns_specifier <your-id>.dns.nextdns.io'
-TV_HOST=<player-ip> tools/venv/bin/python -I tools/tv.py 'settings put global private_dns_mode hostname'
-```
-
-To undo: `settings put global private_dns_mode opportunistic`. It doesn't block YouTube ads. If Spotify
-then shows "Vérifiez votre connexion réseau", switch DNS back and log in to Spotify again.
+The optional DNS extra, with the two commands and the way back, is in
+[docs/faq.md](../../docs/faq.md#can-it-block-ads-inside-apps-too); it does not block YouTube ads. If
+Spotify shows "Vérifiez votre connexion réseau" after it, switch DNS back and log in to Spotify again.
 
 ## When you're done: close ADB
 
 Port 5555 is plaintext. On the TV: Developer options > Revoke USB debugging authorisations, then
-turn USB debugging off. Check from the Mac that this fails:
+turn USB debugging off. Then check from the Mac that the player refuses the port:
 
 ```bash
-nc -vz <player-ip> 5555
+tools/venv/bin/python -I tools/adb-closed.py <player-ip>
 ```
+
+It must say the port is closed (exit 0); only a refused connection proves that. A timeout or "No route to
+host" proves nothing. Use the venv's Python here: Local Network privacy blocked the Command Line Tools
+Python on this Mac (see `debloat.txt`).
 
 Also: a Freebox system update that re-enables packages means running `tools/disable.sh` on the list
 again.

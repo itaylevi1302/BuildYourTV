@@ -26,7 +26,7 @@ a workflow brings in CleanYourTV's changes every day ([`sync-upstream.yml`](.git
 | "Watch on…" | — | Opens the app | Opens **the title** in the app (Netflix, Disney+, Apple TV, Max, Prime) when Wikidata knows its id |
 | Remote buttons | `app_keys` in a theme | — | A `remote.json` per model + a settings screen on the TV |
 | Configuration | The theme's `config.json` | Settings on the TV | A `config.json` pushed from the computer + settings on the TV |
-| Language | English | Several | English and Portuguese, plus Spanish, German, Russian, French and Turkish; follows the TV |
+| Language | English | Several | English and Portuguese, plus Spanish, German, Russian, Ukrainian, French and Turkish; follows the TV |
 | Cost for an AI assistant to adapt | Low | Medium | **Higher**: more code, network and screens, more tokens |
 
 Just want a clean TV and a minimal home? Use CleanYourTV's `launcher/`. Want the home screen without the debloat? Use
@@ -36,9 +36,19 @@ Free My TV. This project is for people who want both and a full Explore.
 
 **Home screen**
 - "For You" with TMDB picks on your services, and Explore, Movies and Shows tabs.
+- Optional Continue Watching in their place (Home Settings → Top of the screen): what your apps left half-way in
+  Android TV's Watch Next list, with progress; OK resumes it. It needs `READ_TV_LISTINGS`, granted from the computer
+  (see [launcher-ui/README.md](launcher-ui/README.md#continue-watching-optional)).
 - An app shelf with official logos; holding OK on an app drops a menu from its card: move, logo and color (a PNG's URL
   and a background color, or through `config.json`), the app's Android settings (force stop, clear cache) and close.
+- Round buttons at the top right (Explore, HDMI Inputs, Settings); holding OK on one drops a menu: move it (← →, OK
+  drops, Back cancels; the order is kept) and add or remove an App Store button (Google Play, or Amazon Appstore on
+  Fire TV; off until added).
 - Weather for your city, a theme that darkens at sunset, a photo screensaver.
+- Optional *Now Playing* (off until `NOW_PLAYING=1`): what an app plays, in the quotes' place on the home screen and
+  the screensaver. It needs Android's notification access, the only way apps' media sessions are shared. It reads
+  only the title, artist and app, never a notification, and nothing leaves the TV: see
+  [launcher-ui/README.md](launcher-ui/README.md#now-playing).
 - No ADB left on: debloat, the Home switch and the remote-button service are done once from the computer.
 
 **Explore** (the ▶ button on the home screen, or a remote button)
@@ -58,11 +68,13 @@ Free My TV. This project is for people who want both and a full Explore.
   copy when offline) and images too (up to 160 MB, a week). When an app or the TV is on, the launcher lets go of what it
   kept in memory: on a 2 GB TCL, about 66 MB in the background, down from ~155 MB.
 - No ads and no telemetry: it only talks to TMDB, Wikidata (the services' ids) and Open-Meteo (weather), plus Binance
-  for the crypto prices when `show_crypto=true` (off by default).
+  for the crypto prices when `show_crypto=true` (off by default), and, with Continue Watching on, the picture addresses
+  your apps left in Android TV's Watch Next list (`https` only, never your home network).
 
 **Remote and configuration**
 - `examples/<model>/remote.json` says which remote buttons can be changed; on the TV each one opens an app, an HDMI
-  input, Explore or your list.
+  input, Explore or your list. It can name the remote (`vendor`, `product`), so a gamepad's buttons stay its own, and
+  turn a burst of presses into one (`debounce_ms`): see [launcher-ui/README.md](launcher-ui/README.md#remotejson).
 - `launcher-ui/config.sh` pushes a `config.json` (shelf, hidden apps, city, buttons, services, logos) over ADB, without
   rebuilding. Only the ADB shell can write that configuration into the app.
 - CleanYourTV themes: `launcher-ui/config.sh --theme themes/<name> [my-config.json]` takes what both launchers share

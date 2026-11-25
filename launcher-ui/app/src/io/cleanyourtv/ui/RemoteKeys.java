@@ -22,13 +22,23 @@ import java.util.List;
  * "native" button is never touched, a "configurable" one runs the action the person picked in Settings > Remote
  * Buttons, or its default. Without remote.json, TCL and Vestel TVs keep the app buttons Free My TV handled.
  *
- * Actions: a package, "input:<tv input id>", "live", "settings", "home", "tmdb:explore", "tmdb:watchlist", or ""
+ * Actions: a package, "input:<tv input id>", "input:next" (the next HDMI input, press after press), "live", "settings", "home", "tmdb:explore", "tmdb:watchlist",
+ * "inputs" (the TV's inputs panel, or the home screen's drawer on the inputs when nothing answers it), or ""
  * (the button does what it did before).
+ *
+ * remote.json may also name its remote: "vendor" and "product" (a number as Android gives it, or hex as in the .kl file's
+ * name, "0957"), and then only that remote's buttons are ours (a gamepad's, a keyboard's or another remote's BUTTON_3 go
+ * on as before; Free My TV's Sabrina and onn). "debounce_ms" makes a burst of presses of one button one press: Xiaomi's
+ * remote sends a press as several, and the app opened several times (Free My TV 6fbaba1).
  */
 final class RemoteKeys {
     private RemoteKeys() {}
 
-    static final boolean TCL = is("TCL"), VESTEL = is("Vestel");
+    static final boolean TCL = is("TCL"), VESTEL = is("Vestel"), HISENSE = is("Hisense");
+
+    /** Brands whose maker answers the plain settings request with its own menu, or nothing (Free My TV ed6be1e). */
+    private static final boolean ANDROID_TV_SETTINGS_BRAND = is("TCL") || is("Philips") || is("Sony") || is("JVC")
+            || is("Skyworth");
 
     private static boolean is(String maker) {
         return maker.equalsIgnoreCase(Build.MANUFACTURER) || maker.equalsIgnoreCase(Build.BRAND);
@@ -47,6 +57,13 @@ final class RemoteKeys {
     private static List<Button> cached;
     private static String cachedRemote = "";
     private static long cachedStamp = Long.MIN_VALUE;
+    /** remote.json's "vendor" and "product" (-1: any device) and "debounce_ms" (0: off), read with the buttons. */
+    private static int cachedVendor = -1, cachedProduct = -1;
+    private static long cachedDebounce;
+    static final long MAX_DEBOUNCE_MS = 5000;
+    /** The button whose press was last seen, and when (KeyEvent.getEventTime()), for debounce_ms. */
+    private static String lastButton;
+    private static long lastDown;
 
     /** The configurable buttons, from remote.json (re-read when it changes) or the built-in TCL/Vestel ones. */
     static List<Button> buttons(Context c) {
@@ -58,10 +75,16 @@ final class RemoteKeys {
             List<Button> out = new ArrayList<>();
             String text = TvConfig.read(f);
             cachedRemote = "";
+            cachedVendor = -1;
+            cachedProduct = -1;
+            cachedDebounce = 0;
             if (text != null) {
                 try {
                     JSONObject o = new JSONObject(text);
                     cachedRemote = o.optString("remote");
+                    cachedVendor = deviceId(o.isNull("vendor") ? null : o.opt("vendor"), "vendor");
+                    cachedProduct = deviceId(o.isNull("product") ? null : o.opt("product"), "product");
+                    cachedDebounce = Math.max(0, Math.min(MAX_DEBOUNCE_MS, o.optLong("debounce_ms", 0)));
                     JSONArray list = o.getJSONArray("buttons");
                     for (int i = 0; i < list.length(); i++) {
                         JSONObject b = list.getJSONObject(i);
@@ -72,15 +95,18 @@ final class RemoteKeys {
                 } catch (Exception e) {
                     AppLog.w("remote.json not read: " + e.getMessage());
                     out.clear();
+                    cachedVendor = -1;
+                    cachedProduct = -1;
+                    cachedDebounce = 0;
                 }
             }
             if (text == null && VESTEL) {
-                out.add(new Button("k" + KeyEvent.KEYCODE_STEM_1, Ui.tr("Botão Netflix", "Netflix button"), "com.netflix.ninja"));
+                out.add(new Button("k" + KeyEvent.KEYCODE_STEM_1, Strings.get(R.string.netflix_button), "com.netflix.ninja"));
             } else if (text == null && TCL) {
-                out.add(new Button("k4062", Ui.tr("Botão Netflix", "Netflix button"), "com.netflix.ninja"));
-                out.add(new Button("k190", Ui.tr("Botão YouTube", "YouTube button"), "com.google.android.youtube.tv"));
-                out.add(new Button("k4099", Ui.tr("Botão Prime Video", "Prime Video button"), "com.amazon.amazonvideo.livingroom"));
-                out.add(new Button("k4020", Ui.tr("Botão TCL Channel", "TCL Channel button"), ""));
+                out.add(new Button("k4062", Strings.get(R.string.netflix_button), "com.netflix.ninja"));
+                out.add(new Button("k190", Strings.get(R.string.youtube_button), "com.google.android.youtube.tv"));
+                out.add(new Button("k4099", Strings.get(R.string.prime_video_button), "com.amazon.amazonvideo.livingroom"));
+                out.add(new Button("k4020", Strings.get(R.string.tcl_channel_button), ""));
             }
             cached = out;
             return out;
@@ -111,11 +137,56 @@ final class RemoteKeys {
             if (b.id.equals(scan)) { found = b; break; }
             if (b.id.equals(key) && found == null) found = b;
         }
-        if (found == null) return false;
+        if (found == null) return HISENSE && keyCode == KeyEvent.KEYCODE_TV_INPUT && hisenseInputs(c, e);
+        if (!fromRemote(e)) return false;
         String action = action(found);
         if (action.isEmpty()) return false;
-        if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) run(c, action);
-        return true;
+        if (action.equals(INPUTS) && keyCode == KeyEvent.KEYCODE_TV_INPUT && inputsAnswered(c)) return false;   // the TV's own panel
+        if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) {
+            // Within debounce_ms of this button's last press it is the same press (a burst): consumed, not run again.
+            boolean again = burst(lastButton, lastDown, found.id, e.getEventTime(), cachedDebounce);
+            lastButton = found.id;
+            lastDown = e.getEventTime();
+            if (!again) run(c, action);
+        }
+        return true;   // down, repeats and up alike, debounced or not
+    }
+
+    /** When remote.json names a vendor or product, only keys from that device are ours. */
+    private static boolean fromRemote(KeyEvent e) {
+        if (cachedVendor < 0 && cachedProduct < 0) return true;
+        InputDevice device = e.getDevice();
+        return device != null && matches(cachedVendor, cachedProduct, device.getVendorId(), device.getProductId());
+    }
+
+    /** -1 matches any id. */
+    static boolean matches(int vendor, int product, int deviceVendor, int deviceProduct) {
+        return (vendor < 0 || vendor == deviceVendor) && (product < 0 || product == deviceProduct);
+    }
+
+    /** A press of the same button less than window ms after its last one (window 0: never). */
+    static boolean burst(String last, long lastDown, String id, long now, long window) {
+        return window > 0 && id.equals(last) && now - lastDown < window;
+    }
+
+    /**
+     * A vendor or product id from remote.json: a whole number as Android reports it (2391), or 1 to 4 hex digits as in
+     * the remote's .kl file name ("0957", "0x0957"). Null (absent): -1, any device. Anything else is refused, so a typo
+     * never opens the buttons to every device.
+     */
+    static int deviceId(Object v, String field) {
+        if (v == null) return -1;
+        int id = -1;
+        if (v instanceof Integer || v instanceof Long) {
+            long n = ((Number) v).longValue();
+            if (n >= 0 && n <= 0xFFFF) id = (int) n;
+        } else if (v instanceof String) {
+            String s = ((String) v).trim();
+            if (s.startsWith("0x") || s.startsWith("0X")) s = s.substring(2);
+            if (s.matches("[0-9A-Fa-f]{1,4}")) id = Integer.parseInt(s, 16);
+        }
+        if (id < 0) throw new IllegalArgumentException(field + " is not a device id: " + v);
+        return id;
     }
 
     static void run(Context c, String action) {
@@ -133,22 +204,116 @@ final class RemoteKeys {
             case "home":
                 return new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(c.getPackageName());
             case "settings":
-                return new Intent(Settings.ACTION_SETTINGS);
-            case "live":
-                return HomeApps.liveTv(c);
+                if (ANDROID_TV_SETTINGS_BRAND) {
+                    Intent own = new Intent(Settings.ACTION_SETTINGS).setPackage("com.android.tv.settings");
+                    if (own.resolveActivity(c.getPackageManager()) != null) return own;
+                }
+                return HomeApps.tvSettings(c);
+            case "live": {   // Live TV, or the HDMI input picked under Settings > Inputs > Live TV button (#60)
+                HomeApps.Item box = HomeApps.liveButtonInput(c);
+                if (box == null) return HomeApps.liveTv(c);
+                rememberInput(c, box.inputId);   // the remote's "next input" goes on from here
+                return HomeApps.inputIntent(c, box);
+            }
+            case INPUTS:   // the TV's inputs panel; with none (Hisense with its stock home off), our drawer on the inputs
+                if (inputsAnswered(c)) return new Intent(VIEW_INPUTS);
+                return new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(c.getPackageName())
+                        .putExtra("open", "inputs");
             case "tmdb:explore":    // a fresh Explore: whatever was open in it before is dropped
                 return new Intent().setClassName(c, ExploreActivity.class.getName()).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
             case "tmdb:watchlist":
                 return new Intent().setClassName(c, ExploreActivity.class.getName()).putExtra(ExploreActivity.EXTRA_SECTION, "watchlist")
                         .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            case NEXT_INPUT: {
+                HomeApps.Item next = nextInput(c);
+                if (next == null) return null;
+                android.widget.Toast.makeText(c, "HDMI " + next.number + (next.label.equals("HDMI " + next.number) ? "" : " · " + next.label),
+                        android.widget.Toast.LENGTH_SHORT).show();
+                return input(c, next.inputId);
+            }
             default:
-                if (action.startsWith("input:")) {
-                    return new Intent(Intent.ACTION_VIEW).setDataAndType(
-                            TvContract.buildChannelUriForPassthroughInput(action.substring("input:".length())),
-                            "vnd.android.cursor.item/channel");
-                }
+                if (action.startsWith("input:")) return input(c, action.substring("input:".length()));
                 return launchIntent(c.getPackageManager(), action);
         }
+    }
+
+    /** Each press goes to the next HDMI input (see nextInput), instead of one fixed input. */
+    static final String NEXT_INPUT = "input:next";
+
+    /** The TV's inputs panel, or the home screen's drawer on the inputs where nothing answers it (#55). */
+    static final String INPUTS = "inputs";
+    private static final String VIEW_INPUTS = "com.android.tv.action.VIEW_INPUTS";
+
+    /**
+     * Something answers the TV's inputs request. Hisense's firmware turns the Input key into it
+     * (HisensePhoneWindowHelper), and only the stock home screen's inputs panel answers: with that home screen off
+     * nothing does and the key is lost (Free My TV 5dbe7bf, fdabf9d). Flags 0, as upstream: any match counts.
+     */
+    static boolean inputsAnswered(Context c) {
+        return c.getPackageManager().resolveActivity(new Intent(VIEW_INPUTS), 0) != null;
+    }
+
+    /**
+     * Hisense's Input key with no Remote Buttons row: ours only while nothing answers it, then the drawer on the inputs
+     * (down and up consumed, as for the app keys). Only on Hisense: another firmware may open its own panel some other
+     * way, and both would come up. Needs the key service: the window never sees this key.
+     */
+    private static boolean hisenseInputs(Context c, KeyEvent e) {
+        if (inputsAnswered(c)) return false;
+        if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) run(c, INPUTS);
+        return true;
+    }
+
+    private static Intent input(Context c, String id) {
+        rememberInput(c, id);
+        return new Intent(Intent.ACTION_VIEW).setDataAndType(TvContract.buildChannelUriForPassthroughInput(id),
+                "vnd.android.cursor.item/channel");
+    }
+
+    /**
+     * The HDMI input after the last one this app opened, in port order. Android doesn't say which input is on screen,
+     * so the app remembers the one it opened last (here and from the home screen). A port takes part when a device on
+     * it is on, or when the person named it in the TV's settings (a PC that is off still counts); with none, every
+     * port does. TCL reports "connected standby" for a port with a device that is off and for an empty one alike.
+     */
+    static HomeApps.Item nextInput(Context c) {
+        List<HomeApps.Item> all = new ArrayList<>();
+        for (HomeApps.Item it : HomeApps.allInputs(c)) if (it.inputId != null) all.add(it);
+        if (all.isEmpty()) return null;
+        List<HomeApps.Item> ring = new ArrayList<>();
+        for (HomeApps.Item it : all) if (it.connected || !it.label.equals("HDMI " + it.number)) ring.add(it);
+        if (ring.isEmpty()) ring = all;
+        String last = lastInput(c);
+        int at = -1;
+        for (int i = 0; i < all.size(); i++) if (all.get(i).inputId.equals(last)) at = i;
+        HomeApps.Item pick = all.get(0);
+        for (int step = 1; step <= all.size(); step++) {
+            HomeApps.Item it = all.get((at + step + all.size()) % all.size());
+            if (ring.contains(it)) {
+                pick = it;
+                break;
+            }
+        }
+        StringBuilder log = new StringBuilder("next input: ");
+        for (HomeApps.Item it : all) {
+            log.append(it == pick ? "[" : "").append("HDMI ").append(it.number).append(it.connected ? " on" : "")
+                    .append(ring.contains(it) ? "" : " skipped").append(it.inputId.equals(last) ? " (last)" : "").append(it == pick ? "]" : "").append("; ");
+        }
+        AppLog.w(log.toString());
+        return pick;
+    }
+
+    /** Kept in a file: the key service and the home screen run in different processes. */
+    static void rememberInput(Context c, String id) {
+        try (java.io.FileOutputStream out = new java.io.FileOutputStream(new File(c.getFilesDir(), "last_input"))) {
+            out.write(id.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (java.io.IOException ignored) {
+        }
+    }
+
+    private static String lastInput(Context c) {
+        String s = TvConfig.read(new File(c.getFilesDir(), "last_input"));
+        return s == null ? "" : s.trim();
     }
 
     private static Intent launchIntent(PackageManager pm, String pkg) {

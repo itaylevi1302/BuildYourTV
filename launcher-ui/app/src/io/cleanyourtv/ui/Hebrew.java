@@ -51,6 +51,8 @@ final class Hebrew {
             case "Off ": return "כבויים";
             case "Off right now.": return "כבוי כרגע.";
             case "Language, clock, weather, city and theme of the home screen.": return "שפה, שעון, מזג אוויר, עיר וערכת העיצוב של מסך הבית.";
+            case "Which inputs (HDMI and others) show, and in what order.": return "אילו כניסות (HDMI ואחרות) מוצגות, ובאיזה סדר.";
+            case "Turns the TV off after the minutes you pick.": return "מכבה את הטלוויזיה אחרי מספר הדקות שבוחרים.";
             case "Which apps sit on the shelf, and in what order.": return "אילו אפליקציות יופיעו בדוק, ובאיזה סדר.";
             case "The first cards: what you started on Netflix and Stremio, with how far along you are.": return "הכרטיסים הראשונים במסך הבית: מה שהתחלת לראות ב־Netflix וב־Stremio, עם ההתקדמות.";
             case "Videos YouTube recommends for you, after Continue watching.": return "סרטונים ש־YouTube ממליץ לך עליהם, אחרי המשך צפייה.";

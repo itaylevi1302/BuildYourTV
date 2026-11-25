@@ -10,14 +10,25 @@ tools/trace.md first: it says which scenario to use and what can mislead.
 Recording needs nothing beyond tools/requirements.txt; the perfetto client already ships on Android 9
 and later. Set TV_HOST to the TV's IP (and TV_PORT if it is not 5555). Usage:
 
-    tools/trace.py home --runs 5 --out traces/before
-    tools/trace.py cold|coldsys|home|nav --runs N --out DIR [--package PKG] [--app COMPONENT]
-    tools/trace.py custom --setup 'input keyevent KEYCODE_HOME' --setup 'sleep 2' \\
-                          --step 'input keyevent KEYCODE_DPAD_RIGHT' --step 'sleep 1' --out DIR
+    tools/venv/bin/python -I tools/trace.py home --runs 5 --out traces/before
+    tools/venv/bin/python -I tools/trace.py cold|coldsys|home|nav --runs N --out DIR [--package PKG] [--app COMPONENT]
+    tools/venv/bin/python -I tools/trace.py custom --setup 'input keyevent KEYCODE_HOME' --setup 'sleep 2' \
+                                         --step 'input keyevent KEYCODE_DPAD_RIGHT' --step 'sleep 1' --out DIR
 
 --out DIR is the folder the traces go into; it is created if it is not there. A file where the folder
-goes, a path through a file, and an empty --out are refused as argument errors (exit 2) before the TV is
-asked anything, so a typo cannot read as a recording that failed.
+goes, a path through a file, an empty --out, and a name the filesystem will not look at are refused as
+argument errors (exit 2) before the TV is asked anything, so a typo cannot read as a recording that
+failed. Started with a Python that lacks the packages, it runs again under tools/venv's Python, or says
+how to make that venv, the way tools/bench.py does.
+
+Exit status: 0 every run is recorded and written; 2 an argument this run cannot use (an --out that is a
+file or passes through one, an empty --out, a name the filesystem will not look at, a --package or --app
+that is not one, --runs outside 1 to 50)
+and a TV that cannot be reached - tools/tv.py's own sentence is printed, whether it refused the target as
+it was imported (no TV_HOST, a TV_PORT that is not a port number) or connect_error() worded the failure -
+both judged before anything is recorded, so nothing was written and --out was not made; 1 a recording that
+started and then failed. A recording still running after 60 completion checks is not pulled or published;
+any previous local trace is kept, and the remote recording is left alone.
 
 Scenarios (setup runs before the recording starts, so it stays out of the trace):
     cold     another app in front, the launcher force-stopped, then started with `am start -W`
@@ -28,16 +39,26 @@ Scenarios (setup runs before the recording starts, so it stays out of the trace)
 """
 import argparse
 import base64
+import contextlib
+import errno
+import importlib.util
 import json
+import math
 import os
 from pathlib import Path
 import re
+import shutil
+import stat
 import sys
+import tempfile
 import time
 
 PACKAGE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$")
 COMPONENT = re.compile(r"^[A-Za-z][A-Za-z0-9_.]*/[A-Za-z0-9_.$]+$")
 REMOTE = "/data/misc/perfetto-traces/cleanyourtv.pftrace"   # the folder perfetto may write to on Android 9 and 10
+# Set on the run that starts again under tools/venv's Python, so a venv without the package answers with
+# the line to run instead of starting a third process. tv.py carries the same marker for the same reason.
+VENV_MARKER = "CLEANYOURTV_TRACE_PY_VENV"
 NAV_KEYS = ("RIGHT RIGHT RIGHT LEFT LEFT LEFT DOWN RIGHT DOWN LEFT DOWN UP "
             "UP RIGHT UP LEFT DOWN DOWN RIGHT RIGHT UP UP UP LEFT").split()
 START_MARGIN_S = 3    # recording starts in the background; give it time before the first step
@@ -88,10 +109,23 @@ def perfetto_config(package, duration_ms):
     return buffers + b"".join(_field(2, _field(1, source)) for source in sources) + _field(3, int(duration_ms))
 
 
+def sleep_seconds(command):
+    """A standalone literal sleep, in seconds; None for a command that must run on the TV."""
+    # A shell comment needs whitespace before '#'; inside an argument it is literal. Match only
+    # this simple command, so a newline or separator cannot hide later commands from the TV.
+    match = re.fullmatch(
+        r"sleep[ \t]+(?P<quote>['\"]?)(?P<number>\+?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)"
+        r"(?:[eE][+-]?[0-9]+)?)(?P<unit>[smhd]?)(?P=quote)(?:[ \t]+#[^\r\n]*)?", command.strip())
+    if not match:
+        return None
+    seconds = float(match["number"]) * {"": 1, "s": 1, "m": 60, "h": 3600, "d": 86400}[match["unit"]]
+    return seconds if math.isfinite(seconds) else None
+
+
 def recording_ms(steps):
-    """How long to record: the steps' sleeps plus a margin either side."""
-    slept = sum(float(s.split()[1]) for s in steps if re.fullmatch(r"sleep \d+(\.\d+)?", s.strip()))
-    return int((START_MARGIN_S + slept + END_MARGIN_S) * 1000)
+    """How long to record: the steps' literal sleeps plus margins, rounded up to whole milliseconds."""
+    slept = math.fsum(seconds for step in steps if (seconds := sleep_seconds(step)) is not None)
+    return math.ceil((START_MARGIN_S + slept + END_MARGIN_S) * 1000)
 
 
 def scenario(name, launcher_component, other_component, setup=(), steps=()):
@@ -115,6 +149,27 @@ def scenario(name, launcher_component, other_component, setup=(), steps=()):
     return list(setup), list(steps)
 
 
+def looked_at(path):
+    """Which of four things a path the reader typed is, and why the filesystem would not say.
+
+    ('folder' | 'other' | 'missing', None), or ('refused', why). Path.exists() and .is_dir() re-raise the
+    OSError for a name the filesystem will not stat - a name over NAME_MAX, a folder this user may not
+    traverse - so --out of that shape came out of argparse's type call as a traceback with exit 1, the status
+    this file keeps for a recording that started and then failed, on 3.11, 3.12, 3.13 and 3.14 alike. Judged
+    once, with the reason, both shapes below become the argument error they were meant to be.
+    """
+    try:
+        info = os.stat(path)
+    except OSError as error:
+        # What Path.exists() answers with False for: nothing is there, or nothing that is a folder.
+        if error.errno in (errno.ENOENT, errno.ENOTDIR, errno.ELOOP, errno.EBADF):
+            return "missing", None
+        return "refused", (error.strerror or str(error))
+    except ValueError:      # a NUL in the name, which os.stat refuses before the filesystem sees it
+        return "missing", None
+    return ("folder" if stat.S_ISDIR(info.st_mode) else "other"), None
+
+
 def traces_folder(value):
     """--out as the folder the traces go into, judged before anything is asked of the TV.
 
@@ -123,16 +178,27 @@ def traces_folder(value):
     thrown from main() after the TV has answered the Home query and the model was read, so the reader
     cannot tell their argument from a recording that failed. Refusing here makes it an argument error
     like --runs or --app, with the run never reaching the TV. A folder that does not exist yet is fine:
-    makedirs() creates it, as the default traces/ always has.
+    makedirs() creates it, as the default traces/ always has. A name the filesystem will not look at - the
+    fourth shape, seen on a 280-character folder and on one this user may not traverse - is refused here
+    too, since exists()/is_dir() re-raise that OSError from argparse's own type call.
     """
     if not value:
         raise argparse.ArgumentTypeError("--out is empty: name the folder for the traces, e.g. --out traces/before")
     path = Path(value)
-    if path.exists() and not path.is_dir():
+    answer, why = looked_at(path)
+    if why:
+        raise argparse.ArgumentTypeError(f"{value} cannot be looked at ({why}), and --out is the folder the "
+                                         f"traces go into: nothing was recorded and the TV was not asked")
+    if answer == "other":
         raise argparse.ArgumentTypeError(f"{value} is a file, and --out is the folder the traces go into: "
                                          f"nothing could be recorded into it")
     for parent in path.parents:
-        if parent.exists() and not parent.is_dir():
+        answer, why = looked_at(parent)
+        if why:
+            raise argparse.ArgumentTypeError(f"{value} cannot be looked at: {parent} is a folder the filesystem "
+                                             f"will not look at ({why}), so the folder the traces go into cannot "
+                                             f"be made")
+        if answer == "other":
             raise argparse.ArgumentTypeError(f"{value} passes through the file {parent}, so the folder the "
                                              f"traces go into cannot be made")
     return value
@@ -163,6 +229,28 @@ def parse(argv):
     return args
 
 
+@contextlib.contextmanager
+def trace_output(path):
+    """Stage a trace or its metadata, then publish it before removing the staging folder."""
+    folder, name = os.path.split(os.path.abspath(path))
+    published = False
+    try:
+        with tempfile.TemporaryDirectory(prefix=".trace-", dir=folder) as staging:
+            part = os.path.join(staging, name)
+            yield part
+            if os.path.isfile(path):
+                shutil.copymode(path, part)
+            os.replace(part, path)
+            published = True
+    except OSError as error:
+        if not published:
+            raise
+        # The complete file is already in place. A local cleanup failure must not stop metadata
+        # or later recordings, or make this successful recording read as a failed download.
+        print(f"warning: {path} was written, but its staging folder could not be removed "
+              f"({error.strerror or error}).", file=sys.stderr)
+
+
 def record_one(dev, setup, steps, package, out_path, run_shell=None):
     """Run the setup, record while the steps run, then pull the trace to out_path."""
     run_shell = run_shell or (lambda cmd: dev.shell(cmd, read_timeout_s=120.0))
@@ -184,12 +272,16 @@ def record_one(dev, setup, steps, package, out_path, run_shell=None):
         if run_shell(alive).strip() != "running":
             break
         time.sleep(1)
-    dev.pull(REMOTE, out_path, transport_timeout_s=300.0, read_timeout_s=300.0)
-    run_shell(f"rm -f {REMOTE}")
-    size = os.path.getsize(out_path)
-    if size == 0:
-        os.remove(out_path)
-        raise RuntimeError("perfetto wrote an empty trace; run with --runs 1 and see tools/trace.md")
+    else:
+        raise RuntimeError("perfetto is still running after the completion wait; no trace was pulled")
+    # A failed or empty pull must not truncate an earlier recording. Stage on the same filesystem so
+    # the completed trace replaces it only after the download and remote cleanup both succeed.
+    with trace_output(out_path) as part:
+        dev.pull(REMOTE, part, transport_timeout_s=300.0, read_timeout_s=300.0)
+        run_shell(f"rm -f {REMOTE}")
+        size = os.path.getsize(part)
+        if size == 0:
+            raise RuntimeError("perfetto wrote an empty trace; run with --runs 1 and see tools/trace.md")
     return size
 
 
@@ -210,24 +302,102 @@ def other_app(shell, package):
 
 def _run(run_shell, cmd):
     """A step: `sleep N` waits here (an adb shell sleep would block the connection), anything else runs on the TV."""
-    m = re.fullmatch(r"sleep (\d+(?:\.\d+)?)", cmd.strip())
-    if m:
-        time.sleep(float(m.group(1)))
+    seconds = sleep_seconds(cmd)
+    if seconds is not None:
+        time.sleep(seconds)
     else:
         run_shell(cmd)
 
 
+def venv_python():
+    """tools/venv's interpreter, which has adb_shell, or None."""
+    here = Path(__file__).resolve().parent
+    for candidate in (here / "venv" / "bin" / "python", here / "venv" / "Scripts" / "python.exe"):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def client_python_or_exit():
+    """Run again under tools/venv's Python when this one has no adb_shell, or say how to make that venv.
+
+    tv.py, imported below for connect(), the shell and its timeouts, imports adb_shell, and the README
+    installs that into tools/venv only. This file is started both ways: the pages print
+    `tools/venv/bin/python -I tools/trace.py home ...`, and a reader who has just cloned the repository
+    types `python3 tools/trace.py home`. That second run ended in a ModuleNotFoundError traceback out of
+    `import tv`, naming neither tools/requirements.txt nor the venv sitting next to it - while bench.py
+    re-execs itself the same way and tv.py, check.py, privacy.py and recovery.py each answer with the
+    line to run. This is the third place the client is imported, so it answers like they do.
+    """
+    if importlib.util.find_spec("adb_shell") is not None:
+        return
+    venv = venv_python()
+    # Once only, marked in the environment as tv.py does: a venv that lacks adb_shell as well gets the
+    # line below rather than another run of itself. (tools/venv/bin/python is often a symlink to the very
+    # interpreter that started this run, so comparing the two paths would skip the venv that has the
+    # package while the one in hand does not.)
+    if venv and not os.environ.get(VENV_MARKER):
+        os.environ[VENV_MARKER] = "1"
+        # -I as in the printed commands, so a module beside the checkout cannot stand in for adb_shell.
+        os.execv(str(venv), [str(venv), "-I", os.path.abspath(__file__), *sys.argv[1:]])
+    make = (r"python -m venv tools\venv; tools\venv\Scripts\python.exe -m pip install -r tools\requirements.txt"
+            if os.name == "nt" else
+            "python3 -m venv tools/venv && tools/venv/bin/pip install -r tools/requirements.txt")
+    sys.exit("tools/trace.py needs the packages in tools/requirements.txt (No module named 'adb_shell').\n"
+             f"run: {make}")
+
+
 def main(argv=None):
+    # A console code page such as cp1252 cannot print every name; print a replacement character instead of stopping.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
     args = parse(sys.argv[1:] if argv is None else argv)
     # Imported only now, so --help and argument errors work without TV_HOST set.
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    # Only a run that started this file as a script may start it again: main(argv) is called by
+    # tests/test_trace.py with a faked TV, and sys.argv there is the test runner's own command line
+    # (`python3 -m unittest discover -s tests`), which execv would hand to trace.py's parser as
+    # 'invalid choice: discover'. A caller that passes its arguments owns the interpreter.
+    if argv is None:
+        client_python_or_exit()
     import bench  # noqa: E402  the accessibility helpers bench.py already tested
-    import tv  # noqa: E402
+    try:
+        import tv  # noqa: E402
+    except SystemExit as exit_request:
+        # tv.py refuses two shapes while it is imported, before it has a connection: no TV_HOST
+        # ("Set TV_HOST to your TV's IP address") and a TV_PORT it cannot read ("not a port number:
+        # 'abc'", which is also what a `:port` in the address with a bad or out-of-range number gets).
+        # The interpreter answers such a text with 1 - the status this file keeps for a recording that
+        # started and then failed - so a run that never reached the TV read as one whose trace was
+        # lost, which is the one thing a perf-ab comparison has to tell apart. 2 is what the docstring
+        # promises for "a TV that cannot be reached" and what the connect() handler below answers.
+        # tv.py's own text is printed here; a client module that exits 0 answered the call itself, and
+        # that status stands (the branch tools/theme_restart.py keeps).
+        if not exit_request.code:
+            raise
+        if isinstance(exit_request.code, str):
+            print(exit_request.code, file=sys.stderr)
+        print(f"Nothing was recorded: {args.out} is made when the first run starts.", file=sys.stderr)
+        raise SystemExit(2) from exit_request
 
     try:
         dev = tv.connect()
-    except OSError as e:
-        sys.exit(f"cannot reach the TV at {tv.HOST}:{tv.PORT} ({e}). Is it on and awake, with network debugging on?")
+    except Exception as error:
+        # tv.py words the failures that mean the TV was not reached: a port that refuses, a Wireless
+        # debugging port that asks for TLS, an address nothing answers on, and the macOS Local Network
+        # denial that looks like one. This file answered those with a line of its own and exit 1 - the
+        # status a recording that started and then failed leaves - and it caught only OSError, so the TLS
+        # one (adb_shell's InvalidCommandError is not an OSError) ended in a traceback. bench.py, check.py
+        # and b64push.py answer both with tv.py's sentence and exit 2. The errors tv.py has nothing to add
+        # to (a key file it cannot read, a reset in the handshake) keep their traceback.
+        why = tv.connect_error(error)
+        if why is None:
+            raise
+        print(f"{why}\nNothing was recorded: {args.out} is made when the first run starts.", file=sys.stderr)
+        raise SystemExit(2) from error
     shell = lambda cmd: dev.shell(cmd, read_timeout_s=120.0)
     try:
         home = shell("cmd package resolve-activity --brief -a android.intent.action.MAIN "
@@ -251,10 +421,12 @@ def main(argv=None):
             for run in range(1, args.runs + 1):
                 path = os.path.join(args.out, f"{args.scenario}-{run}.pftrace")
                 size = record_one(dev, setup, steps, args.package, path, shell)
-                with open(path[:-len(".pftrace")] + ".json", "w") as f:
-                    json.dump({"scenario": args.scenario, "run": run, "package": args.package,
-                               "launcher": launcher, "other_app": other, "setup": setup, "steps": steps,
-                               "tv": about, "recorded": time.strftime("%Y-%m-%dT%H:%M:%S")}, f, indent=1)
+                sidecar = path[:-len(".pftrace")] + ".json"
+                with trace_output(sidecar) as part:
+                    with open(part, "w") as f:
+                        json.dump({"scenario": args.scenario, "run": run, "package": args.package,
+                                   "launcher": launcher, "other_app": other, "setup": setup, "steps": steps,
+                                   "tv": about, "recorded": time.strftime("%Y-%m-%dT%H:%M:%S")}, f, indent=1)
                 print(f"{path}: {size} bytes")
         finally:
             if helpers:
@@ -268,7 +440,7 @@ class _Shell:
     """What bench.py's accessibility helpers expect of a TV: a shell()."""
 
     def __init__(self, run):
-        self.shell = lambda cmd, read_timeout_s=None: run(cmd)
+        self.shell = lambda cmd, read_timeout_s=None, retry=False: run(cmd)
 
 
 if __name__ == "__main__":

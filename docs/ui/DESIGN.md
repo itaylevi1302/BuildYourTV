@@ -33,7 +33,17 @@ segunda tela inicial, inspirada no [Free My TV](https://github.com/simbasjungles
 
 - Home: "Para você" com 3 sugestões por hora (TMDB, só de serviços instalados ou mapeados), abas Filmes/Séries,
   prateleira de vidro, Entradas, clima, tema dia/noite pelo pôr do sol, screensaver com fotos e relógio.
-- Ajustes na TV: Ajustes do Início, Prateleira, **Botões do Controle**, **Recomendações**, Ajustes da TV.
+- Ajustes na TV: Ajustes do Início, Prateleira, **Entradas**, **Botões do Controle**, **Recomendações**, Ajustes da TV.
+- **Ao ligar** (Ajustes do Início, #61): só depois de ligar do zero (um novo `Settings.Global.BOOT_COUNT`, sem
+  permissão nem receiver de boot), nunca ao sair do standby. *Escolha da TV* (padrão) não muda nada; *TV ao Vivo* abre
+  a TV ao vivo 10 s depois que o Início aparece, se nenhuma tecla chegou antes; *Início* traz o Início de volta quando
+  outro app toma a tela até 5 s depois dele aparecer. Sem o ADB do Free My TV não dá para saber das teclas apertadas em
+  outros apps, por isso a janela curta. TV que liga em standby depois de queda de energia: conta a partir de quando a
+  tela acende (Free My TV PR 489).
+  **Entradas** (#60, Free My TV 9ee0103 e eb2fbfb) é o editor da prateleira sobre a TV ao vivo e as HDMI: OK mostra ou
+  esconde, ← → muda a ordem, e a gaveta segue; até ser usado, nada muda. A primeira linha, quando algum botão do
+  controle roda `live`, escolhe o que ele abre: a TV ao vivo ou uma entrada HDMI (no Free My TV é o botão de cima, que
+  aqui não existe).
 - Sai do Free My TV: a troca Free/Original pelo app, o cliente ADB interno (`Adb.java`), o `HomeMode` e o
   `Watchdog`, que dependem do ADB aberto. A volta ao original é `tools/restore.sh`, como no CleanYourTV.
 
@@ -61,8 +71,20 @@ Formato do `examples/tcl-55c725/remote.json` (o seu controle, já levantado):
 voltar e Home ficam `native`.)
 
 Ações possíveis de um botão configurável: um app (inclusive de celular, como o Tomato), `input:<id>` (uma entrada
-HDMI), `live` (TV ao vivo), `settings`, `tmdb:watchlist`, ou vazio (o botão faz o que fazia). A tela **Botões do
+HDMI), `live` (TV ao vivo), `settings`, `tmdb:watchlist`, `inputs` (o painel de entradas da TV, ou a gaveta do Início
+nas entradas quando nada atende o `VIEW_INPUTS`), ou vazio (o botão faz o que fazia). A tela **Botões do
 Controle** só lista os `configurable`; os `native` nunca aparecem nem são interceptados.
+
+Campos opcionais no topo do arquivo (#50, vindos do Free My TV): `vendor` e `product` (número como o Android informa,
+`2391`, ou hex como no nome do `.kl`, `"0957"`) fazem só as teclas daquele controle contarem, e o `BUTTON_3` de um
+gamepad, teclado ou outro controle segue normal; `debounce_ms` (0 a 5000) faz uma rajada do mesmo botão dentro desse
+tempo valer um toque só (controle Xiaomi: `1000`). Sem eles, nada muda. Um `vendor`/`product` inválido faz o arquivo
+inteiro ser ignorado (no log: `remote.json not read`).
+
+Na Hisense, o firmware troca a tecla Input (`KEYCODE_TV_INPUT`, 178) pelo `com.android.tv.action.VIEW_INPUTS`, que só
+o painel da Home original atende; com ela desativada a tecla não fazia nada. Com o serviço ligado, ela abre o Início
+com a gaveta nas entradas, só enquanto nada atende o `VIEW_INPUTS` (Free My TV 5dbe7bf, fdabf9d; #55). Uma linha
+`configurable` para a tecla 178 decide no lugar (`""` deixa a tecla com a TV); uma `native` não desliga isso.
 
 O serviço de acessibilidade que lê os botões é ligado pelo `build-and-install.sh` (`HOME_KEY_SERVICE=1`), como no
 CleanYourTV, e funciona com o ADB desligado depois.

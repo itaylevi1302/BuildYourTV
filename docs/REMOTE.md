@@ -90,14 +90,28 @@ scan your own network for it.
 **TVs that only offer Wireless debugging** (some Google TV sets): mDNS discovery doesn't cross the
 tunnel, so they read you three things from Developer options > Wireless debugging: the IP address
 and port on that screen, and, under Pair device with pairing code, the pairing port and the code.
-With the stock `adb`:
+Pair and connect once with the stock `adb`:
 
 ```bash
 adb pair 100.x.y.z:<pairing port> <code>
 adb connect 100.x.y.z:<connect port>
-adb -s 100.x.y.z:<connect port> tcpip 5555
-TV_HOST=100.x.y.z tools/tv.py --probe
 ```
+
+Two routes reach the TV from there, and only one of them opens the plaintext port. Through the
+pairing itself, with nothing else listening: point `TV_ADB_BINARY` at that same `adb`, keep `TV_HOST`
+as the connection port on the screen, and the tools run over the paired transport
+([tools/native-adb.md](../tools/native-adb.md)):
+
+```bash
+export TV_ADB_BINARY=/absolute/path/to/adb
+TV_HOST=100.x.y.z:<connect port> tools/venv/bin/python -I tools/tv.py --probe
+```
+
+Or open port 5555 and use the client's usual path: `adb -s 100.x.y.z:<connect port> tcpip 5555`, then
+`TV_HOST=100.x.y.z tools/tv.py --probe`. Port 5555 usually closes at the next reboot and whenever
+Wireless debugging is toggled, and the session does both (Afterwards below reboots the TV), so that
+`tcpip` line comes back each time; the paired route has nothing to reopen, and nothing listening on
+5555 to close before you leave.
 
 With option B, use the TV's local address instead of `100.x.y.z`.
 
@@ -112,6 +126,20 @@ With option B, use the TV's local address instead of `100.x.y.z`.
   updates) are theirs to answer, and so is what's plugged into the USB ports.
 - **Leave the restore script with them**, or at least keep it where you can run it the next time
   you're connected.
+- **With option A, make sure Tailscale survives a reboot** before you close ADB. Google TV has no VPN
+  screen in Settings, so make Tailscale the always-on VPN over ADB, reboot once, and check that the
+  `100.x.y.z` address answers again:
+
+  ```bash
+  TV_HOST=<tv ip> tools/venv/bin/python -I tools/tv.py 'settings put secure always_on_vpn_app com.tailscale.ipn'
+  TV_HOST=<tv ip> tools/venv/bin/python -I tools/tv.py 'settings put secure always_on_vpn_lockdown 0'
+  ```
+
+  `lockdown 0` leaves the internet working when Tailscale is down. On a
+  [TCL 43P755](../examples/tcl-g03-google-tv/debloat.txt) (Google TV 11, AR11) Tailscale started at
+  boot but did not reconnect, even with TCL's `APP_AUTO_START` app-op allowed; with always-on set, it
+  was back on its tailnet address about 90 seconds after the next boot. Undo:
+  `settings put secure always_on_vpn_app ""`.
 
 ## Afterwards
 
@@ -138,4 +166,7 @@ before you remove the access: once the tunnel is gone, nobody can check from out
 3. Then remove the access: they revoke the share, or you remove the TV or the helper from your tailnet
    (or turn off its routes) in the admin console. Uninstall Tailscale from the TV unless they use it.
 
-Did this on a TV where something worked differently? Add a line here in a pull request.
+Did this on a TV where something worked differently? Add a line here in a pull request, and keep
+`100.x.y.z` as the address in it: the numbers the TV's Tailscale app shows identify that one set, and a
+page naming them points every reader at somebody's home. `tests/test_doc_addresses.py` refuses a real one
+in the pages, lists and guides this repo ships.

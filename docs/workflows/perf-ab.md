@@ -46,7 +46,8 @@ Some notes on the numbers:
 - **Noise:** two runs of the same build on a TCL C755 differed by 0 ms in key response, up to 45 ms in
   cold start and 1 MB in PSS, and the limits sit above that. Rerun both builds if a field lands near
   its limit.
-- **Run time:** a full run takes about 6 minutes.
+- **Run time:** a full run takes about 6 minutes, and the TV has to stay awake for it: a set that goes to
+  standby drops ADB, and the run stops there without writing `result.json`.
 - **TVs that don't log injected keys:** `return_to_home_ms` is `null`, and `response_ms` includes the ADB
   round trip. It still compares two builds on the same TV.
 
@@ -106,15 +107,18 @@ tools/venv/bin/python tools/trace_report.py traces/before --vs traces/after --ma
 ```bash
 tools/venv/bin/python tools/flamechart.py traces/before traces/after \
     --highlight '<the slices from step 1>' \
-    --subtitle '<TV>, <Android version> · magenta: <what they are>' --out chart.png
+    --subtitle '<TV>, <Android version> · magenta: <what they are>' --out work/chart.png
 ```
 
 For a change to Home, add the frames after the start:
 
 ```bash
 tools/venv/bin/python tools/flamechart.py traces/before traces/after \
-    --window start:1500 --threads RenderThread --highlight '^DrawFrame' --out frames.png
+    --window start:1500 --threads RenderThread --highlight '^DrawFrame' --out work/frames.png
 ```
+
+Both pictures are written into `work/`, the folder step 1's bench results already sit in and which git
+keeps out of the tree: `mkdir -p work` first if you skipped that check.
 
 ## 6. Screenshots
 
@@ -143,4 +147,5 @@ example:
 - **The charts:** each with its `--highlight` stated.
 - **The screenshots:** the pair from `screendiff.py` and its result.
 - **The behaviour checks:** what you checked and what you saw.
-- **Leave out** `traces/` and raw screenshots: they're large and hold your TV's details.
+- **Leave out** `traces/` and raw screenshots: they're large and hold your TV's details. The charts
+  are drawn into `work/` for the same reason: they belong in the description, not in the tree.

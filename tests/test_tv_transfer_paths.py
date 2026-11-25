@@ -225,8 +225,12 @@ class TransferPathsTest(unittest.TestCase):
         status, out, err, opened, sent = self.run_tv(["--pull", "/sdcard/s.png", str(target)])
         self.assertEqual(0, status, err)
         self.assertEqual("192.0.2.1:5555", opened)
-        self.assertEqual([f"pull /sdcard/s.png -> {target}"], sent)
+        self.assertEqual(1, len(sent), sent)
+        # The pull goes into a file of its own beside the target, which replaces it once the pull is done
+        # (tests/test_tv_pull_failure.py).
+        self.assertTrue(sent[0].startswith(f"pull /sdcard/s.png -> {target.parent}"), sent)
         self.assertTrue(target.exists(), "the stub wrote the file where the run was told to")
+        self.assertEqual(["s.png"], os.listdir(target.parent))
 
     def test_the_judgement_runs_before_the_connection_is_made(self):
         source = SCRIPT.read_text(encoding="utf-8")
@@ -243,6 +247,19 @@ class TransferPathsTest(unittest.TestCase):
         self.assertIn("2 it was refused before anything ran on the TV", out)
         self.assertIsNone(opened)
         self.assertEqual([], sent)
+
+    def test_a_pull_to_a_blank_name_is_refused(self):
+        # `--pull <remote> "$OUT"` with OUT holding a space: the file was written as "   " and the run said
+        # "pulled", exit 0.
+        self.assertRefused(["--pull", "/data/local/tmp/x.txt", "   "], "--pull's local file is blank")
+
+    def test_a_pull_to_a_name_that_is_a_folder_is_refused_before_the_tv_is_opened(self):
+        # The folder is not there yet, so isdir() said no; os.replace() was the first to fail, after the
+        # TV had sent the file.
+        for local in ("not-made-yet/", "not-made-yet/.", "not-made-yet/.."):
+            with self.subTest(local=local):
+                self.assertRefused(["--pull", "/data/local/tmp/x.txt", str(self.files) + "/" + local],
+                                   "names a folder", "Nothing was pulled.")
 
 
 if __name__ == "__main__":

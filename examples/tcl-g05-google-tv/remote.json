@@ -1,0 +1,15 @@
+{
+  "remote": "TCL remote (G05_4K_GB board)",
+  "device": "Vendor_3697_Product_0001 (IR receiver), TCL Smart TV Pro (G05)",
+  "note": "Scancodes are KeyEvent.getScanCode() as seen by an accessibility key filter (`RemoteKeyService`), not the raw MSC_SCAN from `getevent -lt` - on this board the two differ (gear: MSC_SCAN 0xf30/3888, but KeyEvent.getScanCode() 561, keyCode 4077; TV: MSC_SCAN 0x16d, but KeyEvent.getScanCode() 365, keyCode 4001). The gear and app-button scancodes match the same board's note in docs/devices/tcl-55c728-g05-4k-gb.md (Netflix 566, Prime Video 752). Native buttons are listed for reference and never intercepted.",
+  "buttons": [
+    { "name": "Gear", "scan": 561, "label": "KEYCODE_4077", "kind": "configurable", "default": "settings" },
+    { "name": "Live TV", "scan": 365, "label": "KEYCODE_4001", "kind": "configurable", "default": "live" },
+    { "name": "Netflix", "scan": 566, "label": "0x236", "kind": "configurable", "default": "com.netflix.ninja" },
+    { "name": "Prime Video", "scan": 752, "label": "0x2f0", "kind": "configurable", "default": "com.amazon.amazonvideo.livingroom" },
+    { "name": "Globoplay", "scan": 586, "label": "0x24a", "kind": "configurable", "default": "com.globo.globotv" },
+    { "name": "Disney+", "scan": 762, "label": "0x2fa", "kind": "configurable", "default": "com.disney.disneyplus" },
+    { "name": "YouTube", "scan": 569, "label": "0x239", "kind": "configurable", "default": "com.google.android.youtube.tv" },
+    { "name": "TCL Channel", "scan": 456, "label": "0x1c8", "kind": "configurable", "default": "com.tcl.waterfall.overseas" }
+  ]
+}

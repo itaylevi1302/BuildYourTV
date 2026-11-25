@@ -1,0 +1,32 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <!-- The only permission: the four films' video files (archive.org, download.blender.org). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application android:allowBackup="false" android:banner="@drawable/banner"
+        android:icon="@mipmap/ic_launcher" android:label="@string/app_name"
+        android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".PlayerActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="openmovies" android:host="play" />
+            </intent-filter>
+        </activity>
+        <!-- Watch provider, spec 1 (docs/specs/provider.md): CleanYourTV UI lists it under "Where to watch". -->
+        <provider android:name=".WatchProvider"
+            android:authorities="io.cleanyourtv.example.openmovies.watch"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="io.cleanyourtv.action.WATCH_PROVIDER" />
+            </intent-filter>
+            <meta-data android:name="io.cleanyourtv.watch_provider" android:resource="@xml/watch_provider" />
+        </provider>
+    </application>
+</manifest>

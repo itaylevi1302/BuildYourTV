@@ -54,7 +54,7 @@ not resolved in spec 1 and make the card invalid, so a card is not localisable i
 | :- | :- | :- |
 | `spec` | yes | Decimal integer. This launcher reads spec `1`. Any other value: the card is ignored, with one log line. |
 | `label` | yes | 1 to 24 characters from `A-Z a-z 0-9` space `. & + ' -`, no leading or trailing space, at least one letter or digit. See the reserved names below. |
-| `caption` | no | Up to 32 characters from the same set. Shown after the label while the card is focused in the grid. The name line under the tile is one line; label and caption together show about 26 characters on a 4 column grid, so keep the caption to a few words. |
+| `caption` | no | Up to 32 characters from the same set, no leading or trailing space. Shown after the label while the card is focused in the grid. The name line under the tile is one line; label and caption together show about 26 characters on a 4 column grid, so keep the caption to a few words. |
 | `accent` | no | `#RRGGBB`. The ambient glow colour while the card is focused in the dock. |
 
 The resource compiler stores some attribute values in a typed form; the launcher accepts the forms
@@ -151,7 +151,9 @@ any violation drops that one card, with a log line and no other effect.
    signing key needs no new prompt.
 9. Launch. A card launches the declaring activity by explicit component with no extras and no data,
    the same way every tile is launched. No field of a card can name an intent, a URI, a class or a
-   package. Holding OK on a card opens the app's App info page, like any tile.
+   package. Holding OK on a card opens the same tile menu a tile opens (`tile_menu`, on by default
+   since launcher 3.3: Move, Remove from Home with `app_library`, and App info where the firmware has
+   that page); with `tile_menu` off it opens the app's App info page, as it did before.
 10. Off switch. `module_cards` in `config.xml` or the `config.json` theme overlay (default `true`). When `false` the launcher never looks
     for cards, never asks, and the Module cards list only says that none are installed.
 

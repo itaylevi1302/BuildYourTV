@@ -55,8 +55,10 @@ import java.util.concurrent.Executors;
  * it, Right or Back closes it). The menu starts with Explore and its settings button, then Search, Home and My list;
  * the rest is the person's to order or hide in Settings. The background is the focused title's picture, softly
  * blurred. With EXTRA_SECTION = "watchlist" (the remote's bookmark button) it opens on My list.
+ * Lists stay the same for Tmdb.LIST_TTL; Up twice at the top of a page reloads it from TMDB (Tmdb.refreshLists).
+ * Holding OK on a title opens TitleMenu (seen, My list, favorites, lists).
  */
-public class ExploreActivity extends Activity {
+public class ExploreActivity extends Activity implements TitleMenu.Host {
     static final String EXTRA_SECTION = "section";
     private static final String HOME = "home", SEARCH = "search", LIST = "watchlist", TOP = "top", MOVIES = "movie",
             SHOWS = "tv", KIDS = "kids", ANIME = "anime", CATS = "categories", SETTINGS = "settings", SERVICE = "service:",
@@ -66,35 +68,47 @@ public class ExploreActivity extends Activity {
     private static final long HERO_MS = 9000;
     private static final int HERO_H = 720, HERO_BLEED = 144, INSET = 120;
 
-    /**
-     * Categories: key, Portuguese, English, movie genre, show genre, keyword, origin country, original language (to
-     * filter search results, which TMDB doesn't filter).
-     */
-    private static final String[][] GENRES = {
-        {"acao", "Ação", "Action", "28", "10759", null, null, null},
-        {"aventura", "Aventura", "Adventure", "12", "10759", null, null, null},
-        {"anime", "Anime", "Anime", "16", "16", "210024", null, "ja"},
-        {"animacao", "Animação", "Animation", "16", "16", null, null, null},
-        {"comedia", "Comédia", "Comedy", "35", "35", null, null, null},
-        {"crime", "Crime", "Crime", "80", "80", null, null, null},
-        {"documentarios", "Documentários", "Documentaries", "99", "99", null, null, null},
-        {"drama", "Drama", "Drama", "18", "18", null, null, null},
-        {"familia", "Família", "Family", "10751", "10751", null, null, null},
-        {"fantasia", "Fantasia", "Fantasy", "14", "10765", null, null, null},
-        {"ficcao", "Ficção científica", "Sci-fi", "878", "10765", null, null, null},
-        {"guerra", "Guerra", "War", "10752", "10768", null, null, null},
-        {"historia", "História", "History", "36", null, null, null, null},
-        {"infantil", "Infantil", "Kids", "10751", "10762", null, null, null},
-        {"misterio", "Mistério", "Mystery", "9648", "9648", null, null, null},
-        {"musica", "Música", "Music", "10402", null, null, null, null},
-        {"faroeste", "Faroeste", "Western", "37", "37", null, null, null},
-        {"reality", "Reality", "Reality", null, "10764", null, null, null},
-        {"romance", "Romance", "Romance", "10749", null, null, null, null},
-        {"suspense", "Suspense", "Thriller", "53", "9648", null, null, null},
-        {"terror", "Terror", "Horror", "27", null, null, null, null},
-        {"novela", "Novelas", "Soaps", null, "10766", null, null, null},
-        {"doramas", "Doramas", "K-dramas", null, "18", null, "KR", "ko"},
-        {"nacionais", "Nacionais", "Brazilian", null, null, null, "BR", "pt"},
+    /** A filter label and the TMDB constraints it represents. */
+    private static final class Genre {
+        final String key, movie, show, keyword, country, language;
+        final int label;
+
+        Genre(String key, int label, String movie, String show, String keyword, String country, String language) {
+            this.key = key;
+            this.label = label;
+            this.movie = movie;
+            this.show = show;
+            this.keyword = keyword;
+            this.country = country;
+            this.language = language;
+        }
+    }
+
+    private static final Genre[] GENRES = {
+        new Genre("acao", R.string.genre_action, "28", "10759", null, null, null),
+        new Genre("aventura", R.string.genre_adventure, "12", "10759", null, null, null),
+        new Genre("anime", R.string.genre_anime, "16", "16", "210024", null, "ja"),
+        new Genre("animacao", R.string.genre_animation, "16", "16", null, null, null),
+        new Genre("comedia", R.string.genre_comedy, "35", "35", null, null, null),
+        new Genre("crime", R.string.genre_crime, "80", "80", null, null, null),
+        new Genre("documentarios", R.string.genre_documentaries, "99", "99", null, null, null),
+        new Genre("drama", R.string.genre_drama, "18", "18", null, null, null),
+        new Genre("familia", R.string.genre_family, "10751", "10751", null, null, null),
+        new Genre("fantasia", R.string.genre_fantasy, "14", "10765", null, null, null),
+        new Genre("ficcao", R.string.genre_sci_fi, "878", "10765", null, null, null),
+        new Genre("guerra", R.string.genre_war, "10752", "10768", null, null, null),
+        new Genre("historia", R.string.genre_history, "36", null, null, null, null),
+        new Genre("infantil", R.string.genre_kids, "10751", "10762", null, null, null),
+        new Genre("misterio", R.string.genre_mystery, "9648", "9648", null, null, null),
+        new Genre("musica", R.string.genre_music, "10402", null, null, null, null),
+        new Genre("faroeste", R.string.genre_western, "37", "37", null, null, null),
+        new Genre("reality", R.string.genre_reality, null, "10764", null, null, null),
+        new Genre("romance", R.string.genre_romance, "10749", null, null, null, null),
+        new Genre("suspense", R.string.genre_thriller, "53", "9648", null, null, null),
+        new Genre("terror", R.string.genre_horror, "27", null, null, null, null),
+        new Genre("novela", R.string.genre_soaps, null, "10766", null, null, null),
+        new Genre("doramas", R.string.genre_k_dramas, null, "18", null, "KR", "ko"),
+        new Genre("nacionais", R.string.genre_brazilian, null, null, null, "BR", "pt"),
     };
 
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -149,6 +163,7 @@ public class ExploreActivity extends Activity {
             return this;
         }
 
+        /** A list the person keeps (My list, favorites, ratings): asked again when they come back or change a title. */
         Section personal() {
             personal = true;
             return this;
@@ -210,13 +225,13 @@ public class ExploreActivity extends Activity {
         String label() {
             List<String> parts = new ArrayList<>();
             for (String g : genres) {
-                String[] d = genre(g);
-                if (d != null) parts.add(Ui.tr(d[1], d[2]));
+                Genre d = genre(g);
+                if (d != null) parts.add(Strings.get(d.label));
             }
             if (!year.isEmpty()) parts.add(yearLabel(year));
-            if (kind.equals("movie")) parts.add(Ui.tr("Filmes", "Movies"));
-            if (kind.equals("tv")) parts.add(Ui.tr("Séries", "Shows"));
-            return parts.isEmpty() ? Ui.tr("Tudo", "Everything") : TextUtils.join(" · ", parts);
+            if (kind.equals("movie")) parts.add(Strings.get(R.string.movies));
+            if (kind.equals("tv")) parts.add(Strings.get(R.string.shows));
+            return parts.isEmpty() ? Strings.get(R.string.everything) : TextUtils.join(" · ", parts);
         }
     }
 
@@ -237,6 +252,8 @@ public class ExploreActivity extends Activity {
         scroll.addView(page);
         root.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.addView(burger(), burgerParams());
+        root.addView(pullHint(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.CENTER_HORIZONTAL));
         shade = new View(this);
         shade.setBackgroundColor(0xB3000000);
         shade.setAlpha(0);
@@ -244,10 +261,12 @@ public class ExploreActivity extends Activity {
         root.addView(shade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.addView(buildMenu(), new FrameLayout.LayoutParams(Math.round(560 * k), ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
-        scroll.getViewTreeObserver().addOnGlobalFocusChangeListener((was, now) -> followFocus(now));
+        scroll.getViewTreeObserver().addOnGlobalFocusChangeListener((was, now) -> {
+            followFocus(now);
+            tilesNear(now);
+        });
         if (!Tmdb.hasKey()) {
-            header(Ui.tr("Explorar", "Explore"), Ui.tr("Sem chave do TMDB: coloque a sua em launcher-ui/config.properties e instale de novo.",
-                    "No TMDB key: add yours to launcher-ui/config.properties and install again."));
+            header(Strings.get(R.string.explore), Strings.get(R.string.tmdb_key_missing_build_hint));
             return;
         }
         io.execute(() -> {
@@ -273,6 +292,7 @@ public class ExploreActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        main.removeCallbacks(heroTick);   // a carousel step after this would hand work to the closed pool and crash
         io.shutdownNow();
         super.onDestroy();
     }
@@ -329,7 +349,7 @@ public class ExploreActivity extends Activity {
     }
 
     /** Three box blurs on a small copy: close to a Gaussian, smooth when stretched over the screen. */
-    private static Bitmap blur(Bitmap small, int radius) {
+    static Bitmap blur(Bitmap small, int radius) {
         int w = small.getWidth(), h = small.getHeight();
         int[] px = new int[w * h], tmp = new int[w * h];
         small.getPixels(px, 0, w, 0, 0, w, h);
@@ -391,7 +411,7 @@ public class ExploreActivity extends Activity {
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
         TextView title = TvUi.text(this, k, 40, Ui.displaySemibold, TvUi.INK);
-        title.setText(Ui.tr("Explorar", "Explore"));
+        title.setText(Strings.get(R.string.explore));
         title.setPaddingRelative(Math.round(26 * k), 0, 0, 0);
         top.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         top.addView(TvUi.iconButton(this, k, "settings", null, v -> {
@@ -400,9 +420,9 @@ public class ExploreActivity extends Activity {
         }));
         top.setPaddingRelative(0, 0, 0, Math.round(26 * k));
         menu.addView(top);
-        menuItem(menu, SEARCH, Ui.tr("Buscar", "Search"), null);
-        menuItem(menu, HOME, Ui.tr("Início", "Home"), null);
-        menuItem(menu, LIST, Ui.tr("Minha lista", "My list"), null);
+        menuItem(menu, SEARCH, Strings.get(R.string.search), null);
+        menuItem(menu, HOME, Strings.get(R.string.home), null);
+        menuItem(menu, LIST, Strings.get(R.string.my_list), null);
         View line = new View(this);
         line.setBackgroundColor(0x1FFFFFFF);
         LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Math.round(2 * k)));
@@ -459,9 +479,9 @@ public class ExploreActivity extends Activity {
         if (into == menuMovable) {   // a long press takes it off the menu, after asking
             item.setOnLongClickListener(v -> {
                 boolean saved = id.startsWith(SAVED);
-                TvUi.confirm(this, saved ? Ui.tr("Remover “", "Remove “") + label + Ui.tr("” do menu?", "” from the menu?")
-                                : Ui.tr("Ocultar “", "Hide “") + label + Ui.tr("” do menu? Volta em Ajustes.", "”? It comes back in Settings."),
-                        saved ? Ui.tr("Remover", "Remove") : Ui.tr("Ocultar", "Hide"), () -> {
+                TvUi.confirm(this, saved ? Strings.get(R.string.remove) + label + Strings.get(R.string.from_the_menu)
+                                : Strings.get(R.string.hide) + label + Strings.get(R.string.it_comes_back_in_settings),
+                        saved ? Strings.get(R.string.remove_2) : Strings.get(R.string.hide_2), () -> {
                             if (saved) removeSaved(id);
                             else setHidden(id, true);
                             fillMenu();
@@ -529,6 +549,10 @@ public class ExploreActivity extends Activity {
         keyAt = android.os.SystemClock.uptimeMillis();
         int code = e.getKeyCode();
         boolean down = e.getAction() == KeyEvent.ACTION_DOWN;
+        if (down && code != KeyEvent.KEYCODE_DPAD_UP && pullAt != 0) {
+            pullAt = 0;
+            hidePullHint();
+        }
         if (overlay != null) {
             if (code == KeyEvent.KEYCODE_BACK) {
                 if (!down) closeOverlay();
@@ -552,19 +576,55 @@ public class ExploreActivity extends Activity {
             }
             return super.dispatchKeyEvent(e);
         }
+        if (code == KeyEvent.KEYCODE_DPAD_UP && Tmdb.hasKey() && !SETTINGS.equals(current)) {
+            View f = getCurrentFocus();
+            View above = f == null || !inside(f, page) ? null : f.focusSearch(View.FOCUS_UP);
+            if (f != null && inside(f, page) && (above == null || !inside(above, page))) {   // already at the top
+                if (down && e.getRepeatCount() == 0) pulled();
+                return true;
+            }
+        }
         if (code == (Ui.he ? KeyEvent.KEYCODE_DPAD_RIGHT : KeyEvent.KEYCODE_DPAD_LEFT) && down && Tmdb.hasKey()) {
             View f = getCurrentFocus();
             boolean heroBack = f != null && f == hero && heroAt > 0;   // the banner goes back first, then the menu
-            if (!heroBack && (f == null || f.focusSearch(Ui.he ? View.FOCUS_RIGHT : View.FOCUS_LEFT) == null)) {
+            View next = f == null ? null : f.focusSearch(Ui.he ? View.FOCUS_RIGHT : View.FOCUS_LEFT);
+            // Left off the first card of a line opens the menu; it never jumps to the end of the line above
+            if (!heroBack && (next == null || !inside(next, page) || !sameLine(f, next))) {
                 openMenu();
                 return true;
             }
+        }
+        if (code == KeyEvent.KEYCODE_DPAD_RIGHT && Tmdb.hasKey()) {   // Right off the last card of a line stays: no jump to the next line
+            View f = getCurrentFocus();
+            View next = f == null || !inside(f, page) ? null : f.focusSearch(View.FOCUS_RIGHT);
+            if (next != null && inside(next, page) && !sameLine(f, next)) return true;
+        }
+        if (code == KeyEvent.KEYCODE_BACK && Tmdb.hasKey() && catOpen != null && catKind != null) {   // a category page: back to the tiles
+            if (!down && !e.isCanceled()) backToTiles();
+            return true;
+        }
+        if (code == KeyEvent.KEYCODE_BACK && Tmdb.hasKey() && CATS.equals(current) && catReturn != null) {   // the filter a category sent us to
+            if (!down && !e.isCanceled()) {
+                Category c = catReturn;
+                String kind = catReturnKind, sort = catReturnSort;
+                showPage(kind);
+                openCategory(c, sort);
+            }
+            return true;
         }
         if (code == KeyEvent.KEYCODE_BACK && !fromBookmark && !HOME.equals(current) && Tmdb.hasKey()) {
             if (!down && !e.isCanceled()) showPage(HOME);
             return true;
         }
         return super.dispatchKeyEvent(e);
+    }
+
+    /** Whether b overlaps a vertically on screen (the same line of chips, posters or tiles). */
+    private static boolean sameLine(View a, View b) {
+        int[] p = new int[2], q = new int[2];
+        a.getLocationOnScreen(p);
+        b.getLocationOnScreen(q);
+        return q[1] < p[1] + a.getHeight() && p[1] < q[1] + b.getHeight();
     }
 
     private static boolean inside(View v, View parent) {
@@ -648,16 +708,16 @@ public class ExploreActivity extends Activity {
 
     private String label(String id) {
         switch (id) {
-            case TOP: return Ui.tr("Top 10 do dia", "Today's top 10");
-            case MOVIES: return Ui.tr("Filmes", "Movies");
-            case SHOWS: return Ui.tr("Séries", "Shows");
-            case KIDS: return Ui.tr("Infantil", "Kids");
-            case ANIME: return Ui.tr("Animes", "Anime");
-            case CATS: return Ui.tr("Categorias", "Categories");
-            case SEARCH: return Ui.tr("Buscar", "Search");
-            case HOME: return Ui.tr("Início", "Home");
-            case LIST: return Ui.tr("Minha lista", "My list");
-            case SETTINGS: return Ui.tr("Ajustes", "Settings");
+            case TOP: return Strings.get(R.string.todays_top_10);
+            case MOVIES: return Strings.get(R.string.movies);
+            case SHOWS: return Strings.get(R.string.shows);
+            case KIDS: return Strings.get(R.string.kids);
+            case ANIME: return Strings.get(R.string.anime);
+            case CATS: return Strings.get(R.string.categories);
+            case SEARCH: return Strings.get(R.string.search);
+            case HOME: return Strings.get(R.string.home);
+            case LIST: return Strings.get(R.string.my_list);
+            case SETTINGS: return Strings.get(R.string.settings);
             default:
                 if (id.startsWith(SAVED)) {
                     JSONObject s = saved().optJSONObject(id);
@@ -680,6 +740,64 @@ public class ExploreActivity extends Activity {
         writeList("recent", list.size() > 10 ? new ArrayList<>(list.subList(0, 10)) : list);
     }
 
+    // MARK: - Reload: Up twice at the top of the page
+
+    private static final long PULL_MS = 2500;
+    private TextView pullHint;
+    private long pullAt;
+    private final Runnable pullGone = this::hidePullHint;
+
+    private View pullHint() {
+        pullHint = TvUi.text(this, k, 26, Ui.medium, 0xFF14161A);
+        pullHint.setPaddingRelative(Math.round(34 * k), Math.round(16 * k), Math.round(34 * k), Math.round(16 * k));
+        pullHint.setBackground(TvUi.round(TvUi.INK, 40 * k));
+        pullHint.setElevation(20 * k);
+        pullHint.setAlpha(0);
+        pullHint.setVisibility(View.GONE);
+        pullHint.setTranslationY(36 * k);
+        return pullHint;
+    }
+
+    /** First Up at the top: a hint; a second one soon after: the page again, every list asked of TMDB anew. */
+    private void pulled() {
+        long now = android.os.SystemClock.uptimeMillis();
+        if (pullAt != 0 && now - pullAt < PULL_MS) {
+            pullAt = 0;
+            Tmdb.refreshLists();
+            flashPullHint(Strings.get(R.string.refreshing), 1400);
+            showPage(current);
+            return;
+        }
+        pullAt = now;
+        flashPullHint(Strings.get(R.string.press_again_to_refresh), PULL_MS);
+    }
+
+    private void flashPullHint(String text, long ms) {
+        pullHint.setText(text);
+        pullHint.setVisibility(View.VISIBLE);
+        pullHint.animate().alpha(1).translationY(48 * k).setDuration(160).start();
+        main.removeCallbacks(pullGone);
+        main.postDelayed(pullGone, ms);
+    }
+
+    private void hidePullHint() {
+        main.removeCallbacks(pullGone);
+        if (pullHint == null || pullHint.getVisibility() != View.VISIBLE) return;
+        pullHint.animate().alpha(0).translationY(36 * k).setDuration(200)
+                .withEndAction(() -> { if (pullHint.getAlpha() == 0) pullHint.setVisibility(View.GONE); }).start();
+    }
+
+    /**
+     * TitleMenu changed a title. Seen: only the badges (TitleMenu) and the banner's line change, nothing reloads; My
+     * list or favorites: those rows, the focus staying on the same poster.
+     */
+    @Override public void titleChanged(boolean lists) {
+        if (!Tmdb.hasKey()) return;
+        if (lists || LIST.equals(current)) refreshPersonal();   // My list's tabs include "Seen"
+        if (lists && catOpen != null && catOpen.id == Category.FAVORITES) showCategoryGrid(catOpen, false);
+        if (hero != null && !heroList.isEmpty()) showHeroMeta();
+    }
+
     // MARK: - Pages
 
     private void showPage(String id) {
@@ -690,6 +808,12 @@ public class ExploreActivity extends Activity {
         placedKeys.clear();
         hero = null;
         feed = null;
+        catCache.clear();
+        catOpen = null;
+        catKind = null;
+        catReturn = null;
+        catFocusId = Integer.MIN_VALUE;
+        catGen++;
         closeOverlay();
         main.removeCallbacks(heroTick);
         main.removeCallbacks(searchSoon);
@@ -710,7 +834,7 @@ public class ExploreActivity extends Activity {
         page.addView(rows, rowsLp);
         status = TvUi.text(this, k, 26, Ui.regular, TvUi.DIM);
         status.setPaddingRelative(0, Math.round(30 * k), 0, 0);
-        status.setText(Ui.tr("Carregando…", "Loading…"));
+        status.setText(Strings.get(R.string.loading));
         rows.addView(status);
         switch (id) {
             case SEARCH: buildFilterPage(true, null); return;
@@ -743,13 +867,13 @@ public class ExploreActivity extends Activity {
     private String subtitle(String id) {
         switch (id) {
             case LIST:
-                return Tmdb.signedIn(this) ? Ui.tr("Da sua conta TMDB", "From your TMDB account") + " · " + Tmdb.accountName(this)
-                        : Ui.tr("Salva nesta TV. Conecte sua conta TMDB em Ajustes para sincronizar.", "Kept on this TV. Connect your TMDB account in Settings to sync.");
-            case SEARCH: return Ui.tr("Filmes, séries e pessoas · filtre por tipo, categoria e ano", "Movies, shows and people · filter by type, category and year");
-            case CATS: return Ui.tr("Escolha categorias e ano no filtro; salve para ter no menu", "Pick categories and year in the filter; save it to the menu");
-            case SETTINGS: return Ui.tr("Conta, serviços e a ordem do menu", "Account, services and the menu's order");
-            case MOVIES: case SHOWS: case KIDS: case ANIME: return Ui.tr("Nos seus serviços · dados do TMDB", "On your services · data from TMDB");
-            default: return id.startsWith(SAVED) ? Ui.tr("Filtro salvo", "Saved filter") : Ui.tr("Dados do TMDB", "Data from TMDB");
+                return Tmdb.signedIn(this) ? Strings.get(R.string.from_your_tmdb_account) + " · " + Tmdb.accountName(this)
+                        : Strings.get(R.string.tmdb_list_local_sync_hint);
+            case SEARCH: return Strings.get(R.string.search_filters_hint);
+            case CATS: return Strings.get(R.string.save_category_filter_hint);
+            case SETTINGS: return Strings.get(R.string.account_services_and_the_menus_order);
+            case MOVIES: case SHOWS: case KIDS: case ANIME: return Strings.get(R.string.on_your_services_data_from_tmdb);
+            default: return id.startsWith(SAVED) ? Strings.get(R.string.saved_filter) : Strings.get(R.string.data_from_tmdb);
         }
     }
 
@@ -790,7 +914,7 @@ public class ExploreActivity extends Activity {
                     left[0]--;
                     status.setVisibility(placed.isEmpty() ? View.VISIBLE : View.GONE);
                     if (placed.isEmpty() && left[0] == 0) {
-                        status.setText(Ui.tr("Não deu para buscar os títulos agora. Confira a internet da TV.", "Couldn't fetch titles now. Check the TV's internet."));
+                        status.setText(Strings.get(R.string.couldnt_fetch_titles_now_check_the_tvs_internet));
                     }
                 });
             });
@@ -813,9 +937,17 @@ public class ExploreActivity extends Activity {
         placedKeys.put(slot, keys.toString());
         View old = placed.remove(slot);
         boolean hadFocus = old != null && old.hasFocus();
+        // Where the focus was in the old row: its title, and its place (to land near it if the title is gone).
+        View was = hadFocus ? getCurrentFocus() : null;
+        Tmdb.Title wasTitle = TvUi.titleOf(was);
+        int wasAt = hadFocus ? cards(old).indexOf(was) : -1, oldAt = old != null ? rows.indexOfChild(old) : -1;
         if (old != null) rows.removeView(old);
-        if (titles.isEmpty()) {
-            if (hadFocus) focusPage();
+        if (titles.isEmpty()) {   // the row is gone: the focus goes to the row that took its place, not to the top
+            if (hadFocus) {
+                View next = oldAt >= 0 && oldAt < rows.getChildCount() ? rows.getChildAt(oldAt)
+                        : rows.getChildCount() > 0 ? rows.getChildAt(rows.getChildCount() - 1) : null;
+                if (next == null || next == status || !next.requestFocus()) focusPage();
+            }
             return;
         }
         View view = s.ranked ? ranked(s, titles) : TvUi.row(this, k, s.title, titles, this::open, moreOf(s), Math.round(INSET * k));
@@ -825,8 +957,34 @@ public class ExploreActivity extends Activity {
             if (e.getKey() < slot && e.getValue().getParent() == rows) index = Math.max(index, rows.indexOfChild(e.getValue()) + 1);
         }
         rows.addView(view, Math.min(index, rows.getChildCount()));
+        if (hadFocus) {   // the same poster in the new row, else the one now in its place
+            List<View> now = cards(view);
+            View same = null;
+            for (View c : now) if (wasTitle != null && TvUi.titleOf(c) != null && TvUi.titleOf(c).key().equals(wasTitle.key())) same = c;
+            if (same == null && !now.isEmpty()) same = now.get(wasAt < 0 ? now.size() - 1 : Math.min(wasAt, now.size() - 1));
+            if (same == null || !same.requestFocus()) focusPage();
+            return;
+        }
         View focus = getCurrentFocus();
-        if (hadFocus || (!menuOpen && overlay == null && (focus == null || !inside(focus, page)))) focusPage();
+        if (!menuOpen && overlay == null && (focus == null || !inside(focus, page))) focusPage();
+    }
+
+    /** The posters under `v`, in order (each card carries its title as the tag). */
+    private static List<View> cards(View v) {
+        List<View> out = new ArrayList<>();
+        collectCards(v, out);
+        return out;
+    }
+
+    private static void collectCards(View v, List<View> out) {
+        if (v.getTag() instanceof Tmdb.Title && v.isFocusable()) {
+            out.add(v);
+            return;
+        }
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) collectCards(g.getChildAt(i), out);
+        }
     }
 
     private Runnable moreOf(Section s) {
@@ -836,6 +994,7 @@ public class ExploreActivity extends Activity {
     }
 
     private void open(Tmdb.Title t) {
+        if (t.kind.equals("movie") || t.kind.equals("tv")) io.execute(() -> Tmdb.noteOpened(this, t));   // Explore's Recents
         if (current.equals(SEARCH) && filter != null && !filter.query.isEmpty()) remember(filter.query);
         DetailActivity.open(this, t.kind, t.id);
     }
@@ -850,6 +1009,7 @@ public class ExploreActivity extends Activity {
         h.setText(s.title);
         box.addView(h);
         TvUi.Grid grid = new TvUi.Grid(this, k, 5, this::open);
+        grid.stretch = false;   // the top 10 keeps its fixed-size posters
         for (int i = 0; i < titles.size(); i++) {
             View cell = TvUi.poster(this, k, titles.get(i), this::open);
             FrameLayout card = (FrameLayout) ((ViewGroup) cell).getChildAt(0);
@@ -935,13 +1095,13 @@ public class ExploreActivity extends Activity {
         }
     }
 
-    private static final String[][] LIST_TABS = {{"list", "Minha lista", "My list"}, {"favorite", "Favoritos", "Favorites"},
-            {"seen", "Já assisti", "Seen"}, {"rated", "Suas notas", "Your ratings"}};
+    private static final String[] LIST_TABS = {"list", "favorite", "seen", "rated"};
+    private static final int[] LIST_LABELS = {R.string.my_list, R.string.favorites, R.string.seen_2, R.string.your_ratings};
 
     private void buildList() {
         status.setVisibility(View.GONE);
         String[] labels = new String[LIST_TABS.length];
-        for (int i = 0; i < labels.length; i++) labels[i] = Ui.tr(LIST_TABS[i][1], LIST_TABS[i][2]);
+        for (int i = 0; i < labels.length; i++) labels[i] = Strings.get(LIST_LABELS[i]);
         tabKeys = null;
         tabs(labels, which -> showTab(which, false));
         showTab(0, false);
@@ -950,11 +1110,11 @@ public class ExploreActivity extends Activity {
     /** A My list tab as a grid built as you scroll; `quiet`: only if it changed (back from a title page). */
     private void showTab(int which, boolean quiet) {
         int gen = generation;
-        String kind = LIST_TABS[which][0];
+        String kind = LIST_TABS[which];
         if (!quiet) {
             tabKeys = null;
             tabBody.removeAllViews();
-            tabBody.addView(note(Ui.tr("Carregando…", "Loading…")));
+            tabBody.addView(note(Strings.get(R.string.loading)));
         }
         io.execute(() -> {
             List<Tmdb.Title> titles = new ArrayList<>();
@@ -965,11 +1125,10 @@ public class ExploreActivity extends Activity {
                     case "seen": titles = Tmdb.seen(this); break;
                     default:
                         if (Tmdb.signedIn(this)) titles = Tmdb.accountList(this, kind);
-                        else problem = Ui.tr("Conecte sua conta TMDB em Ajustes para ver favoritos e notas.",
-                                "Connect your TMDB account in Settings to see favorites and ratings.");
+                        else problem = Strings.get(R.string.tmdb_connect_for_favorites_and_ratings);
                 }
             } catch (Exception e) {
-                problem = Ui.tr("Não deu para carregar: ", "Couldn't load: ") + e.getMessage();
+                problem = Strings.get(R.string.couldnt_load_prefix) + e.getMessage();
             }
             List<Tmdb.Title> got = titles;
             String why = problem;
@@ -980,14 +1139,17 @@ public class ExploreActivity extends Activity {
                 if (quiet && keys.toString().equals(tabKeys)) return;
                 tabKeys = keys.toString();
                 boolean hadFocus = tabBody.hasFocus();
+                View was = hadFocus ? getCurrentFocus() : null;
+                int wasAt = was == null ? -1 : cards(tabBody).indexOf(was);
                 tabBody.removeAllViews();
                 if (why != null || got.isEmpty()) {
-                    tabBody.addView(note(why != null ? why : Ui.tr("Nada aqui ainda. Abra um título para marcar.", "Nothing here yet. Open a title to add it.")));
+                    tabBody.addView(note(why != null ? why : Strings.get(R.string.nothing_here_yet_open_a_title_to_add_it)));
                 } else {
-                    tabBody.addView(note(got.size() == 1 ? Ui.tr("1 título", "1 title") : got.size() + Ui.tr(" títulos", " titles")));
+                    tabBody.addView(note(Strings.quantity(R.plurals.titles, got.size())));
                     TvUi.Grid grid = new TvUi.Grid(this, k, 7, this::open);
                     grid.add(got);
                     tabBody.addView(grid);
+                    if (wasAt >= 0 && grid.focusAt(wasAt)) return;   // the poster now in the place of the one focused
                 }
                 if (hadFocus) tabBar.getChildAt(tab).requestFocus();
             });
@@ -1005,17 +1167,31 @@ public class ExploreActivity extends Activity {
     private static final class Tab {
         final String label, path, kind;
         final Filter filter;
+        final String explore;   // "movie" or "tv" for the By category tab, else null
         Tab(String label, String path, String kind) {
             this.label = label;
             this.path = path;
             this.kind = kind;
             this.filter = null;
+            this.explore = null;
         }
         Tab(String label, Filter filter) {
             this.label = label;
             this.path = null;
             this.kind = null;
             this.filter = filter;
+            this.explore = null;
+        }
+        private Tab(String label, String explore, boolean unused) {
+            this.label = label;
+            this.path = null;
+            this.kind = null;
+            this.filter = null;
+            this.explore = explore;
+        }
+
+        static Tab explorer(String label, String kind) {
+            return new Tab(label, kind, true);
         }
     }
 
@@ -1025,37 +1201,39 @@ public class ExploreActivity extends Activity {
         List<Tab> list = new ArrayList<>();
         switch (id) {
             case MOVIES:
-                list.add(new Tab(Ui.tr("Em alta", "Trending"), "/trending/movie/week", "movie"));
-                list.add(new Tab(Ui.tr("Lançamentos", "New"), sorted(Filter.of("movie"), "new")));
-                list.add(new Tab(Ui.tr("Mais votados", "Top rated"), sorted(Filter.of("movie"), "votes")));
+                list.add(Tab.explorer(Strings.get(R.string.by_category), id));
+                list.add(new Tab(Strings.get(R.string.trending), "/trending/movie/week", "movie"));
+                list.add(new Tab(Strings.get(R.string.new_titles), sorted(Filter.of("movie"), "new")));
+                list.add(new Tab(Strings.get(R.string.top_rated), sorted(Filter.of("movie"), "votes")));
                 for (String g : new String[] {"acao", "comedia", "drama", "terror", "suspense", "ficcao", "romance", "animacao", "documentarios", "nacionais"}) {
                     list.add(new Tab(genreName(g), Filter.of("movie", g)));
                 }
                 break;
             case SHOWS:
-                list.add(new Tab(Ui.tr("Em alta", "Trending"), "/trending/tv/week", "tv"));
-                list.add(new Tab(Ui.tr("No ar", "On the air"), "/tv/on_the_air", "tv"));
-                list.add(new Tab(Ui.tr("Mais votadas", "Top rated"), sorted(Filter.of("tv"), "votes")));
+                list.add(Tab.explorer(Strings.get(R.string.by_category), id));
+                list.add(new Tab(Strings.get(R.string.trending), "/trending/tv/week", "tv"));
+                list.add(new Tab(Strings.get(R.string.on_the_air), "/tv/on_the_air", "tv"));
+                list.add(new Tab(Strings.get(R.string.top_rated_2), sorted(Filter.of("tv"), "votes")));
                 for (String g : new String[] {"drama", "comedia", "crime", "ficcao", "misterio", "reality", "doramas", "novela", "nacionais"}) {
                     list.add(new Tab(genreName(g), Filter.of("tv", g)));
                 }
                 break;
             case KIDS:
-                list.add(new Tab(Ui.tr("Tudo", "All"), Filter.of("all", "infantil")));
-                list.add(new Tab(Ui.tr("Desenhos", "Cartoons"), Filter.of("tv", "animacao", "infantil")));
-                list.add(new Tab(Ui.tr("Filmes", "Movies"), Filter.of("movie", "infantil")));
-                list.add(new Tab(Ui.tr("Animação", "Animation"), Filter.of("movie", "animacao", "familia")));
-                list.add(new Tab(Ui.tr("Mais votados", "Top rated"), sorted(Filter.of("all", "infantil"), "votes")));
+                list.add(new Tab(Strings.get(R.string.all), Filter.of("all", "infantil")));
+                list.add(new Tab(Strings.get(R.string.cartoons), Filter.of("tv", "animacao", "infantil")));
+                list.add(new Tab(Strings.get(R.string.movies), Filter.of("movie", "infantil")));
+                list.add(new Tab(Strings.get(R.string.animation), Filter.of("movie", "animacao", "familia")));
+                list.add(new Tab(Strings.get(R.string.top_rated), sorted(Filter.of("all", "infantil"), "votes")));
                 break;
             default:   // ANIME
-                list.add(new Tab(Ui.tr("Em alta", "Trending"), Filter.of("all", "anime")));
-                list.add(new Tab(Ui.tr("Séries", "Shows"), Filter.of("tv", "anime")));
-                list.add(new Tab(Ui.tr("Filmes", "Movies"), Filter.of("movie", "anime")));
-                list.add(new Tab(Ui.tr("Lançamentos", "New"), sorted(Filter.of("all", "anime"), "new")));
+                list.add(new Tab(Strings.get(R.string.trending), Filter.of("all", "anime")));
+                list.add(new Tab(Strings.get(R.string.shows), Filter.of("tv", "anime")));
+                list.add(new Tab(Strings.get(R.string.movies), Filter.of("movie", "anime")));
+                list.add(new Tab(Strings.get(R.string.new_titles), sorted(Filter.of("all", "anime"), "new")));
                 for (String g : new String[] {"acao", "comedia", "romance", "fantasia", "misterio"}) {
                     list.add(new Tab(genreName(g), Filter.of("all", "anime", g)));
                 }
-                list.add(new Tab(Ui.tr("Mais votados", "Top rated"), sorted(Filter.of("all", "anime"), "votes")));
+                list.add(new Tab(Strings.get(R.string.top_rated), sorted(Filter.of("all", "anime"), "votes")));
         }
         String[] labels = new String[list.size()];
         for (int i = 0; i < labels.length; i++) labels[i] = list.get(i).label;
@@ -1069,6 +1247,14 @@ public class ExploreActivity extends Activity {
     }
 
     private void showCatalogTab(Tab t) {
+        catOpen = null;
+        catKind = null;
+        catFocusId = Integer.MIN_VALUE;
+        catGen++;
+        if (t.explore != null) {
+            showExplorer(t.explore);
+            return;
+        }
         tabBody.removeAllViews();
         TvUi.Grid grid = new TvUi.Grid(this, k, 7, this::open);
         tabBody.addView(grid);
@@ -1126,7 +1312,7 @@ public class ExploreActivity extends Activity {
                     grid.add(fresh);
                     if (list.isEmpty()) done = true;
                     if (count != null) {
-                        count.setText(grid.count == 0 ? Ui.tr("Nada encontrado com esse filtro.", "Nothing matches this filter.") : "");
+                        count.setText(grid.count == 0 ? Strings.get(R.string.nothing_matches_this_filter) : "");
                         count.setVisibility(grid.count == 0 ? View.VISIBLE : View.GONE);
                     }
                     if (grid.count < 21 && !done) more();   // a filtered page can come back thin: fill the first screen
@@ -1139,6 +1325,463 @@ public class ExploreActivity extends Activity {
     private void startFeed(TvUi.Grid grid, Pager pager, TextView count) {
         feed = new Feed(grid, pager, count);
         feed.more();
+    }
+
+    // MARK: - Explore by category
+
+    private String catKind;            // "movie"/"tv" while the explorer tab shows, else null
+    private Category catOpen;          // the category page showing; null on the tiles
+    private String catSort = "popularity";
+    private int catGen, catFocusId = Integer.MIN_VALUE;
+    private long catAt;                // like pageAt: the grid takes the focus only if no key was pressed since
+    private LinearLayout tileGrid, catGridBox;
+    private TvUi.Chip allChip, favChip, recChip;
+    private TextView catCount;
+    private final Map<String, List<Category>> catCache = new HashMap<>();   // per page visit
+    private Filter pendingFilter;      // seeds the filter page from a category's Filters button
+    private Category catReturn;        // Back on that filter page returns to this category page
+    private String catReturnKind, catReturnSort;
+
+    /** A genre tile (with its count and the posters of its collage), or one of the three chips. */
+    private static final class Category {
+        static final int ALL = 0, FAVORITES = -1, RECENTS = -2;
+        final String kind, name;
+        final int id;
+        int count = -1;
+        final List<Tmdb.Title> top = new ArrayList<>();   // the first four titles: the collage
+        ImageView[] pics;
+        boolean picsLoaded;
+
+        Category(String kind, int id, String name) {
+            this.kind = kind;
+            this.id = id;
+            this.name = name;
+        }
+    }
+
+    private static int plural(String kind) {
+        return kind.equals("movie") ? R.plurals.movies_count : R.plurals.shows_count;
+    }
+
+    private String number(int n) {
+        return java.text.NumberFormat.getIntegerInstance(Ui.locale()).format(n);
+    }
+
+    /** One page of a genre's titles (id 0: all), sorted; only on a background thread (it may ask for the services). */
+    private String catPath(String kind, int genreId, String sort, int page) {
+        boolean movie = kind.equals("movie");
+        String field = movie ? "primary_release_date" : "first_air_date";
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
+        StringBuilder p = new StringBuilder();
+        if (genreId > 0) p.append("&with_genres=").append(genreId);
+        switch (sort) {
+            case "new":
+                p.append("&sort_by=").append(field).append(".desc&").append(field).append(".lte=").append(today).append("&vote_count.gte=20");
+                break;
+            case "votes":
+                p.append("&sort_by=vote_average.desc&vote_count.gte=").append(movie ? 500 : 200);
+                break;
+            case "az":
+                p.append("&sort_by=").append(movie ? "original_title" : "original_name").append(".asc&vote_count.gte=20");
+                break;
+            default:
+                p.append("&sort_by=popularity.desc&vote_count.gte=20");
+        }
+        p.append(servicesParam());
+        return discoverPath(kind, p.toString() + "&page=" + page);
+    }
+
+    /** The tab's first view: three chips (All, Favorites, Recents), then a tile for each genre with titles. */
+    private void showExplorer(String kind) {
+        catKind = kind;
+        catOpen = null;
+        feed = null;
+        int my = ++catGen;
+        boolean movie = kind.equals("movie");
+        tabBody.removeAllViews();
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setClipChildren(false);
+        tabBody.addView(box);
+        TvUi.Flow chipRow = new TvUi.Flow(this, Math.round(14 * k), Math.round(14 * k));
+        chipRow.setPaddingRelative(Math.round(24 * k), Math.round(22 * k), Math.round(96 * k), 0);
+        Category all = new Category(kind, Category.ALL, Strings.get(movie ? R.string.all_movies : R.string.all_shows));
+        Category fav = new Category(kind, Category.FAVORITES, Strings.get(R.string.favorites));
+        Category rec = new Category(kind, Category.RECENTS, Strings.get(R.string.recently_opened));
+        allChip = new TvUi.Chip(this, k, all.name, v -> openCategory(all, "popularity"));
+        favChip = new TvUi.Chip(this, k, fav.name, v -> openCategory(fav, "popularity"));
+        recChip = new TvUi.Chip(this, k, rec.name, v -> openCategory(rec, "popularity"));
+        chipRow.addView(allChip);
+        chipRow.addView(favChip);
+        chipRow.addView(recChip);
+        box.addView(chipRow);
+        TextView heading = TvUi.text(this, k, 32, Ui.semibold, TvUi.INK);
+        heading.setText(Strings.get(R.string.explore_by_category));
+        heading.setPaddingRelative(Math.round(24 * k), Math.round(40 * k), 0, Math.round(6 * k));
+        box.addView(heading);
+        tileGrid = new LinearLayout(this);
+        tileGrid.setOrientation(LinearLayout.VERTICAL);
+        tileGrid.setClipChildren(false);
+        box.addView(tileGrid);
+        io.execute(() -> {   // Recents' count, and Favorites' when signed in
+            int opened = 0;
+            for (Tmdb.Title t : Tmdb.opened(this)) if (t.kind.equals(kind)) opened++;
+            int n = opened;
+            main.post(() -> { if (my == catGen && !isFinishing()) recChip.count(n > 0 ? number(n) : ""); });
+            if (!Tmdb.signedIn(this)) return;
+            try {
+                int favs = 0;
+                for (Tmdb.Title t : Tmdb.accountList(this, "favorite")) if (t.kind.equals(kind)) favs++;
+                int f = favs;
+                main.post(() -> { if (my == catGen && !isFinishing()) favChip.count(f > 0 ? number(f) : ""); });
+            } catch (Exception e) {
+                AppLog.w("explore favorites count: " + e.getMessage());
+            }
+        });
+        List<Category> cached = catCache.get(kind);
+        if (cached != null) {   // coming back from a category page: the tiles are as they were
+            renderTiles(kind, cached, my);
+            return;
+        }
+        tileGrid.addView(note(Strings.get(R.string.loading)));
+        io.execute(() -> {   // the genres, then one discover call each: its count and its first posters (cached with the list)
+            List<Category> cats = new ArrayList<>();
+            cats.add(all);
+            try {
+                JSONArray gs = Tmdb.get("/genre/" + kind + "/list").optJSONArray("genres");
+                for (int i = 0; gs != null && i < gs.length(); i++) {
+                    JSONObject g = gs.optJSONObject(i);
+                    if (g != null && g.optInt("id") > 0) cats.add(new Category(kind, g.optInt("id"), g.optString("name")));
+                }
+            } catch (Exception e) {
+                AppLog.w("explore genres: " + e.getMessage());
+            }
+            int[] left = {cats.size()};
+            for (Category c : cats) {
+                io.execute(() -> {
+                    try {
+                        JSONObject o = Tmdb.get(catPath(kind, c.id, "popularity", 1));
+                        c.count = o.optInt("total_results", 0);
+                        List<Tmdb.Title> titles = Tmdb.titles(o, kind);
+                        for (int i = 0; i < titles.size() && c.top.size() < 4; i++) c.top.add(titles.get(i));
+                    } catch (Exception e) {
+                        c.count = 0;
+                    }
+                    main.post(() -> {
+                        if (my != catGen || isFinishing()) return;
+                        if (--left[0] == 0) renderTiles(kind, cats, my);
+                    });
+                });
+            }
+        });
+    }
+
+    private void renderTiles(String kind, List<Category> list, int my) {
+        if (my != catGen || tileGrid == null) return;
+        catCache.put(kind, list);
+        tileGrid.removeAllViews();
+        List<Category> tiles = new ArrayList<>();
+        for (Category c : list) {
+            if (c.id == Category.ALL) allChip.count(c.count > 0 ? number(c.count) : "");
+            else if (c.count > 0) tiles.add(c);
+        }
+        tiles.sort((a, b) -> Integer.compare(b.count, a.count));
+        if (tiles.isEmpty()) {
+            tileGrid.addView(note(Strings.get(R.string.couldnt_fetch_titles_now_check_the_tvs_internet)));
+            return;
+        }
+        int gap = Math.round(26 * k);
+        for (int i = 0; i < tiles.size(); i += 5) {
+            TvUi.Columns line = new TvUi.Columns(this, 5, gap);
+            line.setPaddingRelative(Math.round(24 * k), Math.round(26 * k), Math.round(96 * k), 0);
+            for (int j = i; j < i + 5 && j < tiles.size(); j++) {
+                line.addView(tile(tiles.get(j)), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT));
+            }
+            tileGrid.addView(line);
+        }
+        loadTiles(2);
+        if (catFocusId != Integer.MIN_VALUE) {   // back from a category page: its tile (or chip) takes the focus again
+            int want = catFocusId;
+            catFocusId = Integer.MIN_VALUE;
+            focusCategory(want);
+        }
+    }
+
+    /** The tile of category `id` (or the chip of All, Favorites, Recents) takes the focus. */
+    private void focusCategory(int id) {
+        if (id == Category.ALL) allChip.requestFocus();
+        else if (id == Category.FAVORITES) favChip.requestFocus();
+        else if (id == Category.RECENTS) recChip.requestFocus();
+        else {
+            for (int i = 0; i < tileGrid.getChildCount(); i++) {
+                ViewGroup line = (ViewGroup) tileGrid.getChildAt(i);
+                for (int j = 0; j < line.getChildCount(); j++) {
+                    if (line.getChildAt(j).getTag() instanceof Category && ((Category) line.getChildAt(j).getTag()).id == id) {
+                        loadTiles(i + 2);
+                        line.getChildAt(j).requestFocus();
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    /** A genre: a collage of its first four posters under a shade, its name and how many titles it has. */
+    private View tile(Category c) {
+        TvUi.Ratio tile = new TvUi.Ratio(this, 10f / 16f);
+        tile.setBackground(TvUi.round(TvUi.CARD, 16 * k));
+        tile.setClipToOutline(true);
+        LinearLayout collage = new LinearLayout(this);
+        collage.setOrientation(LinearLayout.VERTICAL);
+        c.pics = new ImageView[4];
+        for (int r = 0; r < 2; r++) {
+            LinearLayout pair = new LinearLayout(this);
+            pair.setOrientation(LinearLayout.HORIZONTAL);
+            for (int q = 0; q < 2; q++) {
+                ImageView pic = new ImageView(this);
+                pic.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                c.pics[r * 2 + q] = pic;
+                pair.addView(pic, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1));
+            }
+            collage.addView(pair, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        }
+        tile.addView(collage, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        View shade = new View(this);
+        shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] {0xEB0A0A0C, 0x730A0A0C, 0x260A0A0C}));
+        tile.addView(shade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        LinearLayout text = new LinearLayout(this);
+        text.setOrientation(LinearLayout.VERTICAL);
+        TextView name = TvUi.text(this, k, 30, Ui.semibold, TvUi.INK);
+        name.setText(c.name);
+        name.setSingleLine(true);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        name.setShadowLayer(8 * k, 0, k, 0x99000000);
+        text.addView(name);
+        TextView count = TvUi.text(this, k, 22, Ui.regular, 0x9EFFFFFF);
+        String quantity = Strings.quantity(plural(c.kind), c.count);
+        count.setText(quantity);
+        text.addView(count);
+        FrameLayout.LayoutParams tp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.START);
+        tp.setMargins(Math.round(20 * k), 0, Math.round(20 * k), Math.round(20 * k));
+        tile.addView(text, tp);
+        tile.setTag(c);
+        tile.setContentDescription(c.name + ", " + quantity);
+        tile.setOnClickListener(v -> openCategory(c, "popularity"));
+        TvUi.focusable(tile, k, 16 * k);
+        return tile;
+    }
+
+    /** The collages of the tiles up to line `upToLine` (the first lines at once, the others as the focus nears them). */
+    private void loadTiles(int upToLine) {
+        if (tileGrid == null) return;
+        for (int i = 0; i <= upToLine && i < tileGrid.getChildCount(); i++) {
+            ViewGroup line = (ViewGroup) tileGrid.getChildAt(i);
+            for (int j = 0; j < line.getChildCount(); j++) {
+                if (!(line.getChildAt(j).getTag() instanceof Category)) continue;
+                Category c = (Category) line.getChildAt(j).getTag();
+                if (c.picsLoaded || c.pics == null) continue;
+                c.picsLoaded = true;
+                for (int p = 0; p < c.pics.length; p++) {
+                    Images.load(c.pics[p], p < c.top.size() && !c.top.get(p).poster.isEmpty() ? Tmdb.POSTER_SMALL + c.top.get(p).poster : null);
+                }
+            }
+        }
+    }
+
+    private void tilesNear(View now) {
+        if (now == null || tileGrid == null || !(now.getTag() instanceof Category)) return;
+        for (View v = now; v != null && v.getParent() instanceof View; v = (View) v.getParent()) {
+            if (v.getParent() == tileGrid) {
+                loadTiles(tileGrid.indexOfChild(v) + 2);
+                return;
+            }
+        }
+    }
+
+    /** A category's page: back, its name and count, the sorts and Filters, then the titles as a grid built as you scroll. */
+    private void openCategory(Category c, String sort) {
+        catOpen = c;
+        catSort = sort;
+        catFocusId = c.id;
+        catGen++;
+        catAt = android.os.SystemClock.uptimeMillis() + 1;
+        feed = null;
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setClipChildren(false);
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setPaddingRelative(Math.round(24 * k), Math.round(20 * k), Math.round(96 * k), 0);
+        TvUi.Chip back = new TvUi.Chip(this, k, "‹  " + Strings.get(R.string.categories), v -> backToTiles());
+        head.addView(back);
+        TextView title = TvUi.text(this, k, 44, Ui.displaySemibold, TvUi.INK);
+        title.setText(c.name);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleLp.setMarginStart(Math.round(24 * k));
+        head.addView(title, titleLp);
+        catCount = TvUi.text(this, k, 26, Ui.regular, TvUi.DIM);
+        catCount.setPaddingRelative(Math.round(18 * k), 0, 0, 0);
+        catCount.setText(c.id >= 0 && c.count >= 0 ? Strings.quantity(plural(c.kind), c.count) : "");
+        head.addView(catCount);
+        content.addView(head);
+        LinearLayout sorts = new LinearLayout(this);
+        sorts.setOrientation(LinearLayout.HORIZONTAL);
+        sorts.setGravity(Gravity.CENTER_VERTICAL);
+        sorts.setClipChildren(false);
+        sorts.setPaddingRelative(Math.round(24 * k), Math.round(18 * k), Math.round(96 * k), 0);
+        String[] keys = {"popularity", "new", "votes", "az"};
+        int[] names = {R.string.sort_popular, R.string.sort_newest, R.string.sort_top_rated, R.string.sort_a_z};
+        TvUi.Chip[] pills = new TvUi.Chip[keys.length];
+        for (int i = 0; i < keys.length; i++) {
+            final String key = keys[i];
+            pills[i] = new TvUi.Chip(this, k, Strings.get(names[i]), null);
+            pills[i].setActivated(key.equals(sort));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMarginEnd(Math.round(14 * k));
+            sorts.addView(pills[i], lp);
+        }
+        for (int i = 0; i < pills.length; i++) {   // set after all exist: a click turns its pill on and the others off
+            final int at = i;
+            pills[i].setOnClickListener(v -> {
+                catSort = keys[at];
+                for (int j = 0; j < pills.length; j++) pills[j].setActivated(j == at);
+                showCategoryGrid(c, false);
+            });
+        }
+        sorts.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
+        if (c.id >= 0) {   // Favorites and Recents are lists of titles, not a discover query
+            sorts.addView(TvUi.iconButton(this, k, "tune", Strings.get(R.string.filters), v -> openCategoryFilter()));
+        }
+        content.addView(sorts);
+        catGridBox = new LinearLayout(this);
+        catGridBox.setOrientation(LinearLayout.VERTICAL);
+        catGridBox.setClipChildren(false);
+        content.addView(catGridBox);
+        int old = tabBody.getChildCount();
+        tabBody.addView(content);
+        for (int i = 0; i < keys.length; i++) {   // the focus moves first, so it is never dropped with the old view
+            if (keys[i].equals(sort)) pills[i].requestFocus();
+        }
+        for (int i = old - 1; i >= 0; i--) tabBody.removeViewAt(i);
+        tileGrid = null;
+        showCategoryGrid(c, true);
+    }
+
+    /** The grid under the sorts; `focusGrid`: the first title takes the focus when it arrives, if no key was pressed meanwhile. */
+    private void showCategoryGrid(Category c, boolean focusGrid) {
+        if (catGridBox == null) return;
+        int my = ++catGen;
+        String sortNow = catSort;
+        boolean focusIn = focusGrid;
+        View was = catGridBox.hasFocus() ? getCurrentFocus() : null;
+        int wasAt = was == null ? -1 : cards(catGridBox).indexOf(was);
+        catGridBox.removeAllViews();
+        TextView empty = note("");
+        if (c.id < 0) {   // Favorites or Recents: kept titles, sorted here
+            feed = null;
+            if (c.id == Category.FAVORITES && !Tmdb.signedIn(this)) {
+                catGridBox.addView(note(Strings.get(R.string.tmdb_connect_for_favorites_and_ratings)));
+                return;
+            }
+            catGridBox.addView(note(Strings.get(R.string.loading)));
+            io.execute(() -> {
+                List<Tmdb.Title> got = new ArrayList<>();
+                try {
+                    for (Tmdb.Title t : c.id == Category.FAVORITES ? Tmdb.accountList(this, "favorite") : Tmdb.opened(this)) {
+                        if (t.kind.equals(c.kind)) got.add(t);
+                    }
+                } catch (Exception e) {
+                    AppLog.w("explore " + c.name + ": " + e.getMessage());
+                }
+                sortLocal(got, sortNow);
+                main.post(() -> {
+                    if (my != catGen || isFinishing()) return;
+                    catGridBox.removeAllViews();
+                    catCount.setText(got.isEmpty() ? "" : Strings.quantity(plural(c.kind), got.size()));
+                    if (got.isEmpty()) {
+                        catGridBox.addView(note(Strings.get(c.id == Category.FAVORITES ? R.string.nothing_here_yet_open_a_title_to_add_it : R.string.recents_empty)));
+                        return;
+                    }
+                    TvUi.Grid grid = new TvUi.Grid(this, k, 7, this::open);
+                    grid.add(got);
+                    catGridBox.addView(grid);
+                    if (wasAt >= 0) grid.focusAt(wasAt);
+                    else if (focusIn && keyAt < catAt) grid.focusAt(0);
+                });
+            });
+            return;
+        }
+        TvUi.Grid grid = new TvUi.Grid(this, k, 7, this::open);
+        catGridBox.addView(grid);
+        empty.setVisibility(View.GONE);
+        catGridBox.addView(empty);
+        startFeed(grid, p -> {
+            JSONObject o = Tmdb.get(catPath(c.kind, c.id, sortNow, p));
+            if (p == 1) {
+                int n = o.optInt("total_results", 0);
+                main.post(() -> {
+                    if (my != catGen || isFinishing()) return;
+                    if (catCount != null) catCount.setText(Strings.quantity(plural(c.kind), n));
+                    // queued again: it runs after the feed's own post, which fills the grid
+                    main.post(() -> { if (my == catGen && focusIn && keyAt < catAt && grid.count > 0) grid.focusAt(0); });
+                });
+            }
+            return Tmdb.titles(o, c.kind);
+        }, empty);
+    }
+
+    /** Popular is the list's own order; newest by date (year when the date is missing), top rated by vote, A-Z by name. */
+    private static void sortLocal(List<Tmdb.Title> list, String sort) {
+        switch (sort) {
+            case "new":
+                list.sort((a, b) -> (b.date.isEmpty() ? b.year : b.date).compareTo(a.date.isEmpty() ? a.year : a.date));
+                break;
+            case "votes":
+                list.sort((a, b) -> Double.compare(b.vote, a.vote));
+                break;
+            case "az":
+                java.text.Collator collator = java.text.Collator.getInstance(Ui.locale());
+                list.sort((a, b) -> collator.compare(a.name, b.name));
+                break;
+            default:
+        }
+    }
+
+    /** Back from a category page to the tiles, on the tile it came from. */
+    private void backToTiles() {
+        if (tabBar != null && tab < tabBar.getChildCount()) tabBar.getChildAt(tab).requestFocus();
+        showExplorer(catKind);
+    }
+
+    /** The filter page, set to this category and sort; Back there returns here. */
+    private void openCategoryFilter() {
+        if (catOpen == null || catKind == null) return;
+        Filter f = new Filter();
+        f.kind = catKind;
+        f.services = true;
+        String key = genreKey(catKind, catOpen.id);
+        if (key != null) f.genres.add(key);
+        f.sort = catSort.equals("az") ? "popularity" : catSort;
+        Category back = catOpen;
+        String backKind = current, backSort = catSort;
+        pendingFilter = f;
+        showPage(CATS);
+        catReturn = back;
+        catReturnKind = backKind;
+        catReturnSort = backSort;
+    }
+
+    /** The filter's key for a TMDB genre id: the plain genres only ("animacao", not "anime", for 16). */
+    private static String genreKey(String kind, int id) {
+        for (Genre g : GENRES) {
+            if (g.keyword != null || g.country != null) continue;
+            if (String.valueOf(id).equals(kind.equals("movie") ? g.movie : g.show)) return g.key;
+        }
+        return null;
     }
 
     // MARK: - Search and categories: the same filter
@@ -1155,7 +1798,8 @@ public class ExploreActivity extends Activity {
         status.setVisibility(View.GONE);
         savedId = saved;
         filter = saved != null ? Filter.fromJson(saved().optJSONObject(saved) == null ? "{}" : saved().optJSONObject(saved).optString("filter"))
-                : new Filter();
+                : pendingFilter != null ? pendingFilter : new Filter();
+        pendingFilter = null;
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
@@ -1169,7 +1813,7 @@ public class ExploreActivity extends Activity {
             field.setTextColor(TvUi.INK);
             field.setHintTextColor(TvUi.FAINT);
             field.setTypeface(Ui.medium);
-            field.setHint(Ui.tr("Filme, série ou pessoa", "Movie, show or person"));
+            field.setHint(Strings.get(R.string.movie_show_or_person));
             field.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
             field.setPaddingRelative(Math.round(36 * k), Math.round(22 * k), Math.round(36 * k), Math.round(22 * k));
             field.setBackground(TvUi.round(0x1FFFFFFF, 40 * k));
@@ -1195,12 +1839,12 @@ public class ExploreActivity extends Activity {
         } else {
             first = null;
         }
-        LinearLayout filterButton = TvUi.iconButton(this, k, "tune", Ui.tr("Filtros", "Filters"), v -> openFilter());
+        LinearLayout filterButton = TvUi.iconButton(this, k, "tune", Strings.get(R.string.filters), v -> openFilter());
         LinearLayout.LayoutParams fl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         fl.setMarginStart(search ? Math.round(20 * k) : 0);
         bar.addView(filterButton, fl);
         if (!search) {
-            TextView save = TvUi.button(this, k, saved != null ? Ui.tr("Salvar alterações", "Save changes") : Ui.tr("Salvar no menu", "Save to menu"),
+            TextView save = TvUi.button(this, k, saved != null ? Strings.get(R.string.save_changes) : Strings.get(R.string.save_to_menu),
                     v -> askSave());
             LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             sl.setMarginStart(Math.round(20 * k));
@@ -1215,7 +1859,7 @@ public class ExploreActivity extends Activity {
             TvUi.Flow recent = new TvUi.Flow(this, Math.round(14 * k), Math.round(14 * k));
             recent.setPaddingRelative(Math.round(6 * k), Math.round(22 * k), Math.round(INSET * k), 0);
             TextView label = TvUi.text(this, k, 24, Ui.medium, TvUi.FAINT);
-            label.setText(Ui.tr("Recentes", "Recent"));
+            label.setText(Strings.get(R.string.recent));
             label.setPaddingRelative(0, Math.round(14 * k), Math.round(6 * k), 0);
             recent.addView(label);
             EditText field = (EditText) first;
@@ -1241,7 +1885,7 @@ public class ExploreActivity extends Activity {
         TvUi.Flow flow = new TvUi.Flow(this, Math.round(14 * k), Math.round(14 * k));
         flow.setPaddingRelative(Math.round(6 * k), Math.round(22 * k), Math.round(INSET * k), 0);
         if (!filter.kind.equals("all")) {
-            flow.addView(TvUi.toggle(this, k, filter.kind.equals("movie") ? Ui.tr("Filmes", "Movies") : Ui.tr("Séries", "Shows"), true, v -> {
+            flow.addView(TvUi.toggle(this, k, filter.kind.equals("movie") ? Strings.get(R.string.movies) : Strings.get(R.string.shows), true, v -> {
                 filter.kind = "all";
                 filterChanged();
             }));
@@ -1275,7 +1919,7 @@ public class ExploreActivity extends Activity {
         rows.addView(results);
         Filter f = filter.copy();
         if (f.query.isEmpty() && f.empty() && current.equals(SEARCH)) {
-            resultsNote.setText(Ui.tr("Em alta na semana", "Trending this week"));
+            resultsNote.setText(Strings.get(R.string.trending_this_week));
             resultsNote.setVisibility(View.VISIBLE);
             startFeed(results, p -> Tmdb.titles(Tmdb.get("/trending/all/week?page=" + p), "movie"), null);
             return;
@@ -1309,13 +1953,13 @@ public class ExploreActivity extends Activity {
         boolean movie = kind.equals("movie");
         List<String> ids = new ArrayList<>(), keywords = new ArrayList<>(), origins = new ArrayList<>();
         for (String key : f.genres) {
-            String[] g = genre(key);
+            Genre g = genre(key);
             if (g == null) continue;
-            String id = movie ? g[3] : g[4];
-            if (id == null && g[5] == null && g[6] == null) return null;
+            String id = movie ? g.movie : g.show;
+            if (id == null && g.keyword == null && g.country == null) return null;
             if (id != null && !ids.contains(id)) ids.add(id);
-            if (g[5] != null) keywords.add(g[5]);
-            if (g[6] != null) origins.add(g[6]);
+            if (g.keyword != null) keywords.add(g.keyword);
+            if (g.country != null) origins.add(g.country);
         }
         StringBuilder p = new StringBuilder();
         if (!ids.isEmpty()) p.append("&with_genres=").append(TextUtils.join(",", ids));
@@ -1346,28 +1990,28 @@ public class ExploreActivity extends Activity {
         String[] range = yearRange(f.year);
         if (range != null && (t.date.length() < 10 || t.date.compareTo(range[0]) < 0 || t.date.compareTo(range[1]) > 0)) return false;
         for (String key : f.genres) {
-            String[] g = genre(key);
+            Genre g = genre(key);
             if (g == null) continue;
-            String id = t.kind.equals("movie") ? g[3] : g[4];
+            String id = t.kind.equals("movie") ? g.movie : g.show;
             if (id != null) {
                 boolean has = false;
                 for (int x : t.genres) has |= String.valueOf(x).equals(id);
                 if (!has) return false;
             }
-            if (g[7] != null && !g[7].equals(t.lang)) return false;
-            if (id == null && g[7] == null) return false;
+            if (g.language != null && !g.language.equals(t.lang)) return false;
+            if (id == null && g.language == null) return false;
         }
         return true;
     }
 
-    private static String[] genre(String key) {
-        for (String[] g : GENRES) if (g[0].equals(key)) return g;
+    private static Genre genre(String key) {
+        for (Genre g : GENRES) if (g.key.equals(key)) return g;
         return null;
     }
 
     private static String genreName(String key) {
-        String[] g = genre(key);
-        return g == null ? key : Ui.tr(g[1], g[2]);
+        Genre g = genre(key);
+        return g == null ? key : Strings.get(g.label);
     }
 
     /** "" (any), a year, a decade ("2010s") or "old" (before 1990). */
@@ -1383,10 +2027,12 @@ public class ExploreActivity extends Activity {
     }
 
     private static String yearLabel(String y) {
-        if (y.equals("old")) return Ui.tr("Antes de 1990", "Before 1990");
-        if (y.endsWith("s") && Ui.tur) return Turkish.decade(y.substring(0, 4));
-        if (y.endsWith("s")) return Ui.tr("Anos ", "The ") + y.substring(0, 4) + (Ui.tr("", "s"));
-        return y;
+        if (y.equals("old")) return Strings.get(R.string.before_1990);
+        if (!y.endsWith("s")) return y;
+        String year = y.substring(0, 4);
+        int label = Ui.tur && "13469".indexOf(year.charAt(2)) >= 0
+                ? R.string.decade_back_vowel : R.string.decade;
+        return Strings.get(label, year);
     }
 
     private static String[] yearRange(String y) {
@@ -1414,11 +2060,11 @@ public class ExploreActivity extends Activity {
         panel.setClipChildren(false);
         panel.setPaddingRelative(Math.round(56 * k), Math.round(56 * k), Math.round(56 * k), Math.round(56 * k));
         TextView h = TvUi.text(this, k, 48, Ui.displaySemibold, TvUi.INK);
-        h.setText(Ui.tr("Filtros", "Filters"));
+        h.setText(Strings.get(R.string.filters));
         panel.addView(h);
-        panel.addView(panelLabel(Ui.tr("Tipo", "Type")));
+        panel.addView(panelLabel(Strings.get(R.string.type)));
         TvUi.Flow kinds = panelFlow();
-        String[][] kindOptions = {{"all", Ui.tr("Tudo", "All")}, {"movie", Ui.tr("Filmes", "Movies")}, {"tv", Ui.tr("Séries", "Shows")}};
+        String[][] kindOptions = {{"all", Strings.get(R.string.all)}, {"movie", Strings.get(R.string.movies)}, {"tv", Strings.get(R.string.shows)}};
         List<TextView> kindChips = new ArrayList<>();
         for (String[] o : kindOptions) {
             TextView c = TvUi.toggle(this, k, o[1], draft.kind.equals(o[0]), v -> {
@@ -1430,22 +2076,22 @@ public class ExploreActivity extends Activity {
             kinds.addView(c);
         }
         panel.addView(kinds);
-        panel.addView(panelLabel(Ui.tr("Categorias (uma ou mais)", "Categories (one or more)")));
+        panel.addView(panelLabel(Strings.get(R.string.categories_one_or_more)));
         TvUi.Flow cats = panelFlow();
-        for (String[] g : GENRES) {
-            cats.addView(TvUi.toggle(this, k, Ui.tr(g[1], g[2]), draft.genres.contains(g[0]), v -> {
-                if (Boolean.TRUE.equals(v.getTag())) draft.genres.add(g[0]); else draft.genres.remove(g[0]);
+        for (Genre g : GENRES) {
+            cats.addView(TvUi.toggle(this, k, Strings.get(g.label), draft.genres.contains(g.key), v -> {
+                if (Boolean.TRUE.equals(v.getTag())) draft.genres.add(g.key); else draft.genres.remove(g.key);
             }));
         }
         panel.addView(cats);
-        panel.addView(panelLabel(Ui.tr("Lançamento", "Release")));
+        panel.addView(panelLabel(Strings.get(R.string.release)));
         TvUi.Flow yrs = panelFlow();
         List<TextView> yearChips = new ArrayList<>();
         List<String> options = new ArrayList<>();
         options.add("");
         options.addAll(years());
         for (String y : options) {
-            TextView c = TvUi.toggle(this, k, y.isEmpty() ? Ui.tr("Qualquer ano", "Any year") : yearLabel(y), draft.year.equals(y), v -> {
+            TextView c = TvUi.toggle(this, k, y.isEmpty() ? Strings.get(R.string.any_year) : yearLabel(y), draft.year.equals(y), v -> {
                 draft.year = y;
                 for (TextView other : yearChips) if (other != v && Boolean.TRUE.equals(other.getTag())) other.performClick();
                 v.setTag(true);
@@ -1456,7 +2102,7 @@ public class ExploreActivity extends Activity {
         panel.addView(yrs);
         TvUi.Flow buttons = panelFlow();
         buttons.setPaddingRelative(0, Math.round(40 * k), 0, 0);
-        TextView apply = TvUi.button(this, k, Ui.tr("Aplicar", "Apply"), v -> {
+        TextView apply = TvUi.button(this, k, Strings.get(R.string.apply), v -> {
             String query = filter.query;
             filter = draft;
             filter.query = query;
@@ -1464,7 +2110,7 @@ public class ExploreActivity extends Activity {
             filterChanged();
         });
         buttons.addView(apply);
-        buttons.addView(TvUi.button(this, k, Ui.tr("Limpar", "Clear"), v -> {
+        buttons.addView(TvUi.button(this, k, Strings.get(R.string.clear), v -> {
             String query = filter.query;
             filter = new Filter();
             filter.query = query;
@@ -1510,23 +2156,23 @@ public class ExploreActivity extends Activity {
     /** Categories: saves the filter as a menu item (a name the person can change). */
     private void askSave() {
         if (filter.empty()) {
-            Toast.makeText(this, Ui.tr("Escolha algo no filtro antes de salvar.", "Pick something in the filter first."), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, Strings.get(R.string.pick_something_in_the_filter_first), Toast.LENGTH_SHORT).show();
             return;
         }
         EditText name = new EditText(this);
         name.setSingleLine(true);
         name.setText(savedId != null ? label(savedId) : filter.label());
         new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle(Ui.tr("Nome no menu", "Name in the menu"))
+                .setTitle(Strings.get(R.string.name_in_the_menu))
                 .setView(name)
-                .setPositiveButton(Ui.tr("Salvar", "Save"), (d, w) -> {
+                .setPositiveButton(Strings.get(R.string.save), (d, w) -> {
                     String n = name.getText().toString().trim();
                     String id = savedId != null ? savedId : SAVED + System.currentTimeMillis();
                     saveFilter(id, n.isEmpty() ? filter.label() : n, filter);
                     fillMenu();
-                    Toast.makeText(this, Ui.tr("Salvo no menu", "Saved to the menu"), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, Strings.get(R.string.saved_to_the_menu), Toast.LENGTH_SHORT).show();
                 })
-                .setNegativeButton(Ui.tr("Cancelar", "Cancel"), null)
+                .setNegativeButton(Strings.get(R.string.cancel), null)
                 .show();
     }
 
@@ -1536,16 +2182,15 @@ public class ExploreActivity extends Activity {
         status.setVisibility(View.GONE);
         TvUi.Flow buttons = new TvUi.Flow(this, Math.round(18 * k), Math.round(18 * k));
         buttons.setPaddingRelative(Math.round(6 * k), Math.round(30 * k), Math.round(INSET * k), 0);
-        String account = Tmdb.signedIn(this) ? Ui.tr("Conta TMDB: ", "TMDB account: ") + Tmdb.accountName(this) : Ui.tr("Conectar conta TMDB", "Connect TMDB account");
+        String account = Tmdb.signedIn(this) ? Strings.get(R.string.tmdb_account_prefix) + Tmdb.accountName(this) : Strings.get(R.string.connect_tmdb_account);
         buttons.addView(TvUi.button(this, k, account, v -> startActivity(new Intent(this, TmdbLoginActivity.class))));
-        buttons.addView(TvUi.button(this, k, Ui.tr("Serviços e apps", "Services and apps"), v -> startActivity(new Intent(this, ServicesActivity.class))));
+        buttons.addView(TvUi.button(this, k, Strings.get(R.string.services_and_apps), v -> startActivity(new Intent(this, ServicesActivity.class))));
         rows.addView(buttons, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         TextView h = TvUi.text(this, k, 32, Ui.semibold, TvUi.INK);
-        h.setText(Ui.tr("Menu lateral", "Side menu"));
+        h.setText(Strings.get(R.string.side_menu));
         h.setPaddingRelative(0, Math.round(50 * k), 0, Math.round(8 * k));
         rows.addView(h);
-        rows.addView(note(Ui.tr("Buscar, Início e Minha lista ficam sempre no topo. OK num item: mover, ocultar ou remover.",
-                "Search, Home and My list always stay on top. OK on an item: move, hide or remove.")));
+        rows.addView(note(Strings.get(R.string.side_menu_edit_hint)));
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
         list.setPaddingRelative(0, Math.round(20 * k), 0, 0);
@@ -1573,29 +2218,29 @@ public class ExploreActivity extends Activity {
             name.setText(label(id));
             row.addView(name, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
             TextView state = TvUi.text(this, k, 24, Ui.regular, TvUi.DIM);
-            state.setText(hid.contains(id) ? Ui.tr("Oculto", "Hidden") : id.startsWith(SAVED) ? Ui.tr("Filtro salvo", "Saved filter")
-                    : id.startsWith(SERVICE) ? Ui.tr("Serviço", "Service") : "");
+            state.setText(hid.contains(id) ? Strings.get(R.string.hidden) : id.startsWith(SAVED) ? Strings.get(R.string.saved_filter)
+                    : id.startsWith(SERVICE) ? Strings.get(R.string.service) : "");
             row.addView(state);
             TvUi.softFocus(row, k, 18 * k);
             row.setOnClickListener(v -> {
                 List<String> labels = new ArrayList<>();
                 List<Runnable> actions = new ArrayList<>();
                 if (at > 0) {
-                    labels.add(Ui.tr("Mover para cima", "Move up"));
+                    labels.add(Strings.get(R.string.move_up));
                     actions.add(() -> move(id, -1));
                 }
                 if (at < ids.size() - 1) {
-                    labels.add(Ui.tr("Mover para baixo", "Move down"));
+                    labels.add(Strings.get(R.string.move_down));
                     actions.add(() -> move(id, 1));
                 }
                 boolean isHidden = hidden().contains(id);
-                labels.add(isHidden ? Ui.tr("Mostrar no menu", "Show in the menu") : Ui.tr("Ocultar do menu", "Hide from the menu"));
+                labels.add(isHidden ? Strings.get(R.string.show_in_the_menu) : Strings.get(R.string.hide_from_the_menu));
                 actions.add(() -> setHidden(id, !isHidden));
                 if (id.startsWith(SAVED)) {
-                    labels.add(Ui.tr("Remover", "Remove"));
+                    labels.add(Strings.get(R.string.remove_2));
                     actions.add(() -> removeSaved(id));
                 }
-                labels.add(Ui.tr("Cancelar", "Cancel"));
+                labels.add(Strings.get(R.string.cancel));
                 actions.add(null);
                 int[] xy = new int[2];
                 v.getLocationInWindow(xy);
@@ -1624,7 +2269,7 @@ public class ExploreActivity extends Activity {
     private final List<Object[]> heroList = new ArrayList<>();   // {title, tag}
     private int heroAt;
     private final Runnable heroTick = () -> {
-        if (hero == null || menuOpen || heroList.size() < 2) return;
+        if (hero == null || menuOpen || heroList.size() < 2 || isDestroyed() || io.isShutdown()) return;
         stepHero(1);
     };
 
@@ -1684,7 +2329,7 @@ public class ExploreActivity extends Activity {
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPaddingRelative(0, Math.round(28 * k), 0, 0);
         heroButton = TvUi.text(this, k, 27, Ui.medium, TvUi.INK);
-        heroButton.setText(Ui.tr("Ver detalhes", "Details"));
+        heroButton.setText(Strings.get(R.string.details));
         heroButton.setPaddingRelative(Math.round(34 * k), Math.round(16 * k), Math.round(34 * k), Math.round(16 * k));
         heroButton.setBackground(TvUi.round(0x33FFFFFF, 40 * k));
         bar.addView(heroButton);
@@ -1706,6 +2351,11 @@ public class ExploreActivity extends Activity {
         });
         hero.setOnClickListener(v -> {
             if (!heroList.isEmpty()) open((Tmdb.Title) heroList.get(heroAt)[0]);
+        });
+        hero.setOnLongClickListener(v -> {   // hold OK: the same menu as a poster's, for the title showing
+            if (heroList.isEmpty()) return false;
+            TitleMenu.show(this, heroButton, (Tmdb.Title) heroList.get(heroAt)[0]);
+            return true;
         });
         hero.setOnKeyListener((v, code, e) -> {
             // Next banner: → (← in Hebrew, which reads the other way); back one: the opposite key.
@@ -1779,12 +2429,7 @@ public class ExploreActivity extends Activity {
         heroTitle.setText(t.name);
         heroTitle.setVisibility(View.VISIBLE);
         heroLogo.setVisibility(View.GONE);
-        List<String> meta = new ArrayList<>();
-        meta.add(t.kind.equals("movie") ? Ui.tr("Filme", "Movie") : Ui.tr("Série", "Show"));
-        if (!t.year.isEmpty()) meta.add(t.year);
-        if (t.vote > 0) meta.add(String.format(Ui.PT, "★ %.1f", t.vote));
-        if (Tmdb.isSeen(this, t.kind, t.id)) meta.add("✓ " + Ui.tr("Assistido", "Seen"));
-        heroMeta.setText(TextUtils.join("  ·  ", meta));
+        showHeroMeta();
         heroOverview.setText(t.overview);
         for (int i = 0; i < heroDots.getChildCount(); i++) {
             heroDots.getChildAt(i).setBackground(TvUi.round(i == heroAt ? TvUi.INK : 0x59FFFFFF, 6 * k));
@@ -1802,6 +2447,16 @@ public class ExploreActivity extends Activity {
                 heroTitle.setVisibility(View.GONE);
             });
         });
+    }
+
+    private void showHeroMeta() {
+        Tmdb.Title t = (Tmdb.Title) heroList.get(heroAt)[0];
+        List<String> meta = new ArrayList<>();
+        meta.add(t.kind.equals("movie") ? Strings.get(R.string.movie) : Strings.get(R.string.show));
+        if (!t.year.isEmpty()) meta.add(t.year);
+        if (t.vote > 0) meta.add(String.format(Ui.PT, "★ %.1f", t.vote));
+        if (Tmdb.isSeen(this, t.kind, t.id)) meta.add("✓ " + Strings.get(R.string.seen));
+        heroMeta.setText(TextUtils.join("  ·  ", meta));
     }
 
     /** The title's logo (a transparent PNG) in the app's language, else English, else without text; null if none. */
@@ -1835,19 +2490,19 @@ public class ExploreActivity extends Activity {
         Set<String> seen = new HashSet<>();
         try {
             if (id.equals(HOME)) {
-                String picked = Ui.tr("Recomendado para você", "Picked for you");
+                String picked = Strings.get(R.string.picked_for_you);
                 List<Tmdb.Title> mine = forYou();
                 for (int i = 0; i < mine.size() && out.size() < 2; i++) addHero(out, seen, mine.get(i), picked);
                 for (Tmdb.Title t : Tmdb.titles(Tmdb.get("/trending/all/day"), "movie")) {
                     if (out.size() >= 7) break;
-                    addHero(out, seen, t, Ui.tr("Em alta hoje", "Trending today"));
+                    addHero(out, seen, t, Strings.get(R.string.trending_today));
                 }
             } else if (id.equals(TOP)) {
                 List<Tmdb.Title> tv = top(Tmdb.titles(Tmdb.get("/trending/tv/day"), "tv"));
                 List<Tmdb.Title> movies = top(Tmdb.titles(Tmdb.get("/trending/movie/day"), "movie"));
                 for (int i = 0; i < 4; i++) {
-                    if (i < tv.size()) addHero(out, seen, tv.get(i), Ui.tr("Nº " + (i + 1) + " em séries hoje", "No. " + (i + 1) + " in shows today"));
-                    if (i < movies.size()) addHero(out, seen, movies.get(i), Ui.tr("Nº " + (i + 1) + " em filmes hoje", "No. " + (i + 1) + " in movies today"));
+                    if (i < tv.size()) addHero(out, seen, tv.get(i), Strings.get(R.string.rank_in_shows_today, i + 1));
+                    if (i < movies.size()) addHero(out, seen, movies.get(i), Strings.get(R.string.rank_in_movies_today, i + 1));
                 }
             } else {
                 Service s = service(id);
@@ -1855,7 +2510,7 @@ public class ExploreActivity extends Activity {
                     for (Tmdb.Title t : mix(discover("tv", "&with_watch_providers=" + s.ids + "&sort_by=popularity.desc"),
                             discover("movie", "&with_watch_providers=" + s.ids + "&sort_by=popularity.desc"))) {
                         if (out.size() >= 6) break;
-                        addHero(out, seen, t, Ui.tr("Em alta na ", "Trending on ") + s.name);
+                        addHero(out, seen, t, Strings.get(R.string.trending_on_prefix) + s.name);
                     }
                 }
             }
@@ -1877,38 +2532,39 @@ public class ExploreActivity extends Activity {
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
         switch (id) {
             case TOP:
-                out.add(new Section(Ui.tr("Top 10 séries hoje", "Top 10 shows today"), () -> top(Tmdb.titles(Tmdb.get("/trending/tv/day"), "tv"))).ranked());
-                out.add(new Section(Ui.tr("Top 10 filmes hoje", "Top 10 movies today"), () -> top(Tmdb.titles(Tmdb.get("/trending/movie/day"), "movie"))).ranked());
+                out.add(new Section(Strings.get(R.string.top_10_shows_today), () -> top(Tmdb.titles(Tmdb.get("/trending/tv/day"), "tv"))).ranked());
+                out.add(new Section(Strings.get(R.string.top_10_movies_today), () -> top(Tmdb.titles(Tmdb.get("/trending/movie/day"), "movie"))).ranked());
                 return out;
             case HOME: {
-                out.add(new Section(Ui.tr("Minha lista", "My list"), () -> Tmdb.watchlist(this)).personal().more(() -> showPage(LIST)));
-                out.add(new Section(Ui.tr("Recomendado para você", "Recommended for you"), this::forYou).personal());
+                if (TmdbLists.on(this)) out.add(new Section(Strings.get(R.string.continue_watching), () -> TmdbLists.continueTitles(this)).personal());
+                out.add(new Section(Strings.get(R.string.my_list), () -> Tmdb.watchlist(this)).personal().more(() -> showPage(LIST)));
+                out.add(new Section(Strings.get(R.string.recommended_for_you), this::forYou));
                 List<Tmdb.Title> seen = Tmdb.seen(this);
                 Tmdb.Title last = seen.isEmpty() ? null : seen.get(0);
                 if (last != null) {
-                    out.add(new Section(Ui.tr("Porque você viu ", "Because you watched ") + last.name,
+                    out.add(new Section(Strings.get(R.string.because_you_watched_prefix) + last.name,
                             () -> fresh(Tmdb.titles(Tmdb.get("/" + last.kind + "/" + last.id + "/recommendations"), last.kind)))
-                            .personal().more("/" + last.kind + "/" + last.id + "/recommendations", last.kind));
+                            .more("/" + last.kind + "/" + last.id + "/recommendations", last.kind));
                 }
-                out.add(new Section(Ui.tr("Em alta hoje", "Trending today"), () -> Tmdb.titles(Tmdb.get("/trending/all/day"), "movie"))
+                out.add(new Section(Strings.get(R.string.trending_today), () -> Tmdb.titles(Tmdb.get("/trending/all/day"), "movie"))
                         .more("/trending/all/day", "movie"));
-                out.add(new Section(Ui.tr("Séries em alta na semana", "Trending shows this week"), () -> mine("tv", Tmdb.titles(Tmdb.get("/trending/tv/week"), "tv")))
+                out.add(new Section(Strings.get(R.string.trending_shows_this_week), () -> mine("tv", Tmdb.titles(Tmdb.get("/trending/tv/week"), "tv")))
                         .more(() -> showPage(SHOWS)));
-                out.add(new Section(Ui.tr("Filmes em alta na semana", "Trending movies this week"), () -> mine("movie", Tmdb.titles(Tmdb.get("/trending/movie/week"), "movie")))
+                out.add(new Section(Strings.get(R.string.trending_movies_this_week), () -> mine("movie", Tmdb.titles(Tmdb.get("/trending/movie/week"), "movie")))
                         .more(() -> showPage(MOVIES)));
                 int n = 0;
                 for (Service s : services()) {
                     if (n++ >= 6) break;
-                    out.add(new Section(Ui.tr("Em alta na ", "Trending on ") + s.name, () -> mix(
+                    out.add(new Section(Strings.get(R.string.trending_on_prefix) + s.name, () -> mix(
                             discover("tv", "&with_watch_providers=" + s.ids + "&sort_by=popularity.desc"),
                             discover("movie", "&with_watch_providers=" + s.ids + "&sort_by=popularity.desc")))
                             .more(() -> showPage(SERVICE + s.key)));
                 }
-                out.add(new Section(Ui.tr("Animes em alta", "Trending anime"), () -> fetch(Filter.of("all", "anime"), 1)).more(() -> showPage(ANIME)));
-                out.add(new Section(Ui.tr("Para as crianças", "For the kids"), () -> fetch(Filter.of("all", "infantil"), 1)).more(() -> showPage(KIDS)));
-                out.add(new Section(Ui.tr("Favoritos", "Favorites"), () -> Tmdb.accountList(this, "favorite")).personal());
-                out.add(new Section(Ui.tr("Suas notas", "Your ratings"), () -> Tmdb.accountList(this, "rated")).personal());
-                out.add(new Section(Ui.tr("Pessoas em alta", "Trending people"), () -> Tmdb.titles(Tmdb.get("/trending/person/week"), "person"))
+                out.add(new Section(Strings.get(R.string.trending_anime), () -> fetch(Filter.of("all", "anime"), 1)).more(() -> showPage(ANIME)));
+                out.add(new Section(Strings.get(R.string.for_the_kids), () -> fetch(Filter.of("all", "infantil"), 1)).more(() -> showPage(KIDS)));
+                out.add(new Section(Strings.get(R.string.favorites), () -> Tmdb.accountList(this, "favorite")).personal());
+                out.add(new Section(Strings.get(R.string.your_ratings), () -> Tmdb.accountList(this, "rated")).personal());
+                out.add(new Section(Strings.get(R.string.trending_people), () -> Tmdb.titles(Tmdb.get("/trending/person/week"), "person"))
                         .more("/trending/person/week", "person"));
                 return out;
             }
@@ -1916,17 +2572,17 @@ public class ExploreActivity extends Activity {
                 Service s = service(id);
                 if (s == null) return out;
                 String p = "&with_watch_providers=" + s.ids;
-                out.add(new Section(Ui.tr("Séries em alta", "Trending shows"), () -> discover("tv", p + "&sort_by=popularity.desc"))
+                out.add(new Section(Strings.get(R.string.trending_shows), () -> discover("tv", p + "&sort_by=popularity.desc"))
                         .more(discoverPath("tv", p + "&sort_by=popularity.desc"), "tv"));
-                out.add(new Section(Ui.tr("Filmes em alta", "Trending movies"), () -> discover("movie", p + "&sort_by=popularity.desc"))
+                out.add(new Section(Strings.get(R.string.trending_movies), () -> discover("movie", p + "&sort_by=popularity.desc"))
                         .more(discoverPath("movie", p + "&sort_by=popularity.desc"), "movie"));
                 String fresh = p + "&sort_by=primary_release_date.desc&primary_release_date.lte=" + today + "&vote_count.gte=20";
-                out.add(new Section(Ui.tr("Filmes recém-chegados", "New movies"), () -> discover("movie", fresh)).more(discoverPath("movie", fresh), "movie"));
+                out.add(new Section(Strings.get(R.string.new_movies), () -> discover("movie", fresh)).more(discoverPath("movie", fresh), "movie"));
                 String newShows = p + "&sort_by=first_air_date.desc&first_air_date.lte=" + today + "&vote_count.gte=10";
-                out.add(new Section(Ui.tr("Séries novas", "New shows"), () -> discover("tv", newShows)).more(discoverPath("tv", newShows), "tv"));
+                out.add(new Section(Strings.get(R.string.new_shows), () -> discover("tv", newShows)).more(discoverPath("tv", newShows), "tv"));
                 String best = p + "&sort_by=vote_average.desc&vote_count.gte=500";
-                out.add(new Section(Ui.tr("Séries mais bem avaliadas", "Top rated shows"), () -> discover("tv", best)).more(discoverPath("tv", best), "tv"));
-                out.add(new Section(Ui.tr("Filmes mais bem avaliados", "Top rated movies"), () -> discover("movie", best)).more(discoverPath("movie", best), "movie"));
+                out.add(new Section(Strings.get(R.string.top_rated_shows), () -> discover("tv", best)).more(discoverPath("tv", best), "tv"));
+                out.add(new Section(Strings.get(R.string.top_rated_movies), () -> discover("movie", best)).more(discoverPath("movie", best), "movie"));
                 return out;
             }
         }

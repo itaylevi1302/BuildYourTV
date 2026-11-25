@@ -1,10 +1,18 @@
-# Xiaomi MiTV-AESP0 (codename aquaman), Android TV 9 (SDK 28), firmware PI.2055.
+# Xiaomi Mi TV Stick, first generation 1080p (MDZ-24-AA on the box, reports as MiTV-AESP0, codename aquaman),
+# Android TV 9 (SDK 28), firmware PI.2055.
+# Not the Mi TV Stick 4K (MDZ-27-AA), which is a different device.
 # Stock launcher: com.google.android.tvlauncher (disabled by launcher/build-and-install.sh).
 # Live TV app: none (no tuner/HDMI inputs); com.google.android.tv is Live Channels.
 #
 # Apply:   TV_HOST=<tv ip> tools/disable.sh examples/xiaomi-mitv-aesp0/debloat.txt
 # Undo:    TV_HOST=<tv ip> tools/restore.sh examples/xiaomi-mitv-aesp0/debloat.txt
 # Everything is DISABLED, not uninstalled. Comment out any line you want to keep.
+#
+# Before applying:
+# - com.xiaomi.android.tvsetup.partnercustomizer is commented out: on many Xiaomi sets it handles Bluetooth
+#   remote pairing and the remote's shortcut buttons. Uncomment it only if you never re-pair the remote.
+# - com.google.android.tungsten.setupwraith stays in the list, but tools/disable.sh skips it while it owns the
+#   saved Wi-Fi network (see the fourth set). Disabling it costs casting, so comment it out to keep Chromecast.
 #
 # Notes from this firmware:
 # - Default IME is already Gboard, so the Mi TV 4A missing-keyboard quirk doesn't apply.
@@ -15,12 +23,16 @@
 #   so always pass HOME_KEY_SERVICE=1.
 #   `input keyevent 284` over adb skips the accessibility filter; test with the real remote.
 # - No HDMI/AV inputs: the launcher hides its Inputs pill by itself on this stick.
-# - Kept on this set: voice assistant (katniss/pumpkin), Chromecast (mediashell),
+# - Kept on this set: voice assistant (katniss/pumpkin), Chromecast (mediashell; casting also needs
+#   setupwraith, which the list disables),
 #   Mi Cast (com.mitv.milinkservice) and firmware updates (com.xiaomi.mitv.updateservice).
+# - After the last batch, wait about 40 s before rebooting (see the fourth set): with a shorter wait the
+#   last packages disabled can come back enabled after the reboot. Check with `adb shell pm list packages -d`.
 #
 # Second verified set (Indonesia-region unit, same firmware PI.2055, in daily use since
 # 21 Oct 2026 with Netflix / Jellyfin / SmartTube / Vidio): the groups marked
-# "second set" below are disabled on that stick on top of the original list.
+# "second set" below are disabled on that stick on top of the original list, including
+# partnercustomizer (now commented out by default, see above).
 # Region note: the ID unit has only the misspelled autoinstalls package below, and
 # none of the preloaded apps in the original list (DAZN, Red Bull TV, Duo, TCL browser).
 #
@@ -35,6 +47,58 @@
 # - Closing ADB: switching off "USB debugging" alone, then rebooting, left 5555 open. Switching off the
 #   Developer options master switch and rebooting closed it (tools/adb-closed.py: refused).
 # - Free memory: about 150 MB stock, about 265 MB right after a reboot with the list and the launcher.
+#
+# Fourth verified set (Peru unit, older firmware PI.1241, debloated 29 Oct 2026 with the launcher, HOME_KEY_SERVICE=1
+# and a dock of Netflix / YouTube / Disney+ / Prime Video). Every line below that was uncommented at the time and that
+# this firmware has was disabled (partnercustomizer included), except setupwraith; voice, Mi Cast and the updater
+# stayed enabled, and so did Chromecast. Notes from that unit:
+# - setupwraith owned the saved Wi-Fi network (`dumpsys wifi | grep -o 'cname=[^ ]*'` showed
+#   cname=com.google.android.tungsten.setupwraith), so it stayed enabled: disabling it would have taken the stick off
+#   Wi-Fi and ADB. tools/disable.sh checks this and skips setupwraith by itself. Keeping it is also why
+#   casting kept working on that unit.
+# - Not installed on PI.1241: android.autoinstalls.config.xiaomi.mibox3 (only the "xioami" one is), com.dazn, Red Bull TV,
+#   Duo, the TCL browser, com.mitv.tvhome.atv, com.mitv.download.service, com.mitv.videoplayer, com.xm.webcontent and
+#   Alphonso. tools/disable.sh reports those lines and goes on.
+# - After the last batch, `sync` and a 15 s wait were not enough: after the reboot the last eight packages
+#   were enabled again. Disabling them again and waiting about 40 s before the reboot kept all of them.
+# - The real Home button returned to the launcher with HOME_KEY_SERVICE=1.
+# - Closing ADB: revoking the USB debugging authorisations, switching off the Developer options master switch and
+#   rebooting closed 5555 (tools/adb-closed.py: refused), as on the third set.
+#
+# Fifth verified set (PI.1727 unit, one session on 19 Nov 2026, reboot-checked but not yet in daily use, reported
+# in #4194): the 39 packages it sent are all lines this list already carries, except the four kept commented out
+# below that the owner turned off by choice - voice (katniss, pumpkin), Chromecast (mediashell) and Mi Cast
+# (milinkservice). No line below was added or re-enabled for this set. Notes from that unit:
+# - Not installed on PI.1727: com.dazn, Google Duo, Red Bull TV and the TCL browser, the same four missing on
+#   PI.1241 (the fourth set); tools/disable.sh reports those lines and goes on.
+# - Left enabled: setupwraith (it owned the saved Wi-Fi network, as on the fourth set), com.google.android.tv
+#   (tools/disable.sh found the TV-input intent handlers and skipped it; no HANDLERS_ALLOW override), mitv.service
+#   (that set's settings app is Google's, so the #1310 freeze was not seen there) and partnercustomizer, which is
+#   commented out here by default.
+# - The three stock screensavers were disabled only after selecting the launcher's ClockDream and setting
+#   screensaver_enabled=1. The clock choice was confirmed; an idle screensaver session was not.
+# - Removing the recommendation and voice packages left the stock Home black for a moment; it came back on its
+#   own and the owner confirmed the normal screen. No restart was needed.
+# - HOME_KEY_SERVICE=1 was used and the physical Home button returned to the launcher, before and after a reboot.
+#   That remote's keycode was not captured, so this set says nothing about ALL_APPS versus HOME.
+# - After a sync, a 40 s wait (the fourth set's advice) and a reboot, tools/check.py found all 39 still disabled
+#   and Home resolving to com.gathin.tvhome/.MainActivity.
+# - Closing ADB: revoking the USB-debugging authorisations, switching off USB debugging and the Developer options
+#   master switch, then rebooting, left 5555 refusing (tools/adb-closed.py), as on the third set.
+# The reporter calls this an initial variant report and plans a persistence check after several days of use, so
+# the 39 are a one-session readback rather than a soak test, and no OTA cycle was run (the updater stayed on).
+#
+# Sixth verified set (PI.2055 unit, patch 2022-08-05, over ADB on Wi-Fi, with the launcher and HOME_KEY_SERVICE=1).
+# The last three batches were applied on 9 Nov 2026 with tools/disable.sh; on 23 Nov 2026, after two weeks in
+# use, `pm list packages -d` showed 48 disabled, every one of them a line this list carries, one of the extras below
+# or tvlauncher, which launcher/build-and-install.sh disables. No line below was added or re-enabled for this set. Notes from that unit:
+# - Also off by the owner's choice: voice (katniss, pumpkin), com.google.android.tts, TalkBack, Mi Cast
+#   (milinkservice), the firmware updater (com.xiaomi.mitv.updateservice, so no OTA reaches that stick),
+#   Netflix, Prime Video, YouTube Kids (com.google.android.youtube.tvkids), com.android.htmlviewer and
+#   com.dsi.ant.service.socket (ANT+ radio).
+# - Left enabled: setupwraith (it owns one of the saved Wi-Fi networks), Chromecast (mediashell) and partnercustomizer.
+# - Before the replacement launcher, the stick ran FLauncher (me.efesser.flauncher) as Home with tvlauncher
+#   disabled; launcher/build-and-install.sh then made com.gathin.tvhome Home, and FLauncher was removed later.
 
 # Xiaomi + Google telemetry
 com.miui.tv.analytics
@@ -62,14 +126,18 @@ com.xiaomo.tv.milegal                       # Xiaomi privacy-policy screen (sic,
 
 # Xiaomi services (second set)
 # mitv.service registers the TvService system service that Xiaomi's own settings app reads the hardware
-# configuration from. Disabled on a China-market set whose settings app is com.xiaomi.mitv.settings it
-# freezes Settings for 20-30 s and then crashes it (#1310); the second set has run with the line below
+# configuration from. On a China-market set whose settings app is com.xiaomi.mitv.settings, disabling it
+# freezes Settings for 20-30 s and then crashes it (#1310). The second set has run with the line below
 # disabled in daily use since 21 Oct 2026. Why, and how to put the service back without a reboot:
 # docs/TROUBLESHOOTING.md#xiaomi-cn-firmware-settings-freezes-or-crashes-after-the-debloat
 mitv.service                                # MiTV service framework for the rows removed above
 com.mitv.download.service                   # PatchWall download service
 com.mitv.videoplayer                        # stock Mi video player; comment out if you use it
-com.xiaomi.android.tvsetup.partnercustomizer  # partner customisation that seeds partner apps at setup
+# partnercustomizer handles Bluetooth remote pairing on many Xiaomi sets and answers the remote's shortcut
+# buttons (Netflix, Prime Video, Input): a MiTV-MSSP3 owner got those buttons back by enabling it again
+# (Discussion #1411). Commented out by default so a remote that needs re-pairing still can; the second and
+# fourth sets disable it. Uncomment only if you never re-pair the remote and don't use those buttons.
+# com.xiaomi.android.tvsetup.partnercustomizer  # partner customisation that seeds partner apps at setup
 
 # Xiaomi services (second set, optional — the original set keeps these)
 # com.xiaomi.mitv.updateservice             # firmware updates; the original set keeps it, uncomment to stop OTAs
@@ -79,7 +147,8 @@ com.xiaomi.android.tvsetup.partnercustomizer  # partner customisation that seeds
 com.google.android.tv                       # Live Channels; the stick has no tuner or HDMI input
 # (com.android.providers.tv, the TV content provider, stays enabled: the repo never disables it)
 com.google.android.videos                   # Google Play Movies & TV
-com.google.android.youtube.tvmusic         # YouTube Music TV
+com.google.android.youtube.tvmusic          # YouTube Music TV
+# setupwraith: tools/disable.sh skips it while it owns the saved Wi-Fi network (the fourth set kept it for that).
 com.google.android.tungsten.setupwraith     # setup wizard: gives Home back, costs casting (comment out to keep casting)
 com.google.android.partnersetup
 com.google.android.onetimeinitializer
@@ -106,10 +175,13 @@ com.google.android.backdrop
 com.android.dreams.basic
 com.mitv.dream
 
+# Casting (kept by the original, second and fourth sets; the third set disabled it)
+# com.google.android.apps.mediashell        # Chromecast receiver; uncomment if you never cast
+
 # Voice, accessibility, phone remote (second set, optional; the original set keeps voice, so these stay
 # commented out here: uncomment the ones you don't use)
 # com.google.android.katniss                # voice search; the voice stack barely works on this firmware
 # com.google.android.speech.pumpkin
 # com.google.android.tts                    # text-to-speech; keep it if anything reads text aloud
 # com.google.android.marvin.talkback        # accessibility; only disable if nobody uses TalkBack
-# com.google.android.tv.remote.service      # kept enabled: phone-as-remote and the remote's mic bridge
+# com.google.android.tv.remote.service      # phone-as-remote and the remote's mic bridge; the third set disabled it

@@ -1,16 +1,22 @@
 package io.cleanyourtv.ui;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.net.Uri;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * TMDB's streaming services in the region and the TV app that opens each one: the person's pick (Settings >
@@ -78,6 +84,13 @@ final class Providers {
         return out;
     }
 
+    /** The services' names as last fetched, never from the network: empty until the list was loaded once. */
+    static synchronized List<String> cachedNames() {
+        List<String> out = new ArrayList<>();
+        if (cached != null) for (Provider p : cached) out.add(p.name);
+        return out;
+    }
+
     /** The official app for a service name when it is installed, or null. */
     static String officialApp(Context c, String name) {
         String n = name.toLowerCase(Locale.ROOT);
@@ -122,5 +135,25 @@ final class Providers {
         } catch (Exception e) {
             return pkg;
         }
+    }
+
+    /**
+     * Apps that specifically handle a YouTube watch URL - the official app, SmartTube, NewPipe-style clients and
+     * the rest - found by diffing the handlers of a youtube.com link against the handlers of an unrelated https
+     * link, so a general-purpose browser (which answers both) is never offered as a "trailer player".
+     */
+    static List<String> youtubePlayers(Context c) {
+        PackageManager pm = c.getPackageManager();
+        Set<String> browsers = new HashSet<>();
+        for (ResolveInfo ri : pm.queryIntentActivities(new Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/")), 0)) {
+            browsers.add(ri.activityInfo.packageName);
+        }
+        List<String> out = new ArrayList<>();
+        Intent yt = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
+        for (ResolveInfo ri : pm.queryIntentActivities(yt, 0)) {
+            String pkg = ri.activityInfo.packageName;
+            if (!browsers.contains(pkg) && !out.contains(pkg)) out.add(pkg);
+        }
+        return out;
     }
 }

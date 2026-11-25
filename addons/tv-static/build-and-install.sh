@@ -6,7 +6,7 @@
 #        TV_HOST=192.168.1.50 addons/tv-static/build-and-install.sh --no-play     # install without playing it now
 #        TV_HOST=192.168.1.50 addons/tv-static/build-and-install.sh --uninstall
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
+HERE="$(cd "$(dirname "$0")" && (pwd -W 2>/dev/null || pwd))"
 TOOLS="$HERE/../../tools"
 : "${TV_HOST:?set TV_HOST to the TV IP address, e.g. TV_HOST=192.168.1.50 $0}"
 PY="$TOOLS/venv/bin/python"
@@ -25,7 +25,9 @@ PLAY=true
 
 (cd "$HERE" && ./gradlew assembleRelease -q) || { echo "build failed (JDK 17 and Android SDK 34 needed; see launcher/README)" >&2; exit 1; }
 "$PY" -I "$TOOLS/b64push.py" "$HERE/app/build/outputs/apk/release/app-release.apk" /data/local/tmp/tvstatic.apk >/dev/null
-tv "pm install -r /data/local/tmp/tvstatic.apk; rm -f /data/local/tmp/tvstatic.apk"
+OUT="$(tv 'pm install -r /data/local/tmp/tvstatic.apk; rm -f /data/local/tmp/tvstatic.apk')"
+echo "$OUT"
+case "$OUT" in *Success*) ;; *) echo "ERROR: pm install failed" >&2; exit 1 ;; esac
 # Android 10 and later let an app open a screen from the background only when it may draw over other apps.
 tv "appops set $PKG SYSTEM_ALERT_WINDOW allow"
 # TCL's TclAppBoot keeps apps from starting at boot unless they may auto-start (AUTO_START on G08 builds,

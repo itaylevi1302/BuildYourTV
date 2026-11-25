@@ -9,10 +9,26 @@
    - The first line is a comment with the exact model, Android version and firmware build
      (`tools/tv.py --probe` prints them).
    - Then the Apply and Undo lines, the stock launcher and Live TV package if they differ, and what was kept and why.
+     `tests/test_list_gives_commands.py` refuses a header that names none of the five scripts and no
+     README: a folder whose firmware needs a batch of its own gives the commands in its `README.md`
+     instead, which counts.
    - One package per line, grouped under a comment that names the group, with a trailing comment on anything
      non-obvious. No duplicates, nothing but package names outside comments.
+   - A folder may ship a second list beside `debloat.txt` - `debloat-keep-cast.txt` for the unit that keeps
+     casting, `debloat-65u7esg.txt` for another unit - named for the unit it is for or what it keeps. An owner
+     applies it with `tools/disable.sh` like the first, so every `debloat*.txt` is read the same way: its own
+     first line, its own Apply and Undo, and the rule above (one of the five scripts, or the folder's
+     `README.md`), which `tests/test_list_gives_commands.py` holds for each list rather than for `debloat.txt`
+     alone.
 3. List only packages you actually disabled and lived with for a few days. Note anything you re-enabled.
    Mark untested entries as comments.
+   - A package the next owner may want goes in commented out, not on an active line. The person's own streaming
+     apps, the firmware updater and the phone-remote service (`com.google.android.tv.remote.service`) are choices
+     each owner makes for themselves, so a set that found one of them unused keeps the line in the list under a
+     note that says so (`# This set has these off; uncomment the ones you don't use`) rather than sending
+     `pm disable-user` at it: a live line takes that app off a TV whose owner wanted it, and the line is commented
+     out on merge anyway. The TV middleware `PROMPT.md` keeps on is written the same way, in the list and never
+     sent.
 4. Add `examples/<folder>/tv.json` beside the list, like `examples/xiaomi-mi-tv-4a/tv.json`:
    ```json
    {
@@ -22,18 +38,97 @@
      "notes": "PatchWall, Mi analytics, SmartShare, MiLink"
    }
    ```
-   `tv` and `os` fill the folder's row in both TV tables, `brand` the brand line (spelled as it is there),
+   `tv` and `os` fill the folder's row in the TV tables, `brand` the README's brand grid (spelled as it is there),
    `notes` the Notes cell in `examples/README.md`: one line of Markdown, links relative to `examples/`, `\|`
-   for a pipe. `readme_os` is the one optional key: it is the OS cell of the front page's two-column table,
+   for a pipe. Three things in it are read back: a package named in backticks with `kept`, `disabled` or
+   `refused` straight after it is a claim about what the list does, and
+   `tests/test_example_readme_package_fates.py` holds it to the lists the folder ships - `kept` and `refused`
+   have to be off an active line of every one of them, `disabled` on an active line of any (the stock launcher
+   `launcher/build-and-install.sh` takes Home from is the exception) - so a package left commented out is not
+   `disabled` however the comment reads, a package any list still sends is not `kept`, and a package a second
+   list turns off can be stated as `disabled`. The other is a package count ("19 packages"), which the same
+   test compares with the number of packages `debloat.txt` sends, so a line commented out of `debloat.txt` moves
+   the number in the row with it - a row that also counts a second list says which list it means. The third is
+   the name of every list in the folder: a folder that ships a `debloat-*.txt` beside `debloat.txt` (step 2)
+   names that file in `notes`, because the row is the only place a reader browsing the tables learns the list
+   exists, and a row that names a list the folder does not ship is refused the same way -
+   `tests/test_second_lists_named_in_row.py` holds both directions. Any other
+   wording after the name claims nothing, which is
+   how `notes` stays free prose. `readme_os` is the one optional key: it is the OS cell of the two-column
+   table in `README.nl.md`,
    for a set whose row there should read shorter than the same set's row in `examples/README.md` - that table
-   has room for `Google TV launcher on Android TV 11`, the front page for `Google TV 11`.
+   has room for `Google TV launcher on Android TV 11`, the short one for `Google TV 11`.
    `tests/test_examples.py` checks the file.
-5. Change nothing outside the folder. The tables in `README.md` and `examples/README.md`, the brand line and the
-   counts (the `TV models` number in the card's alt text) are generated from every `tv.json` by
-   `tools/gen_tables.py`, which a maintainer runs after merging; CI compares them only on `main`.
-6. A `README.md` for TV-specific notes and a `config.json` with the dock are welcome in the folder. Do not add
-   install or restore scripts, Private DNS or AdGuard setup, or `pm uninstall` steps: the folder only
-   disables, and `tools/disable.sh` and `tools/restore.sh` do the rest.
+5. Change nothing outside the folder. The tables in `examples/README.md` and `README.nl.md`, the brand grid in
+   `README.md`, `README.nl.md`, `README.de.md`, `README.uk.md` and `README.tr.md`, and the counts (the
+   `TV models` number in the card's alt text) are generated from every `tv.json` by `tools/gen_tables.py`,
+   which a maintainer runs after merging; CI compares them only on `main`.
+   One copy of those counts is outside the generated blocks: the story sentence that shows the card on the same
+   five front pages ("The lists now cover 387 TV models from 103 brands") is prose, so a regeneration moves the
+   picture and leaves the sentence where it was - the round that took the tree to 387 models shipped 380 in the
+   story two screens below the card. `tests/test_press_counts.py` reads the pair out of the sentence and holds it
+   to the alt text beside it (`README.de.md states (TV models, brands) (380, 101) in its story sentence and its
+   card states (387, 103)`), so they move in the same commit. The sentence is not only on those five pages:
+   `README.pt-BR.md`, `README.he.md`, `README.uz.md`, `README.fr.md` and `README.es.md` carry the story
+   paragraph without the card, so `tools/gen_tables.py` writes nothing there and the same check holds their
+   pair to `README.md`'s alt text in the same words a card page's pair is held to - a regeneration that bumps
+   the five pages above and stops leaves those five red. A translation that copies the story paragraph joins
+   them the day it lands.
+   The brand grid itself is hand-kept on one page:
+   `README.he.md` carries neither the card nor the `tv-brands` markers, so `tools/gen_tables.py` cannot write
+   it and `tests/test_readme_he_brand_block.py` reads its grid, its two-list line, its single-list names and
+   its `<summary>` numbers against README.md's copy - a regeneration moves the Hebrew page with it, while a
+   list PR, which touches only its own folder, leaves both pages where they were and stays green.
+6. A `README.md` for TV-specific notes and a `config.json` with the dock are welcome in the folder. So is a
+   picture, while a page shows it: a screenshot left beside the list that no page links is one a reader never
+   sees, and `tests/test_example_pictures_linked.py` names every one of them
+   (`examples/<folder>/home.jpg`), so it has to be shown by an image in the folder's own `README.md` or by a
+   `docs/devices/` note that displays it - otherwise screenshots belong in the pull request, not the tree. The
+   suffix has to be true as well: `tests/test_image_files.py` reads the first bytes of every image-named file,
+   so a PNG saved as base64 text is refused by name rather than drawing a broken picture on GitHub (two had
+   landed that way). A theme subfolder's `wallpapers/` is the exception to the first check, because the
+   launcher picks one picture out of that folder and no page names it.
+   Notes are free prose; three things in a README are read back, two of them against the list beside it.
+   A whole theme may sit in a theme/ subfolder beside the list instead of a `config.json` at the folder's
+   root: six folders do (`motorola-mt4310`, `nokia-streaming-box-8000`, `philips-google-tv-ta7`,
+   `tivo-stream-4k`, `xiaomi-mi-box-s`, `xiaomi-mitv-afmu0`), a wallpaper and a wallpapers/ collection
+   included, and the folder's own `README.md` is where the owner is told to edit it and push it with
+   `TV_HOST=<tv ip> tools/theme.sh examples/philips-google-tv-ta7/theme`. Both checks that read a shipped `config.json`
+   (`tests/test_shipped_config_keys_are_read.py` and `tests/test_shipped_config_values.py`) walk
+   `examples/` at any depth, so a key or a value in that subfolder is judged where it sits rather than
+   skipped. `tools/theme.sh` is handed the folder that holds the `config.json` you are pushing, which for
+   a theme is the subfolder. `examples/xiaomi-mitv-afmu0` is the one of the six that also keeps a
+   `config.json` at the folder's own root, from a second unit of the same board: the subfolder is the
+   theme its `README.md` has the owner push, and the root file is that other unit's dock and button map.
+   A package count ("The 38 packages that were disabled", "the debloat list disables 71 packages", "The
+   list disables **N packages**", "The list contains N packages", "`debloat.txt` is the list: N
+   packages") is compared with what `tools/disable.sh` would send for the list, so a line added or
+   commented out later moves the number in the README with it: `tests/test_example_list_count.py` answers
+   `examples/<folder>/README.md says 12 packages in the debloat.txt row and its debloat.txt carries 8`. A
+   sentence that only says "The list disables 10 packages" is read while `debloat.txt` is the folder's
+   only list, and not in the folders that also ship a `debloat-keep-cast.txt` or another list beside it,
+   where those words could be about that file. What a second list's own header states about the pair is read
+   instead: "eight more packages are off here than there" is counted against what that list sends and
+   `debloat.txt` does not, in digits or words, by `tests/test_list_header_counts.py`. A sentence the page wraps
+   across two lines is still read as one sentence, so a break cannot hide the number. Its undo
+   is the other: the restore command a README shows passes the same stock launcher as the list's own Undo line,
+   or none where the list passes none, because those two are where an owner looks for the way back and the copy
+   that passes a different package leaves the stock home disabled. `tests/test_folder_undo_agrees.py` names each
+   difference (the Skyworth 7S60_A5 README passed the Coocaa home while its list passed nothing). The third is
+   a path from the repository root written in backticks, which is what a reader copies into a terminal: the
+   file `launcher/build-and-install.sh` with its suffix, never the bare name, and
+   `tests/test_example_readme_paths.py` reads every folder's README and names each path this tree does not have
+   (a Windows twin written with backslashes, a placeholder such as `examples/<your tv>/debloat.txt` and the
+   folders `.gitignore` lists are not read as paths). That
+   `config.json` takes only the keys `themes/README.md`'s Keys table says a theme can set: the rows it marks
+   `config.xml` only - the vendor settings screens, the icon tiles - are never read out of a pushed file, so
+   `theme.sh` drops them without a word and the launcher keeps its own value. A set that needs one wants that
+   line in the folder's `README.md`, for the owner to set in `launcher/app/src/main/res/values/config.xml`
+   before building. `tests/test_shipped_config_keys_are_read.py` holds every shipped `config.json` to the
+   table. Do not add install or restore scripts, Private DNS or AdGuard setup, or `pm uninstall` steps: the
+   folder only disables, and `tools/disable.sh` and `tools/restore.sh` do the rest.
+   `tests/test_list_folders_ship_lists_only.py` holds every folder under `examples/` to that, so a script
+   in the folder is a red suite rather than a second answer to the undo every list already has.
 
 A model with notes but no several-day list goes in `docs/devices/<brand-model>.md`, with one line under the notes
 list at the end of `examples/README.md`. A folder in `examples/` must have packages in it.
@@ -41,9 +136,14 @@ list at the end of `examples/README.md`. A folder in `examples/` must have packa
 ## Update an existing list
 
 Keep the header accurate: add the second unit's model, firmware and region rather than replacing the first.
-Explain each added or re-enabled package in a comment. A list that disables the firmware updater says why in the
-header; keeping it enabled is preferred. `pm hide` or `pm block` needs the matching undo in the header. Edits to
-someone else's list are judgement calls, so say in the PR which TV you tested on and for how long. If the row
-should say something new, change the folder's `tv.json`, not the tables.
+Explain each added or re-enabled package in a comment. If the folder's README says how many packages the list
+holds, that number moves with the list in the same edit (step 6). A list that disables the firmware updater says
+why in the header; keeping it enabled is preferred. `pm hide` or `pm block` needs the matching undo in the header.
+Edits to someone else's list are judgement calls, so say in the PR which TV you tested on and for how long. If the
+row should say something new, change the folder's `tv.json`, not the tables.
 
-Then run the tests: `python3 -m unittest discover -s tests -v`.
+Then run the tests with the checkout's venv: `tools/venv/bin/python -m unittest discover -s tests -v`.
+[`README.md`'s by-hand block](../../README.md) builds it, and it is where `tools/requirements.txt` puts the
+`adb_shell` the suite imports - under the system `python3` those checks skip and the run still says OK. The
+picture, card and wallpaper checks need Pillow as well: `tools/requirements-perf.txt` adds it, and without it
+they are reported as skips, not failures.

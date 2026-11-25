@@ -39,7 +39,7 @@ final class TvConfig {
 
     static boolean validAction(String action) {
         return action.isEmpty() || action.equals("home") || action.equals("settings") || action.equals("live")
-                || action.equals("tmdb:explore") || action.equals("tmdb:watchlist")
+                || action.equals("tmdb:explore") || action.equals("tmdb:watchlist") || action.equals(RemoteKeys.INPUTS)
                 || action.matches("input:[A-Za-z0-9_.$/]{1,200}") || validPackage(action);
     }
 
@@ -72,6 +72,11 @@ final class TvConfig {
             // "dock_apps" is the CleanYourTV launcher's name for the shelf: a theme's config.json works as is.
             JSONArray shelf = o.has("shelf") ? o.optJSONArray("shelf") : o.optJSONArray("dock_apps");
             if (shelf != null) Prefs.setShelf(packages(shelf));
+            if (o.has("shelf_order")) {   // "manual" (the default) or "recent": Settings > Shelf > Shelf order (#63)
+                String order = o.optString("shelf_order").trim();
+                if (order.equals("manual") || order.equals("recent")) Prefs.setShelfRecent(order.equals("recent"));
+                else AppLog.w("config.json: shelf_order skipped");
+            }
             JSONArray hidden = o.optJSONArray("hidden_apps");
             if (hidden != null) Prefs.setHidden(packages(hidden));
             JSONObject city = o.optJSONObject("city");
@@ -80,10 +85,22 @@ final class TvConfig {
                         String.valueOf(city.getDouble("longitude")));
             }
             if (o.has("theme")) Prefs.setTheme(o.getString("theme"));
+            if (o.has("top_of_screen")) {
+                String top = o.optString("top_of_screen").trim();
+                if (top.equals(Prefs.TOP_PICKS) || top.equals(Prefs.TOP_CONTINUE)) Prefs.setTopOfScreen(top);
+                else AppLog.w("config.json: top_of_screen skipped");
+            }
             if (o.has("temperature")) Prefs.setTemperature(o.getString("temperature"));
             if (o.has("weather")) Prefs.setWeather(o.getBoolean("weather"));
+            if (o.has("status_icons")) Prefs.setStatusIcons(o.getBoolean("status_icons"));
             if (o.has("language")) Prefs.setLanguage(o.getString("language"));
             if (o.has("clock")) Prefs.setClockFormat(o.getString("clock"));
+            if (o.has("power_on")) {
+                String powerOn = o.optString("power_on").trim();
+                if (java.util.Arrays.asList(Prefs.POWER_ON).contains(powerOn)) Prefs.setPowerOn(powerOn);
+                else AppLog.w("config.json: power_on skipped");
+            }
+            if (o.has("forecast")) Prefs.setForecast(o.getString("forecast"));
             if (o.has("screensaver")) Prefs.setScreensaverStyle(o.getString("screensaver"));
             if (o.has("show_crypto")) Prefs.setQuotes(o.getBoolean("show_crypto"));
             String currency = o.optString("currency").trim();
@@ -138,6 +155,9 @@ final class TvConfig {
                 }
             }
             if (o.has("show_all_providers")) Prefs.setShowAllProviders(o.getBoolean("show_all_providers"));
+            if (o.has("show_system_apps")) Prefs.setSystemApps(o.getBoolean("show_system_apps"));
+            if (o.has("screensaver_ok")) Prefs.setScreensaverOk(o.getBoolean("screensaver_ok"));
+            if (o.has("app_store_button")) Prefs.setStoreButton(o.getBoolean("app_store_button"));
             AppLog.w("config.json applied");
             return true;
         } catch (Exception e) {

@@ -1,7 +1,8 @@
 # Keeps this fork current with CleanYourTV: every day, merges Gathin23/cleanyourtv's main into main.
 #
-# The fork only adds files, except README.md, which is the fork's own: upstream's README goes to
-# README.cleanyourtv.md on every sync (with a line pointing back here), so README.md never stays in conflict.
+# The fork only adds files, except README.md and README.pt-BR.md, which are the fork's own: upstream's go to
+# README.cleanyourtv.md and README.cleanyourtv.pt-BR.md on every sync (with a line pointing back here), so neither
+# stays in conflict.
 # Any other conflict, or a push GitHub refuses, opens one issue with what to run by hand.
 #
 # Pushing a merge that brings upstream changes to .github/workflows needs a token with the "workflows" permission:
@@ -45,14 +46,24 @@ jobs:
             exit 0
           fi
           git merge --no-commit --no-ff upstream/main || true
-          # README.md is ours; upstream's goes to README.cleanyourtv.md.
+          # README.md and README.pt-BR.md are ours; upstream's go to README.cleanyourtv.md and
+          # README.cleanyourtv.pt-BR.md, with their links between the two pointed at the copies.
           git checkout --ours README.md 2>/dev/null || git checkout HEAD -- README.md
+          git checkout --ours README.pt-BR.md 2>/dev/null || git checkout HEAD -- README.pt-BR.md
           {
             echo "> **CleanYourTV UI:** this is [CleanYourTV](https://github.com/Gathin23/cleanyourtv)'s README, copied on every sync. This fork's is [README.md](README.md) ([Português](README.pt-BR.md))."
             echo
-            git show upstream/main:README.md
+            git show upstream/main:README.md | sed 's/README\.pt-BR\.md/README.cleanyourtv.pt-BR.md/g'
           } > README.cleanyourtv.md
-          git add README.md README.cleanyourtv.md
+          if git cat-file -e upstream/main:README.pt-BR.md 2>/dev/null; then
+            {
+              echo "> **CleanYourTV UI:** este é o README em português do [CleanYourTV](https://github.com/Gathin23/cleanyourtv), copiado a cada sync. O deste fork é o [README.pt-BR.md](README.pt-BR.md)."
+              echo
+              git show upstream/main:README.pt-BR.md | sed -e 's/"README\.md"/"README.cleanyourtv.md"/g' -e 's/(README\.md)/(README.cleanyourtv.md)/g'
+            } > README.cleanyourtv.pt-BR.md
+            git add README.cleanyourtv.pt-BR.md
+          fi
+          git add README.md README.pt-BR.md README.cleanyourtv.md
           if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
             echo "Conflicts:"; git diff --name-only --diff-filter=U
             git merge --abort
@@ -81,7 +92,7 @@ jobs:
             exit 0
           fi
           if [ "$STATUS" = conflict ]; then
-            why="Merging upstream main conflicts with this fork's changes (README.md is handled; the conflict is elsewhere)."
+            why="Merging upstream main conflicts with this fork's changes (README.md and README.pt-BR.md are handled; the conflict is elsewhere)."
           else
             why="The merge is clean, but GitHub refused the push: upstream changed .github/workflows, which needs the SYNC_TOKEN secret (see the comment at the top of sync-upstream.yml)."
           fi
@@ -92,7 +103,9 @@ jobs:
           \`\`\`bash
           git remote add upstream https://github.com/Gathin23/cleanyourtv.git  # once
           git fetch upstream && git merge upstream/main
-          git checkout --ours README.md && git show upstream/main:README.md > README.cleanyourtv.md  # keep our README
+          git checkout --ours README.md README.pt-BR.md  # keep our READMEs; then copy upstream's as the workflow does
+          git show upstream/main:README.md > README.cleanyourtv.md
+          git show upstream/main:README.pt-BR.md > README.cleanyourtv.pt-BR.md
           git push origin main
           \`\`\`
 

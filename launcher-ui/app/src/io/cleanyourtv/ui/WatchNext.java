@@ -1,179 +1,253 @@
 package io.cleanyourtv.ui;
 
+import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.ContentResolver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.media.tv.TvContract;
 import android.net.Uri;
-import android.os.ParcelFileDescriptor;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * The TV provider's Continue watching (Watch Next) rows and preview programs, as other apps publish them. Needs
- * READ_TV_LISTINGS; without ACCESS_ALL_EPG_DATA a reader sees only rows marked searchable (docs/watch-next.md upstream).
+ * Continue Watching (Home Settings → Top of the screen): what you left half-way in your apps, from Android TV's own
+ * lists (TvContract): the system Watch Next list, where Prime Video, Disney+, Max, Plex and others note it, and the
+ * home screen rows some apps name "Continue Watching" instead (Stremio). Newest first, PER_APP per app and MAX in all.
+ * Reading other apps' entries needs READ_TV_LISTINGS, which only ADB grants (build-and-install.sh WATCH_NEXT=1).
+ * Read only while that choice is on, when the home screen comes back (HomeView.reload), never polled; without the
+ * permission, or on a TV without the provider, the list is empty. From Free My TV PR 42 (WatchNext.java).
  */
 final class WatchNext {
     private WatchNext() {}
 
-    private static final String[] COLUMNS = {"package_name", "title", "episode_title", "season_display_number",
-        "episode_display_number", "watch_next_type", "last_engagement_time_utc_millis", "last_playback_position_millis",
-        "duration_millis", "poster_art_uri", "intent_uri"};
+    static final String PERMISSION = "android.permission.READ_TV_LISTINGS";
+    static final int PER_APP = 2, MAX = 6;
+    /** Rows read from one table, at most, whatever the apps wrote there. */
+    private static final int READ_MAX = 60;
+    /** Channel names that mean "continue watching" (apps name their own channel). */
+    private static final Set<String> CHANNEL_NAMES = new HashSet<>(Arrays.asList(
+            "continue watching", "seguir viendo", "continuar viendo", "continuar assistindo", "continue assistindo"));
 
-    /** A text dump for the ADB shell (ConfigProvider "watchnext.txt"): counts, then one tab-separated line per row. */
-    static ParcelFileDescriptor dump(Context c) throws FileNotFoundException {
-        StringBuilder out = new StringBuilder();
-        out.append("# watch_next\n");
-        rows(c, TvContract.WatchNextPrograms.CONTENT_URI, out);
-        out.append("# preview_program\n");
-        rows(c, TvContract.PreviewPrograms.CONTENT_URI, out);
-        try {
-            ParcelFileDescriptor[] pipe = ParcelFileDescriptor.createPipe();
-            byte[] bytes = out.toString().getBytes(StandardCharsets.UTF_8);
-            new Thread(() -> {
-                try (OutputStream o = new ParcelFileDescriptor.AutoCloseOutputStream(pipe[1])) {
-                    o.write(bytes);
-                } catch (IOException ignored) {
-                }
-            }).start();
-            return pipe[0];
-        } catch (IOException e) {
-            throw new FileNotFoundException(e.getMessage());
-        }
-    }
-
-    /** One title to continue: what the app published, with how far along it is (0 to 1). */
     static final class Item {
-        String pkg, title, intent, imdb, poster;
-        int season, episode;
-        float progress;
-        long engaged;
-    }
+        String pkg, title, app, season, number, episodeTitle, intent;
+        long duration, position, engaged;
+        /** The card's picture (the thumbnail, usually 16:9, before the poster); null when it isn't one we read. */
+        Uri picture;
 
-    /**
-     * The titles to continue, most recent first: started (a position past 1 %), not finished (under 97 %), touched in the
-     * last 60 days, one per title. Empty without READ_TV_LISTINGS or when no app publishes any.
-     */
-    static java.util.List<Item> items(Context c) {
-        java.util.List<Item> out = new java.util.ArrayList<>();
-        java.util.Set<String> seen = new java.util.HashSet<>();
-        long since = System.currentTimeMillis() - 60L * 24 * 3600_000L;
-        try (Cursor cur = c.getContentResolver().query(TvContract.WatchNextPrograms.CONTENT_URI, null, null, null, null)) {
-            while (cur != null && cur.moveToNext()) {
-                Item it = new Item();
-                it.pkg = text(cur, "package_name");
-                it.title = text(cur, "title");
-                it.intent = text(cur, "intent_uri");
-                it.season = number(cur, "season_display_number");
-                it.episode = number(cur, "episode_display_number");
-                it.engaged = cur.getLong(Math.max(0, cur.getColumnIndex("last_engagement_time_utc_millis")));
-                long pos = cur.getLong(Math.max(0, cur.getColumnIndex("last_playback_position_millis")));
-                long dur = cur.getLong(Math.max(0, cur.getColumnIndex("duration_millis")));
-                it.progress = dur > 0 ? Math.min(1f, (float) pos / dur) : 0;
-                if (it.title.isEmpty() || it.intent.isEmpty() || it.engaged < since) continue;
-                if (dur > 0 && (it.progress < 0.01f || it.progress > 0.97f)) continue;
-                if (seen.add(it.pkg + "\n" + it.title)) out.add(it);
-            }
-        } catch (RuntimeException e) {
-            AppLog.w("continue watching: " + e.getMessage());
+        /** 0 to 1, or -1 when there is no position worth showing (not started, or no length). */
+        float progress() {
+            if (duration <= 0 || position < 1000 || position >= duration) return -1;
+            return (float) position / duration;
         }
-        stremio(c, out, seen);
-        // Most recent first; Stremio's rows have no date, so they keep their own order after the dated ones.
-        java.util.Collections.sort(out, (a, b) -> Long.compare(b.engaged, a.engaged));
-        return out;
-    }
 
-    private static final String STREMIO = "com.stremio.one";
-    private static final java.util.regex.Pattern IMDB = java.util.regex.Pattern.compile("/(tt\\d+)");
-    private static final java.util.regex.Pattern EPISODE = java.util.regex.Pattern.compile("%3A(\\d+)%3A(\\d+)");
-
-    /**
-     * Stremio publishes no Watch Next rows, but its preview channel holds what is in progress (a playback position
-     * and a stremio:// link with the IMDb id, and season and episode for a show). Started, unfinished titles only.
-     */
-    private static void stremio(Context c, java.util.List<Item> out, java.util.Set<String> seen) {
-        try (Cursor cur = c.getContentResolver().query(TvContract.PreviewPrograms.CONTENT_URI, null, null, null, null)) {
-            while (cur != null && cur.moveToNext()) {
-                if (!STREMIO.equals(text(cur, "package_name"))) continue;
-                long pos = cur.getLong(Math.max(0, cur.getColumnIndex("last_playback_position_millis")));
-                long dur = cur.getLong(Math.max(0, cur.getColumnIndex("duration_millis")));
-                if (dur <= 0) continue;
-                Item it = new Item();
-                it.pkg = STREMIO;
-                it.title = text(cur, "title");
-                it.intent = text(cur, "intent_uri");
-                it.progress = Math.min(1f, (float) pos / dur);
-                if (it.title.isEmpty() || !it.intent.startsWith("stremio:") || it.progress < 0.02f || it.progress > 0.97f) continue;
-                java.util.regex.Matcher m = IMDB.matcher(it.intent);
-                if (m.find()) it.imdb = m.group(1);
-                m = EPISODE.matcher(it.intent);
-                if (m.find()) {
-                    it.season = Integer.parseInt(m.group(1));
-                    it.episode = Integer.parseInt(m.group(2));
-                }
-                if (seen.add(it.pkg + "\n" + it.title)) out.add(it);
-            }
-        } catch (RuntimeException e) {
-            AppLog.w("continue watching, Stremio: " + e.getMessage());
+        /** Minutes still to watch, or 0 when progress() has none. */
+        int minutesLeft() {
+            return progress() < 0 ? 0 : (int) Math.max(1, (duration - position) / 60_000);
         }
     }
 
-    private static final String YOUTUBE = "com.google.android.youtube.tv";
+    /**
+     * Pictures on the TV, read through the apps' own providers, or an https address the app left there (Netflix does),
+     * which only NetPicture fetches. Never a file, never plain http.
+     */
+    static Uri picture(String s) {
+        if (s == null || s.isEmpty()) return null;
+        Uri uri = Uri.parse(s);
+        String scheme = uri.getScheme();
+        return "content".equalsIgnoreCase(scheme) || "android.resource".equalsIgnoreCase(scheme)
+                || "https".equalsIgnoreCase(scheme) ? uri : null;
+    }
 
-    /** YouTube's recommended videos from its preview channels (single videos only, no playlists), in its order. */
-    static java.util.List<Item> youtube(Context c, int max) {
-        java.util.List<Item> out = new java.util.ArrayList<>();
-        try (Cursor cur = c.getContentResolver().query(TvContract.PreviewPrograms.CONTENT_URI, null, null, null, null)) {
-            java.util.Set<String> seen = new java.util.HashSet<>();
-            while (cur != null && cur.moveToNext() && out.size() < max) {
-                if (!YOUTUBE.equals(text(cur, "package_name"))) continue;
-                Item it = new Item();
-                it.pkg = YOUTUBE;
-                it.title = text(cur, "title");
-                it.intent = text(cur, "intent_uri");
-                it.poster = text(cur, "poster_art_uri");
-                it.progress = -1;
-                if (it.title.isEmpty() || !it.intent.contains("watch?v=") || !it.poster.startsWith("https://")) continue;
-                if (seen.add(it.intent)) out.add(it);
-            }
-        } catch (RuntimeException e) {
-            AppLog.w("YouTube picks: " + e.getMessage());
+    static boolean allowed(Context c) {
+        return c.checkSelfPermission(PERMISSION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /** Everything to show, newest first (off the main thread: these are content provider queries). */
+    static List<Item> load(Context c) {
+        if (!allowed(c)) return Collections.emptyList();
+        ContentResolver cr = c.getContentResolver();
+        List<Item> all = new ArrayList<>(read(c, cr, TvContract.WatchNextPrograms.CONTENT_URI));
+        for (long channel : continueChannels(cr, c.getPackageName())) {
+            all.addAll(read(c, cr, TvContract.buildPreviewProgramsUriForChannel(channel)));
+        }
+        Collections.sort(all, (a, b) -> Long.compare(b.engaged, a.engaged));
+        List<Item> out = new ArrayList<>();
+        Map<String, Integer> perApp = new HashMap<>();
+        Set<String> seen = new HashSet<>();
+        for (Item it : all) {
+            if (it.pkg.equals(c.getPackageName())) continue;
+            String key = it.pkg + "|" + (it.intent != null ? it.intent : it.title);
+            int n = perApp.containsKey(it.pkg) ? perApp.get(it.pkg) : 0;
+            if (n >= PER_APP || !seen.add(key)) continue;
+            perApp.put(it.pkg, n + 1);
+            it.app = appName(c, it.pkg);
+            out.add(it);
+            if (out.size() >= MAX) break;
         }
         return out;
     }
 
-    private static String text(Cursor c, String col) {
-        int i = c.getColumnIndex(col);
-        return i < 0 || c.isNull(i) ? "" : c.getString(i);
+    /** Same cards as before (a reload that changes nothing redraws nothing). */
+    static boolean same(List<Item> a, List<Item> b) {
+        if (a.size() != b.size()) return false;
+        for (int i = 0; i < a.size(); i++) {
+            Item x = a.get(i), y = b.get(i);
+            if (!x.pkg.equals(y.pkg) || !x.title.equals(y.title) || x.position != y.position || x.duration != y.duration
+                    || !String.valueOf(x.picture).equals(String.valueOf(y.picture))) return false;
+        }
+        return true;
     }
 
-    private static int number(Cursor c, String col) {
+    /** Resumes it where you left it (the app's own link); if that link can't be used, the app from its start. */
+    static boolean open(Activity a, Item it) {
+        Intent link = it.intent == null ? null : linkIntent(it.intent, it.pkg, a.getPackageName());
+        if (link != null && link.resolveActivity(a.getPackageManager()) != null) {
+            try {
+                a.startActivity(link.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                return true;
+            } catch (ActivityNotFoundException | SecurityException e) {
+                AppLog.w("continue watching link: " + e.getClass().getSimpleName());
+            }
+        }
+        Intent launch = HomeApps.launchIntent(a.getPackageManager(), it.pkg);
+        if (launch == null) return false;
         try {
-            return Integer.parseInt(text(c, col).trim());
-        } catch (NumberFormatException e) {
-            return 0;
+            a.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            return true;
+        } catch (ActivityNotFoundException | SecurityException e) {
+            AppLog.w("couldn't open " + it.pkg + ": " + e.getClass().getSimpleName());
+            return false;
         }
     }
 
-    private static void rows(Context c, Uri uri, StringBuilder out) {
-        // No selection: a caller without ACCESS_ALL_EPG_DATA gets a SecurityException when it passes one.
-        try (Cursor cur = c.getContentResolver().query(uri, null, null, null, null)) {
-            if (cur == null) {
-                out.append("no cursor\n");
-                return;
-            }
-            out.append("count ").append(cur.getCount()).append('\n');
-            while (cur.moveToNext() && out.length() < 200_000) {
-                for (String col : COLUMNS) {
-                    int i = cur.getColumnIndex(col);
-                    out.append(i < 0 || cur.isNull(i) ? "" : cur.getString(i).replace('\t', ' ').replace('\n', ' ')).append('\t');
-                }
-                out.append('\n');
-            }
-        } catch (RuntimeException e) {
-            out.append("error ").append(e).append('\n');
+    /**
+     * Another app wrote this link: it only ever opens that app (never ours or a third one), with no selector and no
+     * URI permissions handed along. Null if it can't be used. From Free My TV PR 42 (HomeView.linkIntent).
+     */
+    static Intent linkIntent(String uri, String pkg, String self) {
+        if (pkg == null || pkg.equals(self)) return null;
+        Intent intent;
+        try {
+            intent = uri.startsWith("intent:") ? Intent.parseUri(uri, Intent.URI_INTENT_SCHEME)
+                    : new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
+        } catch (java.net.URISyntaxException | RuntimeException e) {   // a bad launchFlags= throws NumberFormatException
+            AppLog.w("continue watching link: " + e.getClass().getSimpleName());
+            return null;
         }
+        if (intent.getComponent() != null && !intent.getComponent().getPackageName().equals(pkg)) return null;
+        intent.setSelector(null);
+        intent.setPackage(pkg);
+        intent.setFlags(intent.getFlags() & ~(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION));
+        return intent;
+    }
+
+    private static String appName(Context c, String pkg) {
+        try {
+            PackageManager pm = c.getPackageManager();
+            return String.valueOf(pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)));
+        } catch (PackageManager.NameNotFoundException e) {
+            return "";
+        }
+    }
+
+    private static List<Long> continueChannels(ContentResolver cr, String self) {
+        List<Long> ids = new ArrayList<>();
+        try (Cursor cur = cr.query(TvContract.Channels.CONTENT_URI,
+                new String[] {TvContract.Channels._ID, TvContract.Channels.COLUMN_DISPLAY_NAME,
+                        TvContract.Channels.COLUMN_PACKAGE_NAME}, null, null, null)) {
+            if (cur == null) return ids;
+            int id = cur.getColumnIndex(TvContract.Channels._ID);
+            int name = cur.getColumnIndex(TvContract.Channels.COLUMN_DISPLAY_NAME);
+            int pkg = cur.getColumnIndex(TvContract.Channels.COLUMN_PACKAGE_NAME);
+            while (cur.moveToNext() && ids.size() < 4) {
+                String n = name < 0 ? null : cur.getString(name), p = pkg < 0 ? null : cur.getString(pkg);
+                if (n != null && CHANNEL_NAMES.contains(n.trim().toLowerCase(Locale.ROOT)) && !self.equals(p)) {
+                    ids.add(cur.getLong(id));
+                }
+            }
+        } catch (RuntimeException e) {   // no permission on some firmware, or no provider at all
+            AppLog.w("continue watching channels: " + e.getClass().getSimpleName());
+        }
+        return ids;
+    }
+
+    private static List<Item> read(Context c, ContentResolver cr, Uri uri) {
+        List<Item> out = new ArrayList<>();
+        PackageManager pm = c.getPackageManager();
+        boolean watchNext = TvContract.WatchNextPrograms.CONTENT_URI.equals(uri);
+        List<String> projection = new ArrayList<>(Arrays.asList(
+                TvContract.WatchNextPrograms.COLUMN_BROWSABLE,
+                TvContract.WatchNextPrograms.COLUMN_TITLE,
+                TvContract.WatchNextPrograms.COLUMN_PACKAGE_NAME,
+                TvContract.WatchNextPrograms.COLUMN_SEASON_DISPLAY_NUMBER,
+                TvContract.WatchNextPrograms.COLUMN_EPISODE_DISPLAY_NUMBER,
+                TvContract.WatchNextPrograms.COLUMN_EPISODE_TITLE,
+                TvContract.WatchNextPrograms.COLUMN_DURATION_MILLIS,
+                TvContract.WatchNextPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS,
+                TvContract.WatchNextPrograms.COLUMN_POSTER_ART_URI,
+                TvContract.WatchNextPrograms.COLUMN_THUMBNAIL_URI,
+                TvContract.WatchNextPrograms.COLUMN_INTENT_URI));
+        // Preview programs have no engagement time or Watch Next type.
+        if (watchNext) {
+            projection.add(TvContract.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS);
+            projection.add(TvContract.WatchNextPrograms.COLUMN_WATCH_NEXT_TYPE);
+        }
+        String order = watchNext ? TvContract.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS + " DESC" : null;
+        try (Cursor cur = cr.query(uri, projection.toArray(new String[0]), null, null, order)) {
+            if (cur == null) return out;
+            int rows = 0;
+            while (cur.moveToNext() && rows++ < READ_MAX) {
+                if ("0".equals(text(cur, TvContract.WatchNextPrograms.COLUMN_BROWSABLE))) continue;
+                // Saved for later, not something you're in the middle of.
+                if (watchNext && number(cur, TvContract.WatchNextPrograms.COLUMN_WATCH_NEXT_TYPE)
+                        == TvContract.WatchNextPrograms.WATCH_NEXT_TYPE_WATCHLIST) continue;
+                String title = text(cur, TvContract.WatchNextPrograms.COLUMN_TITLE);
+                String pkg = text(cur, TvContract.WatchNextPrograms.COLUMN_PACKAGE_NAME);
+                if (title == null || title.trim().isEmpty() || pkg == null) continue;
+                Item it = new Item();
+                it.pkg = pkg;
+                it.title = title.trim();
+                String thumbnail = text(cur, TvContract.WatchNextPrograms.COLUMN_THUMBNAIL_URI);
+                it.picture = picture(thumbnail != null ? thumbnail : text(cur, TvContract.WatchNextPrograms.COLUMN_POSTER_ART_URI));
+                // An app without network can't make the TV fetch an address for it.
+                if (it.picture != null && "https".equalsIgnoreCase(it.picture.getScheme())
+                        && pm.checkPermission(android.Manifest.permission.INTERNET, pkg) != PackageManager.PERMISSION_GRANTED) {
+                    it.picture = null;
+                }
+                it.season = text(cur, TvContract.WatchNextPrograms.COLUMN_SEASON_DISPLAY_NUMBER);
+                it.number = text(cur, TvContract.WatchNextPrograms.COLUMN_EPISODE_DISPLAY_NUMBER);
+                it.episodeTitle = text(cur, TvContract.WatchNextPrograms.COLUMN_EPISODE_TITLE);
+                it.duration = number(cur, TvContract.WatchNextPrograms.COLUMN_DURATION_MILLIS);
+                it.position = number(cur, TvContract.WatchNextPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS);
+                it.engaged = number(cur, TvContract.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS);
+                it.intent = text(cur, TvContract.WatchNextPrograms.COLUMN_INTENT_URI);
+                out.add(it);
+            }
+        } catch (RuntimeException e) {   // a provider that refuses (no permission on some firmware) means nothing to show
+            AppLog.w("continue watching: " + e.getClass().getSimpleName());
+        }
+        return out;
+    }
+
+    private static String text(Cursor c, String column) {
+        int i = c.getColumnIndex(column);
+        return i < 0 || c.isNull(i) ? null : c.getString(i);
+    }
+
+    private static long number(Cursor c, String column) {
+        int i = c.getColumnIndex(column);
+        return i < 0 || c.isNull(i) ? 0 : c.getLong(i);
     }
 }
