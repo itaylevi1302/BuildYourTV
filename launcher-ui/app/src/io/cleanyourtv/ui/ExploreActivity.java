@@ -292,6 +292,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
     }
 
     @Override protected void onDestroy() {
+        main.removeCallbacks(heroTick);   // a carousel step after this would hand work to the closed pool and crash
         io.shutdownNow();
         super.onDestroy();
     }
@@ -2265,7 +2266,7 @@ public class ExploreActivity extends Activity implements TitleMenu.Host {
     private final List<Object[]> heroList = new ArrayList<>();   // {title, tag}
     private int heroAt;
     private final Runnable heroTick = () -> {
-        if (hero == null || menuOpen || heroList.size() < 2) return;
+        if (hero == null || menuOpen || heroList.size() < 2 || isDestroyed() || io.isShutdown()) return;
         stepHero(1);
     };
 
