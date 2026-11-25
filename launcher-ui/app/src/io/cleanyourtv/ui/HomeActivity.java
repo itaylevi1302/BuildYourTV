@@ -26,6 +26,7 @@ public class HomeActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        ParentalTimer.showLock(this);   // parental control: Home doesn't get around a used-up allowance
         TvConfig.apply(this);
         if (prefsVersion != Prefs.version) {
             prefsVersion = Prefs.version;

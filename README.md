@@ -17,6 +17,9 @@ repository adds the parts below. It was built and tested on a TCL Smart TV Pro (
 | **YouTube picks** | YouTube's recommended videos on the first tab, with sharp thumbnails, opening in YouTube. |
 | **Screensaver** | Starts on its own on Android 12 too; an aurora that works without Android 13; Google Photos as a third choice. |
 | **Settings** | Redesigned and mirrored, with icons and a status block, plus switches for Continue watching, YouTube picks, ad blocking (Private DNS) and the screensaver delay. |
+| **Parental control** | A time limit for the viewing session (Settings › Parental control). When it runs out a lock screen covers whatever plays: more time or turning parental control off needs the parents' 4-digit code, otherwise the TV turns off a minute later. Home, the app buttons and turning the TV off and on don't get around it. |
+| **USB** | A USB item beside the HDMI inputs opens the TV's media centre for a stick's videos and photos (dimmed with no stick in). |
+| **Older TVs** | Tested on Android TV 9 too (TCL BeyondTV): Hebrew there needs the old `iw` resource code, which the build adds. |
 | **From the computer** | Read the settings changed on the TV back into `config.json`, and dump what the TV's apps publish. |
 
 The app's package stays `io.cleanyourtv.ui`, so an existing install updates in place and keeps its settings.

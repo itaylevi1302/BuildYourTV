@@ -243,6 +243,22 @@
             android:process=":keys"
             android:exported="false" />
 
+        <!-- BuildYourTV parental control: the end of the allowance (ParentalTimer) and the lock screen over whatever plays,
+             both in the key service's process, which may start our window over other apps (no overlay permission). -->
+        <receiver
+            android:name=".ParentalReceiver"
+            android:process=":keys"
+            android:exported="false" />
+        <activity
+            android:name=".ParentalLockActivity"
+            android:process=":keys"
+            android:exported="false"
+            android:taskAffinity="io.cleanyourtv.ui.parental"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen" />
+
         <!-- The sleep timer's last minute over whatever plays: our own window, started by the key service's process,
              so no overlay permission. -->
         <activity

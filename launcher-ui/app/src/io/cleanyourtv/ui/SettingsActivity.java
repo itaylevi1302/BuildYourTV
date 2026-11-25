@@ -147,7 +147,7 @@ public class SettingsActivity extends Activity {
         private String liveButtonText;   // that row's value, read again after a change (the TV's inputs are a system call)
         private int liveButtonAt;
         private int pickFor, pickCurrent, pickScroll, keysScroll;   // pickFor: the remote button (index + 1)
-        private static final int PICK_CITY = 0, PICK_SLEEP = -1;   // PICK_SLEEP: Sleep Timer's choices
+        private static final int PICK_CITY = 0, PICK_SLEEP = -1, PICK_PARENTAL = -2;   // PICK_SLEEP: Sleep Timer's choices
         private final List<String[]> cities = new ArrayList<>();
         private String cityStatus = "";
         // The sleep timer's row: minutes left (0: off) and whether the key service can turn the TV off; read by the poll.
@@ -254,6 +254,7 @@ public class SettingsActivity extends Activity {
                         case DELAY_ROW: return label + ", " + saverMinutes() + Ui.tr(" min", " min");
                         case REMOTE_ROW: return label + ", " + onOff(remoteOn());
                         case SLEEP_ROW: return label + ", " + sleepValue();
+                        case PARENTAL_ROW: return label + ", " + parentalValue();
                         case TMDB_ROW: return Strings.get(R.string.tmdb_account_prefix_2) + account();
                         default: return label;
                     }
@@ -432,15 +433,15 @@ public class SettingsActivity extends Activity {
         // MARK: - Main list: four sections of rows, as in the Apple TV's settings
 
         private static final int HOME_ROW = 0, SHELF_ROW = 1, INPUTS_ROW = 2, WATCH_ROW = 3, YOUTUBE_ROW_M = 4, STYLE_ROW = 5,
-                DELAY_ROW = 6, ADS_ROW_M = 7, REMOTE_ROW = 8, SLEEP_ROW = 9, SERVICES_ROW = 10, TMDB_ROW = 11, TV_ROW = 12,
-                MAIN_ROWS = 13;
+                DELAY_ROW = 6, ADS_ROW_M = 7, REMOTE_ROW = 8, SLEEP_ROW = 9, PARENTAL_ROW = 10, SERVICES_ROW = 11, TMDB_ROW = 12,
+                TV_ROW = 13, MAIN_ROWS = 14;
         private static final int[] SECTION_START = {HOME_ROW, STYLE_ROW, ADS_ROW_M, TMDB_ROW, MAIN_ROWS};
         private static final String[] MAIN_ICONS = {"home", "apps", "hdmi", "play", "tv", "sparkles", "clear_night", "check",
-                "tune", "bedtime", "live_tv", "sync", "tv_settings"};
+                "tune", "bedtime", "lock", "live_tv", "sync", "tv_settings"};
         private static final int[] MAIN_COLORS = {0xFF0A84FF, 0xFF5E5CE6, 0xFF32ADE6, 0xFFFF375F, 0xFFFF3B30, 0xFFBF5AF2,
-                0xFFFF9F0A, 0xFF30D158, 0xFF0FA3C8, 0xFF5856D6, 0xFFE0A800, 0xFF8E8E93, 0xFF636366};
+                0xFFFF9F0A, 0xFF30D158, 0xFF0FA3C8, 0xFF5856D6, 0xFFFF2D55, 0xFFE0A800, 0xFF8E8E93, 0xFF636366};
         /** Design units: where the list starts, a row's height and the gaps around a section's card. */
-        private static final float M_TOP = 118, M_HEADER = 38, M_ROW = 50, M_GAP = 2, M_PAD = 6, M_AFTER = 12;
+        private static final float M_TOP = 118, M_HEADER = 38, M_ROW = 46, M_GAP = 2, M_PAD = 6, M_AFTER = 12;
 
         private String[] sectionNames() {
             return new String[] {Ui.tr("Tela inicial", "Home screen"), Strings.get(R.string.screensaver),
@@ -451,7 +452,7 @@ public class SettingsActivity extends Activity {
             return new String[] {Ui.tr("Ajustes do Início", "Home Settings"), Ui.tr("Prateleira", "Shelf"),
                     Strings.get(R.string.inputs), Ui.tr("Continuar assistindo", "Continue watching"), Ui.tr("Sugestões do YouTube", "YouTube picks"),
                     Ui.tr("Estilo", "Style"), Ui.tr("Começa após", "Starts after"), Ui.tr("Bloqueio de anúncios", "Ad blocking"),
-                    Ui.tr("Botões do Controle", "Remote Buttons"), Strings.get(R.string.sleep_timer), Ui.tr("Serviços", "Services"), Strings.get(R.string.tmdb_account),
+                    Ui.tr("Botões do Controle", "Remote Buttons"), Strings.get(R.string.sleep_timer), ParentalLockActivity.t("Parental control", "בקרת הורים"), Ui.tr("Serviços", "Services"), Strings.get(R.string.tmdb_account),
                     Ui.tr("Ajustes da TV", "TV Settings")};
         }
 
@@ -470,6 +471,8 @@ public class SettingsActivity extends Activity {
                         "A DNS that blocks ad and tracking servers in every app. It doesn't block YouTube's ads."),
                 Ui.tr("O que fazem os botões Netflix, YouTube e outros do controle.", "What the remote's Netflix, YouTube and other buttons do."),
                 Ui.tr("Desliga a TV depois dos minutos que você escolher.", "Turns the TV off after the minutes you pick."),
+                ParentalLockActivity.t("A time limit for this viewing session. When it runs out, a lock screen asks for your code to add time, or turns the TV off.",
+                        "הגבלת זמן לצפייה הזו. כשהזמן נגמר, מסך נעילה מבקש את קוד ההורים כדי להוסיף זמן, או מכבה את הטלוויזיה."),
                 Ui.tr("De quais serviços vêm as sugestões.", "Which streaming services the recommendations come from."),
                 Ui.tr("A conta da sua lista e das suas notas.", "The account behind your list and your ratings."),
                 Ui.tr("Abre os ajustes normais da TV.", "Opens the TV's own settings.")};
@@ -517,7 +520,8 @@ public class SettingsActivity extends Activity {
             Paint fillTile = new Paint(Paint.ANTI_ALIAS_FLAG);
             fillTile.setColor(MAIN_COLORS[i]);
             c.drawRoundRect(tmp, 10 * k, 10 * k, fillTile);
-            Symbols.draw(getContext(), c, MAIN_ICONS[i], tmp.centerX(), tmp.centerY(), 24 * k, 0xFFFFFFFF);
+            if ("lock".equals(MAIN_ICONS[i])) Padlock.draw(c, tmp.centerX(), tmp.centerY(), 24 * k, 0xFFFFFFFF, MAIN_COLORS[i]);
+            else Symbols.draw(getContext(), c, MAIN_ICONS[i], tmp.centerX(), tmp.centerY(), 24 * k, 0xFFFFFFFF);
             rowLabel.setColor(blend(0xF2FFFFFF, INK, f));
             atStart(c, label, base, rowLabel, tile + 4 * k);
             // The row's end: a switch, a value in a pill, a status, or a chevron to a page.
@@ -534,6 +538,10 @@ public class SettingsActivity extends Activity {
                 case SLEEP_ROW:
                     endIcon(c, "chevron_right", 22 * k, blend(0x66FFFFFF, 0x991C1C1E, f));
                     drawPill(c, sleepValue(), f, 34 * k);
+                    break;
+                case PARENTAL_ROW:
+                    endIcon(c, "chevron_right", 22 * k, blend(0x66FFFFFF, 0x991C1C1E, f));
+                    drawPill(c, parentalValue(), f, 34 * k);
                     break;
                 case SHELF_ROW:
                     endIcon(c, "chevron_right", 22 * k, blend(0x66FFFFFF, 0x991C1C1E, f));
@@ -603,6 +611,7 @@ public class SettingsActivity extends Activity {
         private int parentRow() {
             if (screen == SHELF_EDIT) return editingInputs ? INPUTS_ROW : SHELF_ROW;
             if (screen == PICKER && pickFor == PICK_SLEEP) return SLEEP_ROW;
+            if (screen == PICKER && pickFor == PICK_PARENTAL) return PARENTAL_ROW;
             if (screen == REMOTE_KEYS || (screen == PICKER && pickFor != PICK_CITY)) return REMOTE_ROW;
             return HOME_ROW;
         }
@@ -614,7 +623,8 @@ public class SettingsActivity extends Activity {
             p.setColor(MAIN_COLORS[i]);
             p.setShadowLayer(30 * k, 0, 12 * k, 0x59000000);
             c.drawRoundRect(tmp, 40 * k, 40 * k, p);
-            Symbols.draw(getContext(), c, MAIN_ICONS[i], cx, tmp.centerY(), 100 * k, 0xFFFFFFFF);
+            if ("lock".equals(MAIN_ICONS[i])) Padlock.draw(c, cx, tmp.centerY(), 100 * k, 0xFFFFFFFF, MAIN_COLORS[i]);
+            else Symbols.draw(getContext(), c, MAIN_ICONS[i], cx, tmp.centerY(), 100 * k, 0xFFFFFFFF);
             c.drawText(mainLabels()[i], cx, 560 * k, title);
             String desc = mainDescriptions()[i];
             if (i == TMDB_ROW) desc += "\n" + Strings.get(R.string.recommendations) + ": " + recsLine();
@@ -867,6 +877,9 @@ public class SettingsActivity extends Activity {
                             } else if (screen == PICKER && pickFor == PICK_SLEEP) {
                                 focus = SLEEP_ROW;
                                 screen = MAIN;
+                            } else if (screen == PICKER && pickFor == PICK_PARENTAL) {
+                                focus = PARENTAL_ROW;
+                                screen = MAIN;
                             } else if (screen == PICKER) {
                                 focus = pickFor - 1 - keysScroll;
                                 screen = REMOTE_KEYS;
@@ -1068,6 +1081,90 @@ public class SettingsActivity extends Activity {
                     break;
             }
             HomeData.get(getContext()).settingsChanged();
+        }
+
+        // MARK: - Parental control (BuildYourTV)
+
+        private String parentalValue() {
+            Context c = getContext();
+            if (!ParentalTimer.on(c)) return Strings.get(R.string.off);
+            if (ParentalTimer.locked(c)) return ParentalLockActivity.t("Time's up", "הזמן נגמר");
+            int m = ParentalTimer.minutesLeft(c);
+            return Ui.he ? "נותרו " + m + " דק'" : m + " min left";
+        }
+
+        private static String parentalChoice(int m) {
+            if (m == 0) return Strings.get(R.string.off);
+            if (m == 1) return Ui.he ? "דקה אחת" : "1 minute";
+            if (Ui.he) return m == 60 ? "שעה" : m == 90 ? "שעה וחצי" : m == 120 ? "שעתיים" : m == 180 ? "3 שעות" : m + " דקות";
+            return m < 60 ? m + " minutes" : m % 60 == 0 ? (m / 60) + (m == 60 ? " hour" : " hours") : (m / 60f) + " hours";
+        }
+
+        private EditText pinField() {
+            EditText field = new EditText(activity);
+            field.setSingleLine(true);
+            field.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+            field.setFilters(new android.text.InputFilter[] {new android.text.InputFilter.LengthFilter(4)});
+            field.setGravity(android.view.Gravity.CENTER);
+            field.setImeOptions(EditorInfo.IME_ACTION_DONE);
+            return field;
+        }
+
+        /** A 4-digit dialog; `done` gets what was typed (OK, or Done on the keyboard). */
+        private void pinDialog(String title, String message, java.util.function.Consumer<String> done) {
+            EditText field = pinField();
+            AlertDialog dialog = new AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                    .setTitle(title)
+                    .setMessage(message)
+                    .setView(field)
+                    .setPositiveButton(Strings.get(R.string.save), (d, which) -> done.accept(field.getText().toString()))
+                    .setNegativeButton(Strings.get(R.string.cancel), null)
+                    .create();
+            field.setOnEditorActionListener((v, action, event) -> {
+                dialog.dismiss();
+                done.accept(field.getText().toString());
+                return true;
+            });
+            dialog.show();
+        }
+
+        /** The parents' code, then `then`. */
+        private void askPin(Runnable then) {
+            pinDialog(ParentalLockActivity.t("Parents' code", "קוד הורים"),
+                    ParentalLockActivity.t("Enter the 4-digit code.", "הזינו את הקוד בן 4 הספרות."), pin -> {
+                        if (ParentalTimer.checkPin(activity, pin)) {
+                            then.run();
+                            invalidate();
+                        } else {
+                            Toast.makeText(activity, ParentalLockActivity.t("Wrong code", "קוד שגוי"), Toast.LENGTH_LONG).show();
+                        }
+                    });
+        }
+
+        /** A new code, typed twice; then `then` (null: back to the main list). */
+        private void askNewPin(Runnable then) {
+            pinDialog(ParentalLockActivity.t("New parents' code", "קוד הורים חדש"),
+                    ParentalLockActivity.t("Choose 4 digits. Only you need to know them.", "בחרו 4 ספרות. רק אתם צריכים לדעת אותן."), first -> {
+                        if (!ParentalTimer.validPin(first)) {
+                            Toast.makeText(activity, ParentalLockActivity.t("The code is 4 digits", "הקוד הוא 4 ספרות"), Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        pinDialog(ParentalLockActivity.t("New parents' code", "קוד הורים חדש"),
+                                ParentalLockActivity.t("Type it again.", "הקלידו אותו שוב."), second -> {
+                                    if (!first.equals(second)) {
+                                        Toast.makeText(activity, ParentalLockActivity.t("The codes don't match", "הקודים לא תואמים"), Toast.LENGTH_LONG).show();
+                                        return;
+                                    }
+                                    ParentalTimer.setPin(activity, first);
+                                    Toast.makeText(activity, ParentalLockActivity.t("Code saved", "הקוד נשמר"), Toast.LENGTH_SHORT).show();
+                                    if (then != null) then.run();
+                                    else {
+                                        focus = PARENTAL_ROW;
+                                        screen = MAIN;
+                                    }
+                                    invalidate();
+                                });
+                    });
         }
 
         private void askCity() {
@@ -1382,6 +1479,10 @@ public class SettingsActivity extends Activity {
                     pickLabels.add(m == 0 ? Strings.get(R.string.off) : Strings.get(R.string.sleep_minutes, m));
                 }
                 pickCurrent = sleepLeft == 0 ? 0 : -1;   // a running timer: focus on Off, which cancels it
+            } else if (which == PICK_PARENTAL) {
+                for (int m : ParentalTimer.CHOICES) pickLabels.add(parentalChoice(m));
+                pickLabels.add(ParentalLockActivity.t("Change the code", "שינוי הקוד"));
+                pickCurrent = ParentalTimer.on(getContext()) ? -1 : 0;
             } else {
                 pickLabels.addAll(appLabels);
                 pickCurrent = appPkgs.indexOf(RemoteKeys.action(RemoteKeys.buttons(getContext()).get(which - 1)));
@@ -1397,6 +1498,7 @@ public class SettingsActivity extends Activity {
         private void drawPicker(Canvas c) {
             subHeading(c, pickFor == PICK_CITY ? Strings.get(R.string.city)
                     : pickFor == PICK_SLEEP ? Strings.get(R.string.sleep_timer)
+                    : pickFor == PICK_PARENTAL ? ParentalLockActivity.t("Parental control", "בקרת הורים")
                     : RemoteKeys.buttons(getContext()).get(pickFor - 1).name);
             int rows = rowCount();
             float hy = subCard(c, rows);
@@ -1470,7 +1572,16 @@ public class SettingsActivity extends Activity {
 
         private void activate() {
             Context c = getContext();
-            if (screen == PICKER && pickFor == PICK_SLEEP) {
+            if (screen == PICKER && pickFor == PICK_PARENTAL) {
+                int at = pickScroll + focus;
+                if (at >= ParentalTimer.CHOICES.length) {
+                    askNewPin(null);
+                    return;
+                }
+                ParentalTimer.start(c, ParentalTimer.CHOICES[at]);
+                focus = PARENTAL_ROW;
+                screen = MAIN;
+            } else if (screen == PICKER && pickFor == PICK_SLEEP) {
                 int minutes = SleepTimer.CHOICES[pickScroll + focus];
                 SleepTimer.set(c, minutes);
                 sleepLeft = minutes;
@@ -1540,6 +1651,14 @@ public class SettingsActivity extends Activity {
             } else if (focus == TMDB_ROW) {
                 // A release APK comes without a key: it is typed here once (or pushed in config.json "tmdb_key").
                 if (Tmdb.hasKey()) activity.startActivity(new Intent(c, TmdbLoginActivity.class)); else askTmdbKey();
+            } else if (focus == PARENTAL_ROW) {
+                if (!SleepTimer.available(c)) {   // the lock screen turns the TV off through the key service
+                    Toast.makeText(activity, Strings.get(R.string.sleep_unavailable_why), Toast.LENGTH_LONG).show();
+                    return;
+                }
+                if (ParentalTimer.hasPin(c)) askPin(() -> openPicker(PICK_PARENTAL));
+                else askNewPin(() -> openPicker(PICK_PARENTAL));
+                return;
             } else if (focus == SLEEP_ROW) {
                 sleepReady = SleepTimer.available(c);
                 if (!sleepReady) {   // only the key service can turn the TV off: say so, and how to turn it on

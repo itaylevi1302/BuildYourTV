@@ -20,6 +20,11 @@ public class RemoteKeyService extends AccessibilityService {
     /** The TV turned off some other way (the remote, HDMI-CEC): a sleep timer that was running ends there. */
     private final BroadcastReceiver screenOff = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
+            if (Intent.ACTION_SCREEN_ON.equals(i.getAction())) {
+                // Parental control: turning the TV off and on doesn't end a used-up allowance.
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> ParentalTimer.showLock(c), 1500);
+                return;
+            }
             if (SleepTimer.end(c) != 0) SleepTimer.cancel(c);
         }
     };
@@ -28,6 +33,10 @@ public class RemoteKeyService extends AccessibilityService {
         super.onServiceConnected();
         bound = this;
         IntentFilter off = new IntentFilter(Intent.ACTION_SCREEN_OFF);
+        off.addAction(Intent.ACTION_SCREEN_ON);
+        // Parental control after a restart: the alarm again, and the lock if the time ran out meanwhile.
+        ParentalTimer.arm(this);
+        ParentalTimer.showLock(this);
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(screenOff, off, Context.RECEIVER_NOT_EXPORTED);
         else registerReceiver(screenOff, off);
     }
@@ -55,7 +64,24 @@ public class RemoteKeyService extends AccessibilityService {
     }
 
     @Override protected boolean onKeyEvent(KeyEvent event) {
+        if (ParentalTimer.locked(this)) return lockedKey(event);
         return RemoteKeys.onKey(this, event);
+    }
+
+    /**
+     * Parental control's time is up: the lock screen's keys (arrows, OK, Back, digits) and the TV's own (volume, power)
+     * pass; the app buttons, Home, Input and the rest bring the lock screen back instead of opening anything.
+     */
+    private boolean lockedKey(KeyEvent e) {
+        int k = e.getKeyCode();
+        boolean pass = (k >= KeyEvent.KEYCODE_DPAD_UP && k <= KeyEvent.KEYCODE_DPAD_CENTER) || k == KeyEvent.KEYCODE_ENTER
+                || k == KeyEvent.KEYCODE_NUMPAD_ENTER || k == KeyEvent.KEYCODE_BACK || k == KeyEvent.KEYCODE_DEL
+                || (k >= KeyEvent.KEYCODE_0 && k <= KeyEvent.KEYCODE_9) || k == KeyEvent.KEYCODE_VOLUME_UP
+                || k == KeyEvent.KEYCODE_VOLUME_DOWN || k == KeyEvent.KEYCODE_VOLUME_MUTE || k == KeyEvent.KEYCODE_POWER
+                || k == KeyEvent.KEYCODE_SLEEP || k == KeyEvent.KEYCODE_WAKEUP;
+        if (pass) return false;
+        if (e.getAction() == KeyEvent.ACTION_UP) ParentalTimer.showLock(this);
+        return true;
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {}
