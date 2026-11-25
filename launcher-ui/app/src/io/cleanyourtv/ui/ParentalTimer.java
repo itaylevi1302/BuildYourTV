@@ -33,30 +33,64 @@ final class ParentalTimer {
     /** How long the lock screen waits before it turns the TV off. */
     static final long GRACE_MS = 60_000;
     static final String END = "io.cleanyourtv.ui.PARENTAL_END";
-    private static final String FILE = "parental-end", PIN_FILE = "parental-pin";
+    private static final String FILE = "parental-end", PIN_FILE = "parental-pin", FAILS_FILE = "parental-fails";
+    /** Wrong codes in a row before a lockout, and how long it lasts. */
+    static final int MAX_FAILS = 5;
+    static final long LOCKOUT_MS = 5 * 60_000;
 
     private static PendingIntent alarm(Context c, int flags) {
         Intent i = new Intent(END).setClass(c, ParentalReceiver.class);
         return PendingIntent.getBroadcast(c, 3, i, flags | PendingIntent.FLAG_IMMUTABLE);
     }
 
-    /** When the allowance ends (System.currentTimeMillis), or 0 when parental control is off. */
-    static long end(Context c) {
-        String s = TvConfig.read(new File(c.getFilesDir(), FILE));
-        try {
-            return s == null ? 0 : Long.parseLong(s.trim());
-        } catch (NumberFormatException e) {
-            return 0;
+    /**
+     * The file holds three numbers: the end in wall-clock time (it survives a restart), the end on the monotonic clock
+     * (SystemClock.elapsedRealtime, which a changed date or time doesn't move) and the boot it belongs to. Index 0 is
+     * the wall-clock end, 0 when parental control is off.
+     */
+    private static long[] read(Context c, String name) {
+        String s = TvConfig.read(new File(c.getFilesDir(), name));
+        long[] out = new long[3];
+        if (s == null) return out;
+        String[] parts = s.trim().split(" +");
+        for (int i = 0; i < parts.length && i < 3; i++) {
+            try {
+                out[i] = Long.parseLong(parts[i]);
+            } catch (NumberFormatException ignored) {
+            }
         }
+        return out;
     }
+
+    /** This boot's number (Settings.Global.BOOT_COUNT), so a monotonic time is only compared within one boot. */
+    private static long boot(Context c) {
+        return android.provider.Settings.Global.getInt(c.getContentResolver(), android.provider.Settings.Global.BOOT_COUNT, 0);
+    }
+
+    /** When the allowance ends (System.currentTimeMillis), or 0 when parental control is off. */
+    static long end(Context c) { return read(c, FILE)[0]; }
 
     static boolean on(Context c) { return end(c) > 0; }
 
-    /** The allowance is used up: the lock screen must be on top. */
+    /**
+     * The allowance is used up: the lock screen must be on top. Either clock ending it is enough, so setting the TV's
+     * date or time back doesn't add time within a boot.
+     */
     static boolean locked(Context c) {
-        long e = end(c);
-        return e > 0 && System.currentTimeMillis() >= e;
+        long[] f = read(c, FILE);
+        if (f[0] <= 0) return false;
+        if (System.currentTimeMillis() >= f[0]) return true;
+        return f[2] == boot(c) && f[1] > 0 && android.os.SystemClock.elapsedRealtime() >= f[1];
     }
+
+    /**
+     * Parental control is on but the key service is off (switched off in the TV's accessibility settings): nothing
+     * could cover other apps or turn the TV off, so the home screen shows the lock until the code is typed.
+     */
+    static boolean tampered(Context c) { return on(c) && !SleepTimer.available(c); }
+
+    /** The lock is due: the time is up, or its service was switched off. */
+    static boolean mustLock(Context c) { return locked(c) || tampered(c); }
 
     /** Minutes left, rounded up; 0 when off or used up. */
     static int minutesLeft(Context c) {
@@ -71,7 +105,8 @@ final class ParentalTimer {
             cancel(c);
             return;
         }
-        write(c, System.currentTimeMillis() + minutes * 60_000L);
+        long ms = minutes * 60_000L;
+        write(c, FILE, (System.currentTimeMillis() + ms) + " " + (android.os.SystemClock.elapsedRealtime() + ms) + " " + boot(c));
         arm(c);
         AppLog.w("parental control: " + minutes + " min");
     }
@@ -97,7 +132,7 @@ final class ParentalTimer {
 
     /** The lock screen over whatever plays, when the allowance is used up and the TV is on. */
     static void showLock(Context c) {
-        if (!locked(c) || !c.getSystemService(PowerManager.class).isInteractive()) return;
+        if (!mustLock(c) || !c.getSystemService(PowerManager.class).isInteractive()) return;
         try {
             c.startActivity(new Intent(c, ParentalLockActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
@@ -106,9 +141,9 @@ final class ParentalTimer {
         }
     }
 
-    private static void write(Context c, long end) {
-        try (FileOutputStream out = new FileOutputStream(new File(c.getFilesDir(), FILE))) {
-            out.write(Long.toString(end).getBytes(StandardCharsets.UTF_8));
+    private static void write(Context c, String name, String text) {
+        try (FileOutputStream out = new FileOutputStream(new File(c.getFilesDir(), name))) {
+            out.write(text.getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             AppLog.w("parental control not saved: " + e.getMessage());
         }
@@ -126,7 +161,38 @@ final class ParentalTimer {
         }
     }
 
-    static boolean checkPin(Context c, String pin) {
+    static final int PIN_OK = 0, PIN_WRONG = 1, PIN_LOCKED_OUT = 2;
+
+    /** Milliseconds until code entry opens again after too many wrong codes, or 0. */
+    static long lockoutLeft(Context c) {
+        long[] f = read(c, FAILS_FILE);   // wrong codes in a row, lockout end (elapsedRealtime), boot
+        if (f[2] != boot(c)) return 0;
+        return Math.max(0, f[1] - android.os.SystemClock.elapsedRealtime());
+    }
+
+    /**
+     * Every code check (the lock screen and Settings): MAX_FAILS wrong codes in a row close code entry for LOCKOUT_MS, in
+     * every process, so the four digits can't be tried one after another.
+     */
+    static int tryPin(Context c, String pin) {
+        if (lockoutLeft(c) > 0) return PIN_LOCKED_OUT;
+        if (checkPin(c, pin)) {
+            new File(c.getFilesDir(), FAILS_FILE).delete();
+            return PIN_OK;
+        }
+        long[] f = read(c, FAILS_FILE);
+        long fails = (f[2] == boot(c) ? f[0] : 0) + 1;
+        long until = 0;
+        if (fails >= MAX_FAILS) {
+            fails = 0;
+            until = android.os.SystemClock.elapsedRealtime() + LOCKOUT_MS;
+            AppLog.w("parental control: too many wrong codes, code entry closed for 5 min");
+        }
+        write(c, FAILS_FILE, fails + " " + until + " " + boot(c));
+        return until > 0 ? PIN_LOCKED_OUT : PIN_WRONG;
+    }
+
+    private static boolean checkPin(Context c, String pin) {
         String saved = TvConfig.read(new File(c.getFilesDir(), PIN_FILE));
         return saved != null && MessageDigest.isEqual(saved.trim().getBytes(StandardCharsets.UTF_8),
                 hash(pin).getBytes(StandardCharsets.UTF_8));

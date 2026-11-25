@@ -1132,11 +1132,14 @@ public class SettingsActivity extends Activity {
         private void askPin(Runnable then) {
             pinDialog(ParentalLockActivity.t("Parents' code", "קוד הורים"),
                     ParentalLockActivity.t("Enter the 4-digit code.", "הזינו את הקוד בן 4 הספרות."), pin -> {
-                        if (ParentalTimer.checkPin(activity, pin)) {
+                        int result = ParentalTimer.tryPin(activity, pin);
+                        if (result == ParentalTimer.PIN_OK) {
                             then.run();
                             invalidate();
                         } else {
-                            Toast.makeText(activity, ParentalLockActivity.t("Wrong code", "קוד שגוי"), Toast.LENGTH_LONG).show();
+                            Toast.makeText(activity, result == ParentalTimer.PIN_LOCKED_OUT
+                                    ? ParentalLockActivity.t("Too many wrong codes. Try again in 5 minutes.", "יותר מדי קודים שגויים. אפשר לנסות שוב בעוד 5 דקות.")
+                                    : ParentalLockActivity.t("Wrong code", "קוד שגוי"), Toast.LENGTH_LONG).show();
                         }
                     });
         }

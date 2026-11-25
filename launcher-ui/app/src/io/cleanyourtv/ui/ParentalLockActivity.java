@@ -46,7 +46,7 @@ public class ParentalLockActivity extends Activity {
     @Override protected void onStart() {
         super.onStart();
         handler.removeCallbacks(comeBack);
-        if (!ParentalTimer.locked(this)) {
+        if (!ParentalTimer.mustLock(this)) {
             finish();
             return;
         }
@@ -55,7 +55,7 @@ public class ParentalLockActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
-        if (!ParentalTimer.locked(this)) finish();
+        if (!ParentalTimer.mustLock(this)) finish();
     }
 
     @Override protected void onStop() {
@@ -63,7 +63,7 @@ public class ParentalLockActivity extends Activity {
         boolean on = getSystemService(PowerManager.class).isInteractive();
         if (!on) view.screenOff();
         // Another app (a remote button, the input menu) came over it: back on top while the time is still up.
-        if (on && !unlocked && !isFinishing() && ParentalTimer.locked(this)) handler.postDelayed(comeBack, 600);
+        if (on && !unlocked && !isFinishing() && ParentalTimer.mustLock(this)) handler.postDelayed(comeBack, 600);
     }
 
     @Override protected void onDestroy() {
@@ -221,18 +221,23 @@ public class ParentalLockActivity extends Activity {
         }
 
         private void digit(char d) {
-            if (pin.length() >= 4) return;
+            if (pin.length() >= 4 || ParentalTimer.lockoutLeft(a) > 0) return;
             wrong = false;
             pin += d;
             if (pin.length() == 4) {
-                if (ParentalTimer.checkPin(a, pin) && turnOff) {
+                int result = ParentalTimer.tryPin(a, pin);
+                if (result == ParentalTimer.PIN_OK && turnOff) {
                     a.unlock(0);   // parental control off, the lock goes
-                } else if (ParentalTimer.checkPin(a, pin)) {
+                } else if (result == ParentalTimer.PIN_OK) {
                     mode = MORE;
                     focus = 1;   // 30 minutes
                 } else {
                     wrong = true;
                     shake = 1;
+                    if (result == ParentalTimer.PIN_LOCKED_OUT) {   // too many wrong codes: back to the clock, TV off
+                        toLock();
+                        sleepNow();
+                    }
                 }
                 pin = "";
             }
@@ -276,9 +281,16 @@ public class ParentalLockActivity extends Activity {
             float cy = lerp(300, 205, compact) * k, radius = lerp(122, 92, compact) * k;
             drawRing(c, 960 * k, cy, radius, now);
             float ty = lerp(530, 372, compact) * k;
-            String head = mode == LOCK ? t("Time's up", "הזמן נגמר") : mode == PIN ? t("Parents' code", "קוד הורים")
+            boolean tampered = !ParentalTimer.locked(a);   // here only because the key service was switched off
+            String head = mode == LOCK && tampered ? t("Parental control is paused", "בקרת ההורים הושהתה")
+                    : mode == LOCK ? t("Time's up", "הזמן נגמר") : mode == PIN ? t("Parents' code", "קוד הורים")
                     : t("How much more time?", "כמה זמן להוסיף?");
-            String sub = mode == LOCK ? t("The viewing time you were given is over.", "זמן הצפייה שאושר הסתיים.")
+            long lockout = ParentalTimer.lockoutLeft(a);
+            String sub = mode == LOCK && tampered ? t("The remote buttons service was turned off. A parent's code is needed.",
+                    "שירות כפתורי השלט כובה. נדרש קוד הורים.")
+                    : mode == PIN && lockout > 0 ? t("Too many wrong codes. Try again in " + ((lockout + 59_999) / 60_000) + " min.",
+                    "יותר מדי קודים שגויים. אפשר לנסות שוב בעוד " + ((lockout + 59_999) / 60_000) + " דק'.")
+                    : mode == LOCK ? t("The viewing time you were given is over.", "זמן הצפייה שאושר הסתיים.")
                     : mode == PIN && turnOff ? t("Enter the code to turn parental control off", "הזינו את הקוד כדי לכבות את בקרת ההורים")
                     : mode == PIN ? t("Enter the 4-digit code", "הזינו את הקוד בן 4 הספרות")
                     : t("It counts from now.", "הזמן נספר מעכשיו.");

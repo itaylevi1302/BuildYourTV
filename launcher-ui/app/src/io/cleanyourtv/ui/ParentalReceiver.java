@@ -11,7 +11,7 @@ import android.content.Intent;
 public class ParentalReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context c, Intent i) {
         if (!ParentalTimer.END.equals(i.getAction())) return;
-        if (ParentalTimer.locked(c)) ParentalTimer.showLock(c);
+        if (ParentalTimer.mustLock(c)) ParentalTimer.showLock(c);
         else ParentalTimer.arm(c);   // came early (an allowance extended meanwhile): wait for the new end
     }
 }
