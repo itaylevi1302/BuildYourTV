@@ -342,10 +342,6 @@
     <string name="top_rated_movies">"Фільми з високими оцінками"</string>
     <string name="top_rated_shows">"Серіали з високими оцінками"</string>
     <string name="trailer">"Трейлер"</string>
-    <string name="trailer_banner_unavailable">"Недоступно на цьому телевізорі"</string>
-    <string name="trailer_in_the_banner">"Трейлер у банері"</string>
-    <string name="trailer_mute">"Вимкнути звук"</string>
-    <string name="trailer_unmute">"Увімкнути звук"</string>
     <string name="trending">"Популярне"</string>
     <string name="trending_anime">"Популярне аніме"</string>
     <string name="trending_movies">"Популярні фільми"</string>

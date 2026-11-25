@@ -384,20 +384,6 @@ final class Prefs {
     static String trailerPlayer() { return sp().getString("trailerPlayer", ""); }
     static void setTrailerPlayer(String pkg) { put("trailerPlayer", pkg == null ? "" : pkg); }
 
-    /** Explore's banner plays the focused title's trailer, muted, after the focus rests (#113). Off (the default): no WebView, nothing loads. */
-    static boolean bannerTrailer() { return sp().getBoolean("bannerTrailer", false); }
-    static void setBannerTrailer(boolean on) { sp().edit().putBoolean("bannerTrailer", on).apply(); }   // Explore-only: no version bump
-
-    /** YouTube ids the embedded player refused, oldest first (at most 200). */
-    static java.util.Set<String> badTrailers() { return new java.util.LinkedHashSet<>(keyList(sp().getString("badTrailers", ""))); }
-    static void addBadTrailer(String id) {
-        List<String> all = keyList(sp().getString("badTrailers", ""));
-        all.remove(id);
-        all.add(id);
-        while (all.size() > 200) all.remove(0);
-        sp().edit().putString("badTrailers", String.join(",", all)).apply();
-    }
-
     // MARK: - IPTV player
 
     /** The app the "Onde assistir" row leads with, or "" for no IPTV chip (the default). */
