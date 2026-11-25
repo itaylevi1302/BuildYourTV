@@ -1128,6 +1128,8 @@ public class SettingsActivity extends Activity {
             dialog.show();
         }
 
+        private int lockoutMinutes() { return (int) ((ParentalTimer.lockoutLeft(activity) + 59_999) / 60_000); }
+
         /** The parents' code, then `then`. */
         private void askPin(Runnable then) {
             pinDialog(ParentalLockActivity.t("Parents' code", "קוד הורים"),
@@ -1138,7 +1140,8 @@ public class SettingsActivity extends Activity {
                             invalidate();
                         } else {
                             Toast.makeText(activity, result == ParentalTimer.PIN_LOCKED_OUT
-                                    ? ParentalLockActivity.t("Too many wrong codes. Try again in 5 minutes.", "יותר מדי קודים שגויים. אפשר לנסות שוב בעוד 5 דקות.")
+                                    ? ParentalLockActivity.t("Too many wrong codes. Try again in " + lockoutMinutes() + " min.",
+                                            "יותר מדי קודים שגויים. אפשר לנסות שוב בעוד " + lockoutMinutes() + " דק'.")
                                     : ParentalLockActivity.t("Wrong code", "קוד שגוי"), Toast.LENGTH_LONG).show();
                         }
                     });

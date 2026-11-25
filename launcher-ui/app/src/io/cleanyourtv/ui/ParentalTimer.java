@@ -50,10 +50,10 @@ final class ParentalTimer {
      */
     private static long[] read(Context c, String name) {
         String s = TvConfig.read(new File(c.getFilesDir(), name));
-        long[] out = new long[3];
+        long[] out = new long[5];
         if (s == null) return out;
         String[] parts = s.trim().split(" +");
-        for (int i = 0; i < parts.length && i < 3; i++) {
+        for (int i = 0; i < parts.length && i < 5; i++) {
             try {
                 out[i] = Long.parseLong(parts[i]);
             } catch (NumberFormatException ignored) {
@@ -164,32 +164,40 @@ final class ParentalTimer {
     static final int PIN_OK = 0, PIN_WRONG = 1, PIN_LOCKED_OUT = 2;
 
     /** Milliseconds until code entry opens again after too many wrong codes, or 0. */
+    /*
+     * The fails file: wrong codes in a row, the lockout's end on the monotonic clock, its boot, the lockout's end in
+     * wall-clock time, and how many lockouts in a row. All of it survives a restart: the count goes on, and a lockout
+     * from an earlier boot holds until its wall-clock end.
+     */
     static long lockoutLeft(Context c) {
-        long[] f = read(c, FAILS_FILE);   // wrong codes in a row, lockout end (elapsedRealtime), boot
-        if (f[2] != boot(c)) return 0;
-        return Math.max(0, f[1] - android.os.SystemClock.elapsedRealtime());
+        long[] f = read(c, FAILS_FILE);
+        long left = f[2] == boot(c) ? f[1] - android.os.SystemClock.elapsedRealtime() : f[3] - System.currentTimeMillis();
+        return Math.max(0, left);
     }
 
     /**
-     * Every code check (the lock screen and Settings): MAX_FAILS wrong codes in a row close code entry for LOCKOUT_MS, in
-     * every process, so the four digits can't be tried one after another.
+     * Every code check (the lock screen and Settings): MAX_FAILS wrong codes in a row close code entry for LOCKOUT_MS,
+     * doubled for each lockout in a row up to an hour, in every process and across restarts, so the four digits can't
+     * be tried one after another.
      */
     static int tryPin(Context c, String pin) {
         if (lockoutLeft(c) > 0) return PIN_LOCKED_OUT;
+        long[] f = read(c, FAILS_FILE);
         if (checkPin(c, pin)) {
             new File(c.getFilesDir(), FAILS_FILE).delete();
             return PIN_OK;
         }
-        long[] f = read(c, FAILS_FILE);
-        long fails = (f[2] == boot(c) ? f[0] : 0) + 1;
-        long until = 0;
+        long fails = f[0] + 1, untilMono = 0, untilWall = 0, lockouts = f[4];
         if (fails >= MAX_FAILS) {
             fails = 0;
-            until = android.os.SystemClock.elapsedRealtime() + LOCKOUT_MS;
-            AppLog.w("parental control: too many wrong codes, code entry closed for 5 min");
+            lockouts++;
+            long ms = Math.min(60 * 60_000L, LOCKOUT_MS << Math.min(4, lockouts - 1));
+            untilMono = android.os.SystemClock.elapsedRealtime() + ms;
+            untilWall = System.currentTimeMillis() + ms;
+            AppLog.w("parental control: too many wrong codes, code entry closed for " + ms / 60_000 + " min");
         }
-        write(c, FAILS_FILE, fails + " " + until + " " + boot(c));
-        return until > 0 ? PIN_LOCKED_OUT : PIN_WRONG;
+        write(c, FAILS_FILE, fails + " " + untilMono + " " + boot(c) + " " + untilWall + " " + lockouts);
+        return untilMono > 0 ? PIN_LOCKED_OUT : PIN_WRONG;
     }
 
     private static boolean checkPin(Context c, String pin) {
