@@ -15,6 +15,9 @@ Legenda: ✅ feito · 🔜 nesta versão · ➖ fora do escopo da TV (e por quê
 | `GET/POST /account/{id}/favorite…` | 🔜 Favoritos: botão na página do título e fileira no Explorar |
 | `GET /account/{id}/rated/movies`, `/rated/tv`, `/rated/tv/episodes` | 🔜 fileira "Suas notas"; base das recomendações |
 | `GET /account/{id}/lists`, `POST /list`, `POST /list/{id}/add_item`, `remove_item`, `item_status`, `clear`, `DELETE /list/{id}` | 🔜 "Adicionar a uma lista" na página do título; listas no Explorar |
+| `POST /4/auth/request_token`, `POST /4/auth/access_token`, `POST /3/authentication/session/convert/4`, `DELETE /4/auth/access_token` | ✅ com o token de leitura (`eyJ…`): mesmo QR, e o token v4 vira sessão v3 |
+| `GET /4/account/{id}/lists`, `POST /4/list`, `PUT /4/list/{id}` | ✅ acha ou cria as listas privadas `tk:watching` e `tk:watched` (renomeia as do testetv) |
+| `GET /4/list/{id}`, `POST/DELETE /4/list/{id}/items` | ✅ "Continuar assistindo" lê `tk:watching`; só o "Já assisti" explícito move para `tk:watched`. Comentários são lidos, nunca escritos |
 | `GET /authentication/guest_session/new`, `/guest_session/{id}/rated…` | ➖ notas sem conta: a TV guarda o "Já assisti" localmente |
 | `POST /authentication/token/validate_with_login` | ➖ pediria a senha na TV; o QR é mais seguro |
 

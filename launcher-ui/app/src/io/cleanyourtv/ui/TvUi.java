@@ -14,7 +14,10 @@ import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -83,8 +86,10 @@ final class TvUi {
             look.animateTo(has ? 1 : 0);
             if (caption != null) {
                 caption.setTextColor(has ? INK : DIM);
-                caption.setEllipsize(has ? TextUtils.TruncateAt.MARQUEE : TextUtils.TruncateAt.END);
-                caption.setSelected(has);
+                if (caption.getMaxLines() == 1) {   // a two-line caption (stretched grids) just brightens
+                    caption.setEllipsize(has ? TextUtils.TruncateAt.MARQUEE : TextUtils.TruncateAt.END);
+                    caption.setSelected(has);
+                }
             }
         });
     }
@@ -216,22 +221,31 @@ final class TvUi {
     }
 
     static View poster(Activity a, float k, Tmdb.Title t, OnTitle open) {
+        return poster(a, k, t, open, false);
+    }
+
+    /**
+     * `stretch`: for a Columns line, which sets the width; the card keeps 2:3 and the name takes two lines. Otherwise
+     * a fixed POSTER_W by POSTER_H (rows).
+     */
+    static View poster(Activity a, float k, Tmdb.Title t, OnTitle open, boolean stretch) {
         int w = Math.round(POSTER_W * k), h = Math.round(POSTER_H * k);
+        int fit = stretch ? ViewGroup.LayoutParams.MATCH_PARENT : 0;
         LinearLayout cell = new LinearLayout(a);
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setClipChildren(false);
-        FrameLayout card = new FrameLayout(a);
+        FrameLayout card = stretch ? new Ratio(a, 1.5f) : new FrameLayout(a);
         card.setBackground(round(CARD, 14 * k));
         card.setClipToOutline(true);
         card.setTag(t);
         ImageView img = new ImageView(a);
         img.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        card.addView(img, new FrameLayout.LayoutParams(w, h));
+        card.addView(img, stretch ? new FrameLayout.LayoutParams(fit, fit) : new FrameLayout.LayoutParams(w, h));
         TextView fallback = text(a, k, 24, Ui.medium, DIM);
         fallback.setText(t.name);
         fallback.setGravity(Gravity.CENTER);
         fallback.setPadding(Math.round(14 * k), 0, Math.round(14 * k), 0);
-        card.addView(fallback, 0, new FrameLayout.LayoutParams(w, h));
+        card.addView(fallback, 0, stretch ? new FrameLayout.LayoutParams(fit, fit) : new FrameLayout.LayoutParams(w, h));
         if (t.kind.equals("movie") || t.kind.equals("tv")) card.addView(seenBadge(a, k), badgeParams(k));
         Images.load(img, t.poster.isEmpty() ? null : (t.kind.equals("person") ? Tmdb.PROFILE : Tmdb.POSTER) + t.poster);
         card.setContentDescription(t.name + (t.year.isEmpty() ? "" : ", " + t.year));
@@ -242,17 +256,23 @@ final class TvUi {
                 return true;
             });
         }
-        cell.addView(card, new LinearLayout.LayoutParams(w, h));
+        cell.addView(card, stretch ? new LinearLayout.LayoutParams(fit, ViewGroup.LayoutParams.WRAP_CONTENT) : new LinearLayout.LayoutParams(w, h));
         TextView name = text(a, k, 22, Ui.regular, DIM);
-        focusable(card, k, 14 * k, name);
         name.setText(t.name);
-        name.setSingleLine(true);
-        name.setEllipsize(TextUtils.TruncateAt.END);
-        name.setMarqueeRepeatLimit(-1);
-        name.setHorizontalFadingEdgeEnabled(true);
-        name.setFadingEdgeLength(Math.round(18 * k));
+        if (stretch) {
+            name.setLines(2);
+            name.setEllipsize(TextUtils.TruncateAt.END);
+            name.setLineSpacing(2 * k, 1f);
+        } else {
+            name.setSingleLine(true);
+            name.setEllipsize(TextUtils.TruncateAt.END);
+            name.setMarqueeRepeatLimit(-1);
+            name.setHorizontalFadingEdgeEnabled(true);
+            name.setFadingEdgeLength(Math.round(18 * k));
+        }
+        focusable(card, k, 14 * k, name);
         name.setPadding(0, Math.round(26 * k), 0, 0);
-        cell.addView(name, new LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT));
+        cell.addView(name, new LinearLayout.LayoutParams(stretch ? fit : w, ViewGroup.LayoutParams.WRAP_CONTENT));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.rightMargin = Math.round(POSTER_GAP * k);
         cell.setLayoutParams(lp);
@@ -451,6 +471,79 @@ final class TvUi {
         return b;
     }
 
+    /**
+     * The title page's button: a Material icon (tinted in code) with a label, or round without one. White when
+     * focused; at rest the icon takes `onColor` when the thing it stands for is on (My list, Favorite, Seen), else ink.
+     */
+    static final class Action extends LinearLayout {
+        private final float k;
+        private final int onColor;
+        private final ImageView icon;
+        private final TextView text;
+        private String label = "";
+        private boolean on;
+        private int rest = 0x33FFFFFF;
+
+        Action(Context c, float k, int iconRes, String label, int onColor, View.OnClickListener click) {
+            super(c);
+            this.k = k;
+            this.onColor = onColor;
+            setOrientation(HORIZONTAL);
+            setGravity(Gravity.CENTER);
+            icon = new ImageView(c);
+            addView(icon, new LinearLayout.LayoutParams(Math.round(32 * k), Math.round(32 * k)));
+            text = text(c, k, 28, Ui.medium, INK);
+            text.setPadding(Math.round(14 * k), 0, 0, 0);
+            addView(text);
+            setFocusable(true);
+            setFocusableInTouchMode(true);
+            setOnClickListener(click);
+            setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+            setOnFocusChangeListener((v, has) -> {
+                paint();
+                v.animate().scaleX(has ? 1.06f : 1f).scaleY(has ? 1.06f : 1f).translationZ(has ? 12 * k : 0).setDuration(140).start();
+            });
+            set(iconRes, label, false);
+        }
+
+        /** Another icon, another label (null or empty: round) and whether it is on. */
+        void set(int iconRes, String newLabel, boolean isOn) {
+            label = newLabel == null ? "" : newLabel;
+            on = isOn;
+            icon.setImageResource(iconRes);
+            boolean round = label.isEmpty();
+            text.setText(label);
+            text.setVisibility(round ? GONE : VISIBLE);
+            if (round) setPadding(Math.round(17 * k), Math.round(17 * k), Math.round(17 * k), Math.round(17 * k));
+            else setPadding(Math.round(30 * k), Math.round(16 * k), Math.round(34 * k), Math.round(16 * k));
+            setContentDescription(round ? null : label);
+            paint();
+        }
+
+        String label() {
+            return label;
+        }
+
+        /** The fill at rest (a darker one over a picture); returns this. */
+        Action rest(int color) {
+            rest = color;
+            paint();
+            return this;
+        }
+
+        private void paint() {
+            boolean f = hasFocus();
+            setBackground(round(f ? INK : rest, 40 * k));
+            int tint = f ? 0xFF14161A : on ? onColor : INK;
+            icon.setImageTintList(android.content.res.ColorStateList.valueOf(tint));
+            text.setTextColor(f ? 0xFF14161A : INK);
+        }
+    }
+
+    static Action action(Context c, float k, int icon, String label, View.OnClickListener click) {
+        return new Action(c, k, icon, label, ACCENT, click);
+    }
+
     /** A chip that is on or off (filters): on shows a check on a light pill; focused it turns white. */
     static TextView toggle(Context c, float k, String label, boolean on, View.OnClickListener click) {
         TextView b = text(c, k, 26, Ui.medium, INK);
@@ -498,6 +591,8 @@ final class TvUi {
         /** Asked when the focus nears the end and nothing is waiting (the next TMDB page). */
         Runnable needMore;
         int count;
+        /** Cards share the line's width (no empty strip at its end); off for a grid of fixed-size cells. */
+        boolean stretch = true;
 
         Grid(Activity a, float k, int columns, OnTitle open) {
             super(a);
@@ -516,16 +611,15 @@ final class TvUi {
         }
 
         private void showWaiting(int n) {
-            for (int i = 0; i < n && !waiting.isEmpty(); i++) add(poster(a, k, waiting.remove(0), open));
+            for (int i = 0; i < n && !waiting.isEmpty(); i++) add(poster(a, k, waiting.remove(0), open, stretch));
         }
 
         void add(View cell) {
             if (line == null || line.getChildCount() >= columns) {
-                line = new LinearLayout(a);
-                line.setOrientation(HORIZONTAL);
-                line.setClipChildren(false);
-                line.setClipToPadding(false);
-                line.setPadding(Math.round(24 * k), Math.round(30 * k), 0, Math.round(16 * k));
+                Columns l = new Columns(a, columns, Math.round(POSTER_GAP * k));
+                l.stretch = stretch;
+                line = l;
+                line.setPadding(Math.round(24 * k), Math.round(30 * k), Math.round(96 * k), Math.round(16 * k));
                 addView(line);
             }
             line.addView(cell);
@@ -556,6 +650,103 @@ final class TvUi {
                 }
             }
             return -1;
+        }
+    }
+
+    /** A frame whose height is its width times `ratio` (a 2:3 poster, a 10:16 tile) at any width. */
+    static final class Ratio extends FrameLayout {
+        private final float ratio;
+
+        Ratio(Context c, float ratio) {
+            super(c);
+            this.ratio = ratio;
+        }
+
+        @Override protected void onMeasure(int widthSpec, int heightSpec) {
+            int w = MeasureSpec.getSize(widthSpec), h = Math.round(w * ratio);
+            super.onMeasure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
+        }
+    }
+
+    /**
+     * A horizontal line of `columns` cells that share its width: a short last line keeps the same cell width. Cells
+     * take their width from here (their layout params are set in place, no extra layout pass).
+     */
+    static final class Columns extends LinearLayout {
+        private final int columns, gap;
+        boolean stretch = true;
+
+        Columns(Context c, int columns, int gap) {
+            super(c);
+            this.columns = columns;
+            this.gap = gap;
+            setOrientation(HORIZONTAL);
+            setClipChildren(false);
+            setClipToPadding(false);
+        }
+
+        @Override protected void onMeasure(int widthSpec, int heightSpec) {
+            if (stretch && MeasureSpec.getMode(widthSpec) != MeasureSpec.UNSPECIFIED) {
+                int cw = (MeasureSpec.getSize(widthSpec) - getPaddingLeft() - getPaddingRight() - gap * (columns - 1)) / columns;
+                for (int i = 0; i < getChildCount(); i++) {
+                    LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) getChildAt(i).getLayoutParams();
+                    lp.width = Math.max(0, cw);
+                    lp.rightMargin = i == columns - 1 ? 0 : gap;
+                }
+            }
+            super.onMeasure(widthSpec, heightSpec);
+        }
+    }
+
+    /** A pill for a category, a sort or a way back: white when focused, lighter when it is the one on; may show a count. */
+    static final class Chip extends TextView {
+        private final float k;
+        private final String label;
+        private String count = "";
+
+        Chip(Context c, float k, String label, View.OnClickListener click) {
+            super(c);
+            this.k = k;
+            this.label = label;
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, 26 * k);
+            setIncludeFontPadding(false);
+            setGravity(Gravity.CENTER);
+            setPadding(Math.round(28 * k), Math.round(14 * k), Math.round(28 * k), Math.round(14 * k));
+            setFocusable(true);
+            setFocusableInTouchMode(true);
+            setOnClickListener(click);
+            setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+            setOnFocusChangeListener((v, has) -> {
+                style();
+                v.animate().scaleX(has ? 1.05f : 1f).scaleY(has ? 1.05f : 1f).translationZ(has ? 12 * k : 0).setDuration(140).start();
+            });
+            style();
+        }
+
+        void count(String c) {
+            count = c == null ? "" : c;
+            style();
+        }
+
+        @Override public void setActivated(boolean on) {
+            super.setActivated(on);
+            style();
+        }
+
+        private void style() {
+            if (label == null) return;   // setActivated can run before the constructor has finished
+            boolean f = hasFocus(), on = isActivated();
+            SpannableStringBuilder s = new SpannableStringBuilder(label);
+            if (!count.isEmpty()) {
+                int at = s.length();
+                s.append("  ").append(count);
+                s.setSpan(new ForegroundColorSpan(f ? 0x99141616 : DIM), at, s.length(), 0);
+                s.setSpan(new RelativeSizeSpan(0.88f), at, s.length(), 0);
+            }
+            setText(s);
+            setTypeface(on || f ? Ui.semibold : Ui.medium);
+            setTextColor(f ? 0xFF14161A : INK);
+            setBackground(round(f ? INK : on ? 0x4DFFFFFF : 0x1FFFFFFF, 40 * k));
         }
     }
 
@@ -721,6 +912,77 @@ final class TvUi {
         pop.showAtLocation(parent, Gravity.NO_GRAVITY, x, y);
         View focus = first;
         if (focus != null) focus.post(focus::requestFocus);
+        return pop;
+    }
+
+    /** `anchor` in window coordinates, as TitleMenu.pick works it out. */
+    static Rect rectOf(View v) {
+        int[] xy = new int[2];
+        v.getLocationInWindow(xy);
+        return new Rect(xy[0], xy[1], xy[0] + v.getWidth(), xy[1] + v.getHeight());
+    }
+
+    /**
+     * A menu that drops below a button (the season picker, the rating): like popover, but the rows scroll when there
+     * are many, `selected` shows a check and takes the focus. It flips above the anchor when there is no room below.
+     */
+    static PopupWindow dropdown(Activity a, View parent, Rect anchor, String title, String[] items, int selected, OnPick pick) {
+        float k = k(a);
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(Math.round(14 * k), Math.round(18 * k), Math.round(14 * k), Math.round(14 * k));
+        box.setBackground(round(0xF2202329, 26 * k));
+        box.setElevation(30 * k);
+        TextView h = text(a, k, 22, Ui.semibold, FAINT);
+        h.setText(title.toUpperCase(java.util.Locale.ROOT));
+        h.setLetterSpacing(0.1f);
+        h.setPadding(Math.round(22 * k), 0, Math.round(22 * k), Math.round(12 * k));
+        box.addView(h);
+        PopupWindow pop = new PopupWindow(box, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        pop.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
+        pop.setElevation(30 * k);
+        LinearLayout rows = new LinearLayout(a);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        ScrollView scroll = new ScrollView(a);
+        scroll.setFocusable(false);
+        scroll.setVerticalScrollBarEnabled(false);
+        View focus = null;
+        for (int i = 0; i < items.length; i++) {
+            final int which = i;
+            boolean on = i == selected;
+            TextView row = text(a, k, 28, on ? Ui.semibold : Ui.medium, INK);
+            row.setText(on ? "✓  " + items[i] : items[i]);
+            row.setMinWidth(Math.round(380 * k));
+            row.setPadding(Math.round(22 * k), Math.round(16 * k), Math.round(22 * k), Math.round(16 * k));
+            row.setFocusable(true);
+            row.setOnFocusChangeListener((v, has) -> {
+                v.setBackground(has ? round(INK, 16 * k) : null);
+                ((TextView) v).setTextColor(has ? 0xFF14161A : INK);
+            });
+            row.setOnClickListener(v -> {
+                pop.dismiss();
+                pick.pick(which);
+            });
+            row.setOnKeyListener((v, code, e) -> code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT
+                    || (code == KeyEvent.KEYCODE_DPAD_UP && which == 0) || (code == KeyEvent.KEYCODE_DPAD_DOWN && which == items.length - 1));
+            rows.addView(row);
+            if (on || (focus == null && selected < 0)) focus = row;
+        }
+        if (focus == null && rows.getChildCount() > 0) focus = rows.getChildAt(0);
+        scroll.addView(rows);
+        int screenH = a.getResources().getDisplayMetrics().heightPixels, screenW = a.getResources().getDisplayMetrics().widthPixels;
+        rows.measure(View.MeasureSpec.makeMeasureSpec(screenW, View.MeasureSpec.AT_MOST), View.MeasureSpec.UNSPECIFIED);
+        int rowsH = Math.min(rows.getMeasuredHeight(), Math.round(screenH * 0.62f));
+        box.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, rowsH));
+        box.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        int w = box.getMeasuredWidth(), hgt = box.getMeasuredHeight();
+        int x = Math.max(Math.round(24 * k), Math.min(screenW - w - Math.round(24 * k), anchor.centerX() - w / 2));
+        int y = anchor.bottom + Math.round(16 * k);
+        if (y + hgt > screenH - Math.round(24 * k)) y = Math.max(Math.round(24 * k), anchor.top - hgt - Math.round(16 * k));
+        pop.setAnimationStyle(android.R.style.Animation_Dialog);
+        pop.showAtLocation(parent, Gravity.NO_GRAVITY, x, y);
+        View f = focus;
+        if (f != null) f.post(f::requestFocus);
         return pop;
     }
 }

@@ -31,7 +31,8 @@ final class Tmdb {
 
     static final String API = "https://api.themoviedb.org/3";
     static final String POSTER = "https://image.tmdb.org/t/p/w342", BACKDROP = "https://image.tmdb.org/t/p/w1280",
-            LOGO = "https://image.tmdb.org/t/p/w92", PROFILE = "https://image.tmdb.org/t/p/w185";
+            LOGO = "https://image.tmdb.org/t/p/w92", PROFILE = "https://image.tmdb.org/t/p/w185",
+            POSTER_SMALL = "https://image.tmdb.org/t/p/w154";
     /** In memory: the answers of the last half hour, a few dozen; on disk (DISK_MAX): for as long as ttl() says. */
     private static final long TTL = 30 * 60_000L, DISK_MAX = 24L * 1024 * 1024;
     /** Lists (trending, discover, the top 10…) stay the same this long, so Explore doesn't change under the person. */
@@ -110,7 +111,8 @@ final class Tmdb {
         if (path.startsWith("/search/")) return 3600_000L;
         if (isList(path)) return LIST_TTL;
         if (path.contains("/images") || path.startsWith("/person/") || path.startsWith("/collection/")
-                || path.contains("/season/") || path.startsWith("/watch/providers") || path.contains("/top_rated")) return 7 * 24 * 3600_000L;
+                || path.contains("/season/") || path.startsWith("/watch/providers") || path.contains("/top_rated")
+                || path.startsWith("/genre/")) return 7 * 24 * 3600_000L;
         return 12 * 3600_000L;
     }
 
@@ -296,7 +298,8 @@ final class Tmdb {
 
     // MARK: - Account
 
-    private static SharedPreferences sp(Context c) {
+    /** The "tmdb" settings file; the lists sync keeps its state in it too, so signOut clears everything. */
+    static SharedPreferences sp(Context c) {
         return c.getSharedPreferences("tmdb", Context.MODE_PRIVATE);
     }
 
@@ -304,6 +307,29 @@ final class Tmdb {
     static int account(Context c) { return sp(c).getInt("account", 0); }
     static String accountName(Context c) { return sp(c).getString("name", ""); }
     static boolean signedIn(Context c) { return !session(c).isEmpty() && account(c) != 0; }
+
+    /** The key is TMDB's v4 read access token (a JWT): needed for the lists shared with tk-stream. */
+    static boolean hasReadToken() { return Prefs.tmdbKey().startsWith("eyJ"); }
+    static String v4Token(Context c) { return sp(c).getString("v4_token", ""); }
+    static String v4Account(Context c) { return sp(c).getString("v4_account", ""); }
+    /** When Explore was asked to reload its lists (the double Up). */
+    static long listsSince() { return listsSince; }
+
+    /** v4 sign-in done: the v4 access token becomes a v3 session, so ratings and My list keep working as before. */
+    static void finishV4(Context c, String accessToken, String accountId) throws IOException, JSONException {
+        String old = session(c);
+        String session = post("/authentication/session/convert/4", new JSONObject().put("access_token", accessToken)).getString("session_id");
+        JSONObject acc = new JSONObject(call("GET", "/account?session_id=" + session, null));
+        sp(c).edit().putString("session", session).putInt("account", acc.getInt("id"))
+                .putString("name", acc.optString("username")).putString("v4_token", accessToken)
+                .putString("v4_account", accountId).remove("tk_lost").apply();
+        if (!old.isEmpty() && !old.equals(session)) {
+            new Thread(() -> {
+                try { call("DELETE", "/authentication/session", new JSONObject().put("session_id", old).toString()); }
+                catch (Exception ignored) {}
+            }).start();
+        }
+    }
 
     /** Step 1: a request token the person approves at themoviedb.org/authenticate/<token>. */
     static String requestToken() throws IOException, JSONException {
@@ -433,11 +459,45 @@ final class Tmdb {
         post("/list/" + list + "/add_item?session_id=" + session(c), new JSONObject().put("media_id", movie));
     }
 
-    static List<Title> seen(Context c) { return local(c, "seen"); }
+    /** Seen on the TV, then what tk:watched holds on the account that the TV doesn't have yet. */
+    static List<Title> seen(Context c) {
+        List<Title> out = local(c, "seen");
+        java.util.Set<String> have = new java.util.HashSet<>();
+        for (Title t : out) have.add(t.key());
+        for (Title t : local(c, "seen_remote")) if (have.add(t.key())) out.add(t);
+        return out;
+    }
+
+    /** Titles in tk:watched, replaced as a whole at every lists sync. */
+    static void setSeenRemote(Context c, List<Title> titles) {
+        JSONArray a = new JSONArray();
+        try {
+            for (Title t : titles) a.put(toJson(t));
+        } catch (JSONException ignored) {
+        }
+        sp(c).edit().putString("seen_remote", a.toString()).apply();
+    }
+
+    static boolean isSeenRemote(Context c, String key) {
+        for (Title t : local(c, "seen_remote")) if (t.key().equals(key)) return true;
+        return false;
+    }
 
     /** Episodes marked as seen on the TV, as "series:season:episode". */
     static boolean episodeSeen(Context c, int series, int season, int episode) {
         return sp(c).getStringSet("episodes", new java.util.HashSet<>()).contains(series + ":" + season + ":" + episode);
+    }
+
+    /** The season of the show's last episode marked as seen on the TV, or -1 when there is none. */
+    static int lastSeenSeason(Context c, int series) {
+        int best = -1;
+        for (String key : sp(c).getStringSet("episodes", new java.util.HashSet<>())) {
+            String[] p = key.split(":");
+            if (p.length == 3 && p[0].equals(String.valueOf(series))) {
+                try { best = Math.max(best, Integer.parseInt(p[1])); } catch (NumberFormatException ignored) {}
+            }
+        }
+        return best;
     }
 
     static void setEpisodeSeen(Context c, int series, int season, int episode, boolean on) {
@@ -446,22 +506,41 @@ final class Tmdb {
         if (on) all.add(key); else all.remove(key);
         sp(c).edit().putStringSet("episodes", all).apply();
     }
-    private static String seenRaw;
+    private static String seenRaw, remoteRaw;
     private static final java.util.Set<String> SEEN = new java.util.HashSet<>();
 
     /** Asked for every poster: the list is parsed again only when it changed. */
     static boolean isSeen(Context c, String kind, int id) {
-        String raw = sp(c).getString("seen", "[]");
+        String raw = sp(c).getString("seen", "[]"), remote = sp(c).getString("seen_remote", "[]");
         synchronized (SEEN) {
-            if (!raw.equals(seenRaw)) {
+            if (!raw.equals(seenRaw) || !remote.equals(remoteRaw)) {
                 SEEN.clear();
                 for (Title t : local(c, "seen")) SEEN.add(t.key());
+                for (Title t : local(c, "seen_remote")) SEEN.add(t.key());
                 seenRaw = raw;
+                remoteRaw = remote;
             }
             return SEEN.contains(kind + ":" + id);
         }
     }
-    static void setSeen(Context c, Title t, boolean on) { localSet(c, "seen", t, on); }
+    static void setSeen(Context c, Title t, boolean on) {
+        localSet(c, "seen", t, on);
+        if (!on && isSeenRemote(c, t.key())) {
+            List<Title> rest = local(c, "seen_remote");
+            rest.removeIf(x -> x.key().equals(t.key()));
+            setSeenRemote(c, rest);
+        }
+    }
+
+    static JSONObject toJson(Title x) throws JSONException {
+        return new JSONObject().put("kind", x.kind).put("id", x.id).put("name", x.name).put("poster", x.poster)
+                .put("backdrop", x.backdrop).put("year", x.year).put("vote", x.vote);
+    }
+
+    static Title fromJson(JSONObject o) throws JSONException {
+        return new Title(o.getString("kind"), o.getInt("id"), o.optString("name"), o.optString("poster"),
+                o.optString("backdrop"), o.optString("year"), o.optDouble("vote", 0));
+    }
 
     private static List<Title> local(Context c, String list) {
         List<Title> out = new ArrayList<>();
@@ -469,8 +548,7 @@ final class Tmdb {
             JSONArray a = new JSONArray(sp(c).getString(list, "[]"));
             for (int i = 0; i < a.length(); i++) {
                 JSONObject o = a.getJSONObject(i);
-                out.add(new Title(o.getString("kind"), o.getInt("id"), o.optString("name"), o.optString("poster"),
-                        o.optString("backdrop"), o.optString("year"), o.optDouble("vote", 0)));
+                out.add(fromJson(o));
             }
         } catch (JSONException ignored) {
         }
@@ -489,11 +567,15 @@ final class Tmdb {
         JSONArray a = new JSONArray();
         try {
             for (Title x : all.subList(0, Math.min(all.size(), 200))) {
-                a.put(new JSONObject().put("kind", x.kind).put("id", x.id).put("name", x.name).put("poster", x.poster)
-                        .put("backdrop", x.backdrop).put("year", x.year).put("vote", x.vote));
+                a.put(toJson(x));
             }
         } catch (JSONException ignored) {
         }
         sp(c).edit().putString(list, a.toString()).apply();
     }
+
+    /** Titles opened from Explore, newest first (its "Recents"), kept on the TV. */
+    static List<Title> opened(Context c) { return local(c, "opened"); }
+
+    static void noteOpened(Context c, Title t) { localSet(c, "opened", t, true); }
 }

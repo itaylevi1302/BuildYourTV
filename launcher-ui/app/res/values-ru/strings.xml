@@ -63,14 +63,12 @@
     <string name="couldnt_save_the_rating_prefix">"Не удалось сохранить оценку: "</string>
     <string name="couldnt_search_now_prefix">"Не удалось выполнить поиск: "</string>
     <string name="create">"Создать"</string>
-    <string name="created_by_prefix">"Создатели: "</string>
     <string name="crypto">"Криптовалюты"</string>
     <string name="dark">"Тёмная"</string>
     <string name="data_from_tmdb">"Данные TMDB"</string>
     <string name="decade">"%1$s-е"</string>
     <string name="details">"Подробнее"</string>
     <string name="died_prefix">"Дата смерти: "</string>
-    <string name="directed_by_prefix">"Режиссёр: "</string>
     <string name="directing">"Режиссура"</string>
     <string name="disconnect">"Отключить"</string>
     <string name="dollar">"Доллар"</string>
@@ -149,7 +147,6 @@
     <string name="language">"Язык"</string>
     <string name="light">"Светлая"</string>
     <string name="like_prefix">"Похожее на "</string>
-    <string name="list">"Список"</string>
     <string name="list_created">"Список создан"</string>
     <string name="list_name">"Название списка"</string>
     <string name="live_tv">"Телеканалы"</string>
@@ -369,7 +366,6 @@
     <string name="where_to_watch">"Где смотреть"</string>
     <string name="wi_fi_network">"Wi-Fi и сеть"</string>
     <string name="writing">"Сценарии"</string>
-    <string name="you_may_also_like">"Вам также может понравиться"</string>
     <string name="your_rating_for_prefix">"Ваша оценка для "</string>
     <string name="your_rating_prefix">"Ваша оценка: "</string>
     <string name="your_ratings">"Ваши оценки"</string>

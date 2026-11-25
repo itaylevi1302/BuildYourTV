@@ -57,13 +57,11 @@
     <string name="couldnt_save_the_rating_prefix">"לא ניתן לשמור את הדירוג: "</string>
     <string name="couldnt_search_now_prefix">"לא ניתן לחפש כרגע: "</string>
     <string name="create">"יצירה"</string>
-    <string name="created_by_prefix">"יוצרים: "</string>
     <string name="crypto">"קריפטו"</string>
     <string name="dark">"כהה"</string>
     <string name="data_from_tmdb">"מידע מ־TMDB"</string>
     <string name="details">"פרטים"</string>
     <string name="died_prefix">"נפטר/ה: "</string>
-    <string name="directed_by_prefix">"בימוי: "</string>
     <string name="directing">"בימוי"</string>
     <string name="disconnect">"ניתוק"</string>
     <string name="dollar">"דולר"</string>
@@ -120,7 +118,6 @@
     <string name="language">"שפה"</string>
     <string name="light">"בהיר"</string>
     <string name="like_prefix">"בדומה ל־"</string>
-    <string name="list">"רשימה"</string>
     <string name="list_created">"הרשימה נוצרה"</string>
     <string name="list_name">"שם הרשימה"</string>
     <string name="live_tv">"שידור חי"</string>
@@ -320,7 +317,6 @@
     <string name="where_to_watch">"איפה לצפות"</string>
     <string name="wi_fi_network">"רשת - WiFi"</string>
     <string name="writing">"כתיבה"</string>
-    <string name="you_may_also_like">"אולי יעניין אותך גם"</string>
     <string name="your_rating_for_prefix">"הדירוג שלך ל־"</string>
     <string name="your_rating_prefix">"הדירוג שלך: "</string>
     <string name="your_ratings">"הדירוגים שלך"</string>

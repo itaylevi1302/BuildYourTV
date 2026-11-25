@@ -71,6 +71,10 @@
         <intent>
             <action android:name="android.settings.MANAGE_APPLICATIONS_SETTINGS" />
         </intent>
+        <!-- Watch providers (docs/specs/provider.md, #106): apps whose ContentProvider answers "do you have this title?" for Where to watch. -->
+        <intent>
+            <action android:name="io.cleanyourtv.action.WATCH_PROVIDER" />
+        </intent>
     </queries>
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -157,14 +161,6 @@
 
         <activity
             android:name=".GridActivity"
-            android:process=":home"
-            android:exported="false"
-            android:screenOrientation="landscape"
-            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
-            android:theme="@style/CleanYourTV.Home" />
-
-        <activity
-            android:name=".SeasonActivity"
             android:process=":home"
             android:exported="false"
             android:screenOrientation="landscape"

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Open Movies</string>
+    <string name="subtitle">Four open movies from the Blender Foundation, free to watch and share (CC BY). CleanYourTV UI lists them under Where to watch.</string>
+    <string name="footer">Open movies by the Blender Foundation, www.blender.org, shared under Creative Commons Attribution (CC BY).</string>
+    <string name="loading">Loading %1$s…</string>
+    <string name="buffering">Loading…</string>
+    <string name="not_found">This film is not in Open Movies.</string>
+    <string name="play_error">Couldn\'t play this film. Check the TV\'s internet connection.</string>
+    <string name="film_meta">%1$d min · %2$s · %3$s</string>
+</resources>

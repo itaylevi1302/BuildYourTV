@@ -56,12 +56,10 @@
     <string name="couldnt_save_the_rating_prefix">"Impossible d\'enregistrer la note : "</string>
     <string name="couldnt_search_now_prefix">"Recherche impossible pour l\'instant : "</string>
     <string name="create">"Créer"</string>
-    <string name="created_by_prefix">"Créé par "</string>
     <string name="dark">"Sombre"</string>
     <string name="data_from_tmdb">"Données TMDB"</string>
     <string name="details">"Détails"</string>
     <string name="died_prefix">"Décès : "</string>
-    <string name="directed_by_prefix">"Réalisé par "</string>
     <string name="directing">"Réalisation"</string>
     <string name="disconnect">"Déconnecter"</string>
     <string name="ended">"Terminée"</string>
@@ -115,7 +113,6 @@
     <string name="language">"Langue"</string>
     <string name="light">"Clair"</string>
     <string name="like_prefix">"Similaires à "</string>
-    <string name="list">"Liste"</string>
     <string name="list_created">"Liste créée"</string>
     <string name="list_name">"Nom de la liste"</string>
     <string name="live_tv">"TV en direct"</string>
@@ -312,7 +309,6 @@
     <string name="where_to_watch">"Où regarder"</string>
     <string name="wi_fi_network">"Wi-Fi et réseau"</string>
     <string name="writing">"Scénario"</string>
-    <string name="you_may_also_like">"Vous aimerez aussi"</string>
     <string name="your_rating_for_prefix">"Votre note pour "</string>
     <string name="your_rating_prefix">"Votre note : "</string>
     <string name="your_ratings">"Vos notes"</string>

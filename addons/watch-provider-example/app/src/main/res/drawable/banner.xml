@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The TV banner: a play triangle on a film frame. Drawn for this add-on, no third-party art. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp" android:height="180dp"
+    android:viewportWidth="320" android:viewportHeight="180">
+    <path android:fillColor="#FF14202E" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="#FF1F3A57" android:pathData="M60,30h200v120h-200z" />
+    <path android:fillColor="#FFF2A33A" android:pathData="M142,66L142,114L186,90z" />
+    <path android:fillColor="#FF33475E"
+        android:pathData="M20,20h20v14h-20z M20,50h20v14h-20z M20,80h20v14h-20z M20,110h20v14h-20z M20,140h20v14h-20z M280,20h20v14h-20z M280,50h20v14h-20z M280,80h20v14h-20z M280,110h20v14h-20z M280,140h20v14h-20z" />
+</vector>

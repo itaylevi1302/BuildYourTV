@@ -2,10 +2,13 @@ package io.cleanyourtv.ui;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.content.pm.PackageManager;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -28,6 +31,8 @@ public class ServicesActivity extends Activity {
     private float k;
     private LinearLayout list;
     private final List<String[]> apps = new ArrayList<>();
+    private List<WatchProviders.Provider> watchProviders;   // the apps that offer Where to watch results; null until known
+    private List<Providers.Provider> lastProviders;         // what build() last showed, to build again after a change
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -47,9 +52,23 @@ public class ServicesActivity extends Activity {
         for (String[] a : HomeApps.launchable(this)) if (!a[0].equals(getPackageName())) apps.add(a);
         Collections.sort(apps, (a, b) -> a[1].toLowerCase(Locale.ROOT).compareTo(b[1].toLowerCase(Locale.ROOT)));
         build(null);
+        refreshWatchProviders(false);
+    }
+
+    /** Looks the apps up on a thread (it reads their manifests), then shows them; rebuilds even when the services are not in yet. */
+    private void refreshWatchProviders(boolean rebuild) {
+        new Thread(() -> {
+            List<WatchProviders.Provider> found = WatchProviders.found(this);
+            main.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                watchProviders = found;
+                if (rebuild || lastProviders != null) build(lastProviders);
+            });
+        }).start();
     }
 
     private void build(List<Providers.Provider> providers) {
+        lastProviders = providers;
         View focused = getCurrentFocus();
         Object focusTag = focused == null ? null : focused.getTag();
         list.removeAllViews();
@@ -67,6 +86,7 @@ public class ServicesActivity extends Activity {
                     Prefs.setShowAllProviders(!Prefs.showAllProviders());
                     build(providers);
                 }));
+        if (watchProviders != null && !watchProviders.isEmpty()) watchProvidersSection();
         if (providers == null) {
             TextView loading = TvUi.text(this, k, 26, Ui.regular, TvUi.DIM);
             loading.setText(Strings.get(R.string.loading_the_services));
@@ -87,6 +107,59 @@ public class ServicesActivity extends Activity {
         }
         View restore = focusTag == null ? null : list.findViewWithTag(focusTag);
         (restore != null ? restore : list.getChildAt(2)).requestFocus();
+    }
+
+    /** Settings for the apps that offer results in Where to watch: OK switches one on or off, left and right move it. */
+    private void watchProvidersSection() {
+        TextView head = TvUi.text(this, k, 32, Ui.semibold, TvUi.INK);
+        head.setText(Strings.get(R.string.watch_providers_section));
+        head.setPadding(0, Math.round(26 * k), 0, 0);
+        list.addView(head);
+        TextView hint = TvUi.text(this, k, 24, Ui.regular, TvUi.DIM);
+        hint.setText(Strings.get(R.string.watch_providers_hint));
+        hint.setPadding(0, Math.round(8 * k), 0, Math.round(16 * k));
+        list.addView(hint);
+        List<WatchProviders.Provider> shown = watchProviders;
+        for (WatchProviders.Provider p : shown) {
+            Drawable icon = null;
+            try {
+                icon = getPackageManager().getApplicationIcon(p.pkg);
+            } catch (PackageManager.NameNotFoundException ignored) {
+            }
+            View row = iconRow("wp:" + p.pkg, icon, p.label, p.state == WatchProviders.State.ON ? Strings.get(R.string.on) : Strings.get(R.string.off), v -> {
+                if (p.state == WatchProviders.State.ON) {
+                    WatchProviders.decide(p, false);
+                    refreshWatchProviders(true);
+                } else {
+                    askConsent(p);
+                }
+            });
+            row.setOnKeyListener((v, code, ev) -> {
+                if (ev.getAction() != KeyEvent.ACTION_DOWN) return false;
+                if (code != KeyEvent.KEYCODE_DPAD_LEFT && code != KeyEvent.KEYCODE_DPAD_RIGHT) return false;
+                int dir = (code == KeyEvent.KEYCODE_DPAD_LEFT) != Ui.he ? -1 : 1;   // mirrored in Hebrew, like the home screen
+                WatchProviders.move(shown, p, dir);
+                refreshWatchProviders(true);
+                return true;
+            });
+            list.addView(row);
+        }
+    }
+
+    /** The question the title page asks, again: Back records nothing. */
+    private void askConsent(WatchProviders.Provider p) {
+        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle(p.label)
+                .setMessage(Strings.get(R.string.watch_provider_consent, p.appLabel))
+                .setPositiveButton(Strings.get(R.string.allow), (d, w) -> {
+                    WatchProviders.decide(p, true);
+                    refreshWatchProviders(true);
+                })
+                .setNegativeButton(Strings.get(R.string.not_now), (d, w) -> {
+                    WatchProviders.decide(p, false);
+                    refreshWatchProviders(true);
+                })
+                .show();
     }
 
     private String value(Providers.Provider p) {
@@ -170,16 +243,25 @@ public class ServicesActivity extends Activity {
     }
 
     private View row(Object tag, String logo, String name, String value, View.OnClickListener click) {
+        return fullRow(tag, null, logo, name, value, click);
+    }
+
+    private View iconRow(Object tag, Drawable icon, String name, String value, View.OnClickListener click) {
+        return fullRow(tag, icon, null, name, value, click);
+    }
+
+    private View fullRow(Object tag, Drawable icon, String logo, String name, String value, View.OnClickListener click) {
         LinearLayout row = new LinearLayout(this);
         row.setTag(tag);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(Math.round(26 * k), Math.round(14 * k), Math.round(30 * k), Math.round(14 * k));
-        if (logo != null) {
+        if (logo != null || icon != null) {
             ImageView img = new ImageView(this);
             img.setClipToOutline(true);
             img.setBackground(TvUi.round(0x00000000, 10 * k));
-            Images.load(img, logo.isEmpty() ? null : Tmdb.LOGO + logo);
+            if (icon != null) img.setImageDrawable(icon);
+            else Images.load(img, logo.isEmpty() ? null : Tmdb.LOGO + logo);
             int s = Math.round(52 * k);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(s, s);
             lp.rightMargin = Math.round(22 * k);

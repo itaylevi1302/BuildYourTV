@@ -84,6 +84,13 @@ final class Providers {
         return out;
     }
 
+    /** The services' names as last fetched, never from the network: empty until the list was loaded once. */
+    static synchronized List<String> cachedNames() {
+        List<String> out = new ArrayList<>();
+        if (cached != null) for (Provider p : cached) out.add(p.name);
+        return out;
+    }
+
     /** The official app for a service name when it is installed, or null. */
     static String officialApp(Context c, String name) {
         String n = name.toLowerCase(Locale.ROOT);

@@ -56,7 +56,6 @@
     <string name="couldnt_save_the_rating_prefix">"Puan kaydedilemedi: "</string>
     <string name="couldnt_search_now_prefix">"Şu anda arama yapılamıyor: "</string>
     <string name="create">"Oluştur"</string>
-    <string name="created_by_prefix">"Yaratıcı: "</string>
     <string name="crypto">"Kripto"</string>
     <string name="dark">"Koyu"</string>
     <string name="data_from_tmdb">"TMDB verileri"</string>
@@ -64,7 +63,6 @@
     <string name="decade_back_vowel">"%1$s\'lar"</string>
     <string name="details">"Detaylar"</string>
     <string name="died_prefix">"Ölüm: "</string>
-    <string name="directed_by_prefix">"Yönetmen: "</string>
     <string name="directing">"Yönetmenlik"</string>
     <string name="disconnect">"Bağlantıyı kes"</string>
     <string name="dollar">"Dolar"</string>
@@ -139,7 +137,6 @@
     <string name="language">"Dil"</string>
     <string name="light">"Açık"</string>
     <string name="like_prefix">"Benzerleri: "</string>
-    <string name="list">"Liste"</string>
     <string name="list_created">"Liste oluşturuldu"</string>
     <string name="list_name">"Liste adı"</string>
     <string name="live_tv">"Canlı TV"</string>
@@ -341,7 +338,6 @@
     <string name="where_to_watch">"Nerede İzlenir?"</string>
     <string name="wi_fi_network">"Wi-Fi ve Ağ"</string>
     <string name="writing">"Senaryo"</string>
-    <string name="you_may_also_like">"Bunları da beğenebilirsiniz"</string>
     <string name="your_rating_for_prefix">"Puanınız: "</string>
     <string name="your_rating_prefix">"Puanınız: "</string>
     <string name="your_ratings">"Puanlarınız"</string>
