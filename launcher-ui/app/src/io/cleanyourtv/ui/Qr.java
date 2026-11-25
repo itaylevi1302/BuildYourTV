@@ -3,21 +3,22 @@ package io.cleanyourtv.ui;
 import java.nio.charset.StandardCharsets;
 
 /**
- * A QR code for a short text (the TMDB sign-in link): byte mode, error correction level M, versions 1 to 10.
+ * A QR code for a short text (the TMDB sign-in link): byte mode, error correction level M, versions 1 to 20
+ * (up to 485 bytes: TMDB's v4 sign-in link carries a long token).
  * Follows the ISO 18004 steps as Project Nayuki's QR Code generator lays them out (MIT).
  */
 final class Qr {
     final int size;
     private final boolean[][] modules, function;
 
-    private static final int[] ECC_PER_BLOCK = {-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26};
-    private static final int[] BLOCKS = {-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5};
+    private static final int[] ECC_PER_BLOCK = {-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26};
+    private static final int[] BLOCKS = {-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16};
 
     boolean dark(int x, int y) { return modules[y][x]; }
 
     static Qr encode(String text) {
         byte[] data = text.getBytes(StandardCharsets.UTF_8);
-        for (int ver = 1; ver <= 10; ver++) {
+        for (int ver = 1; ver < BLOCKS.length; ver++) {
             int capacity = dataCodewords(ver) * 8;
             int needed = 4 + (ver <= 9 ? 8 : 16) + data.length * 8;
             if (needed <= capacity) return new Qr(ver, data);
